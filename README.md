@@ -26,7 +26,7 @@ Basic models can be extended by subclassing `RecommenderModel` class and definin
 class CooccurenceModel(RecommenderModel):
     def __init__(self, *args, **kwargs):
         super(CooccurenceModel, self).__init__(*args, **kwargs)
-        self.method = 'item-to-item'
+        self.method = 'item-to-item' #pick some meaningful name
         
     def build(self):
         self._recommendations = None
