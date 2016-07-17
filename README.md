@@ -60,7 +60,7 @@ class CooccurenceModel(RecommenderModel):
         top_recs = self.get_topk_items(i2i_scores)
         return top_recs
 ```
-An the model is ready for evaluation:
+And the model is ready for evaluation:
 ```python
 i2i = CooccurenceModel(data_model)
 i2i.build()
