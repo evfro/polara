@@ -3,7 +3,29 @@ Polara is the first recommendation framework that allows a deeper analysis of re
 
 In addition to standard question of "how good a recommender system is at recommending relevant items", it allows assessing the ability of a recommender system to **avoid irrelevant recommendations** (thus, less likely to disappoint a user). You can read more about this idea in a reasearch paper [Fifty Shades of Ratings: How to Benefit from a Negative Feedback in Top-N Recommendations Tasks](http://arxiv.org/abs/1607.04228). The research results can be easily reproduced with this framework, visit a "fixed state" version of the code at https://github.com/Evfro/fifty-shades (there're also many usage examples).
 
-The framework also features efficient tensor-based implementation of an algorithm, proposed in the paper, that takes full advantage of the polarity-based formulation. Currently, there is an [online demo](http://coremodel.azurewebsites.net) (for test purposes only), that demonstrates the effect of taking into account feedback polarity. 
+The framework also features efficient tensor-based implementation of an algorithm, proposed in the paper, that takes full advantage of the polarity-based formulation. Currently, there is an [online demo](http://coremodel.azurewebsites.net) (for test purposes only), that demonstrates the effect of taking into account feedback polarity.
+
+
+## Prerequisites
+**Note:** Currently runs on python 2 only.
+
+The framework heavily depends on `Pandas, Numpy, Scipy` and `Numba` packages. It also is recommended (but not required) to have `mkl` installed for better performance. Visualization routines currently depend on `matplotlib` and `seaborn`. The easiest way to get all those at once is to use the latest [Anaconda distribution](https://www.continuum.io/downloads).
+
+In case you have created your own conda environment the following command can be used to ensure that all required dependencies are in place (see [this](http://conda.pydata.org/docs/commands/conda-install.html) for more info):
+
+`conda install --file conda_req.txt`
+
+Alternatively, a new conda environment named `polara_env` with all required packages can be created by:
+
+`conda create -n polara_env python=2.7 --file conda_req.txt`
+
+
+## Installation
+First, clone this repository to your local PC (`git clone git://github.com/evfro/polara.git`) and navigate to your local copy.
+Once in the root of the repository, run
+
+`python setup.py install`.
+
 
 ## Usage example
 A special effort was made to make a *recsys for humans*, which stresses on the ease of use of the framework. For example, that's how you build a pure SVD recommender on top of the [Movielens 1M](http://grouplens.org/datasets/movielens/) dataset:
@@ -27,32 +49,32 @@ class CooccurenceModel(RecommenderModel):
     def __init__(self, *args, **kwargs):
         super(CooccurenceModel, self).__init__(*args, **kwargs)
         self.method = 'item-to-item' #pick some meaningful name
-        
+
     def build(self):
         self._recommendations = None
         idx, val, shp = self.data.to_coo(tensor_mode=False)
         #np.ones_like makes feedback implicit
         user_item_matrix = sp.sparse.coo_matrix((np.ones_like(val), (idx[:, 0], idx[:, 1])),
                                           shape=shp, dtype=np.float64).tocsr()
-        
+
         i2i_matrix = user_item_matrix.T.dot(user_item_matrix)
         #exclude "self-links"
         diag_vals = i2i_matrix.diagonal()
         i2i_matrix -= sp.sparse.dia_matrix((diag_vals, 0), shape=i2i_matrix.shape)
         self._i2i_matrix = i2i_matrix
-        
+
     def get_recommendations(self):
         userid, itemid, feedback = self.data.fields
         test_data = self.data.test.testset
         i2i_matrix = self._i2i_matrix
-        
+
         idx = (test_data[userid], test_data[itemid])
         val = np.ones_like(test_data[feedback]) #make feedback implicit
         shp = (idx[0].max()+1, i2i_matrix.shape[0])
         test_matrix = sp.sparse.coo_matrix((val, idx), shape=shp,
                                            dtype=np.float64).tocsr()
         i2i_scores = test_matrix.dot(self._i2i_matrix).A
-        
+
         if self.filter_seen:
             #prevent seen items from appearing in recommendations
             self.downvote_seen_items(i2i_scores, idx)

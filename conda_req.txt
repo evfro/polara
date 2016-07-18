@@ -1,0 +1,10 @@
+# This file may be used to create an environment using:
+# $ conda create --name <env> --file <this file>
+
+numba>=0.21.0
+numpy>=1.10.1
+matplotlib>=1.4.3
+pandas>=0.17.1
+requests>=2.7.0
+scipy>=0.16.0
+seaborn>=0.6.0
