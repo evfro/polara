@@ -7,22 +7,21 @@ The framework also features efficient tensor-based implementation of an algorith
 
 
 ## Prerequisites
-**Note:** Currently runs on python 2 only.
+**Note:** Currently runs on python 2 only (python 3 support in plans).
 
-The framework heavily depends on `Pandas, Numpy, Scipy` and `Numba` packages. It also is recommended (but not required) to have `mkl` installed for better performance. Visualization routines currently depend on `matplotlib` and `seaborn`. The easiest way to get all those at once is to use the latest [Anaconda distribution](https://www.continuum.io/downloads).
+The framework heavily depends on `Pandas, Numpy, Scipy` and `Numba` packages. Better performance can be achieved with `mkl` (optional). It's also recommended to use `jupyter notebook` for experimentation. Visualization of results can be done with help of `matplotlib` and optionally `seaborn`. The easiest way to get all those at once is to use the latest [Anaconda distribution](https://www.continuum.io/downloads).
 
-In case you have created your own conda environment the following command can be used to ensure that all required dependencies are in place (see [this](http://conda.pydata.org/docs/commands/conda-install.html) for more info):
+If you use a separate conda environment for testing, the following command can be used to ensure that all required dependencies are in place (see [this](http://conda.pydata.org/docs/commands/conda-install.html) for more info):
 
 `conda install --file conda_req.txt`
 
-Alternatively, a new conda environment named `polara_env` with all required packages can be created by:
+Alternatively, a new conda environment with all required packages can be created by:
 
-`conda create -n polara_env python=2.7 --file conda_req.txt`
+`conda create -n <your_environment_name> python=2.7 --file conda_req.txt`
 
 
 ## Installation
-First, clone this repository to your local PC (`git clone git://github.com/evfro/polara.git`) and navigate to your local copy.
-Once in the root of the repository, run
+If you use specific conda environment, don't forget to activate it first with either `source activate <your_environment_name>` (Linux) or  `activate <your_environment_name>` (Windows). Clone this repository to your local machine (`git clone git://github.com/evfro/polara.git`). Once in the root of the newly created local repository, run
 
 `python setup.py install`.
 
