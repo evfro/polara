@@ -8,7 +8,7 @@ _packages = ["polara",
             "polara/tools",
             "polara/tools/mymedialite"]
 
-_libs = ["numpy", "scipy", "pandas" ,"numba", "requests", "matplotlib", "seaborn"]
+_libs = ["numpy", "scipy", "pandas", "numba", "requests", "matplotlib", "seaborn"]
 
 opts = dict(name="polara",
             description="Fast and flexible recommender framework",
@@ -18,7 +18,7 @@ opts = dict(name="polara",
             author="Evgeny Frolov",
             platforms=["any"],
             packages=_packages,
-            requires=_libs)
+            install_requires=_libs)
 
 
 if __name__ == '__main__':
