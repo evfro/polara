@@ -44,9 +44,13 @@ svd.evaluate()
 ## Creating new recommender models
 Basic models can be extended by subclassing `RecommenderModel` class and defining two required methods: `self.build()` and `self.get_recommendations()`. Here's an example of a simple item-to-item recommender model:
 ```python
-class CooccurenceModel(RecommenderModel):
+import scipy as sp
+import numpy as np
+from polara.recommender.models import RecommenderModel
+
+class CooccurrenceModel(RecommenderModel):
     def __init__(self, *args, **kwargs):
-        super(CooccurenceModel, self).__init__(*args, **kwargs)
+        super(CooccurrenceModel, self).__init__(*args, **kwargs)
         self.method = 'item-to-item' #pick some meaningful name
 
     def build(self):
@@ -83,7 +87,7 @@ class CooccurenceModel(RecommenderModel):
 ```
 And the model is ready for evaluation:
 ```python
-i2i = CooccurenceModel(data_model)
+i2i = CooccurrenceModel(data_model)
 i2i.build()
 i2i.evaluate()
 ```
