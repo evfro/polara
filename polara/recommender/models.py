@@ -177,6 +177,47 @@ class NonPersonalized(RecommenderModel):
         return top_recs
 
 
+class CooccurrenceModel(RecommenderModel):
+
+    def __init__(self, *args, **kwargs):
+        super(CooccurrenceModel, self).__init__(*args, **kwargs)
+        self.method = 'item-to-item' #pick some meaningful name
+
+
+    def build(self):
+        self._recommendations = None
+        idx, val, shp = self.data.to_coo(tensor_mode=False)
+        #np.ones_like makes feedback implicit
+        user_item_matrix = sp.sparse.coo_matrix((np.ones_like(val), (idx[:, 0], idx[:, 1])),
+                                          shape=shp, dtype=np.float64).tocsr()
+
+        i2i_matrix = user_item_matrix.T.dot(user_item_matrix)
+        #exclude "self-links"
+        diag_vals = i2i_matrix.diagonal()
+        i2i_matrix -= sp.sparse.dia_matrix((diag_vals, 0), shape=i2i_matrix.shape)
+        self._i2i_matrix = i2i_matrix
+
+
+    def get_recommendations(self):
+        userid, itemid, feedback = self.data.fields
+        test_data = self.data.test.testset
+        i2i_matrix = self._i2i_matrix
+
+        idx = (test_data[userid], test_data[itemid])
+        val = np.ones_like(test_data[feedback]) #make feedback implicit
+        shp = (idx[0].max()+1, i2i_matrix.shape[0])
+        test_matrix = sp.sparse.coo_matrix((val, idx), shape=shp,
+                                           dtype=np.float64).tocsr()
+        i2i_scores = test_matrix.dot(self._i2i_matrix).A
+
+        if self.filter_seen:
+            #prevent seen items from appearing in recommendations
+            self.downvote_seen_items(i2i_scores, idx)
+
+        top_recs = self.get_topk_items(i2i_scores)
+        return top_recs
+
+
 class SVDModel(RecommenderModel):
 
     def __init__(self, *args, **kwargs):
