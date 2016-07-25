@@ -23,6 +23,7 @@ mlrank = (13, 10, 2)
 growth_tol = 0.0001
 num_iters = 25
 show_output = False
+prediction_slice = -1
 
 #RECOMMENDATIONS
 topk = 10 #number of items to return
