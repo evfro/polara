@@ -275,10 +275,19 @@ class CoffeeModel(RecommenderModel):
         self.mlrank = defaults.mlrank
         self.chunk = defaults.test_chunk_size
         self.method = 'CoFFee'
-        self.smooth_prediction = defaults.smooth_prediction
+        self._prediction_slice = defaults.prediction_slice
         self.growth_tol = defaults.growth_tol
         self.num_iters = defaults.num_iters
         self.show_output = defaults.show_output
+
+
+    @property
+    def prediction_slice(self):
+        return self._prediction_slice
+
+    @prediction_slice.setter
+    def prediction_slice(self, ind):
+        self._prediction_slice = ind
 
 
     def build(self):
@@ -331,13 +340,10 @@ class CoffeeModel(RecommenderModel):
             slice_scores = np.tensordot(slice_scores, v, axes=(1, 0))
             slice_scores = np.tensordot(np.tensordot(slice_scores, v, axes=(2, 1)), w, axes=(1, 1))
 
-            if self.predict_negative: #predict low ratings
-                predicted_scores = slice_scores[:, :, :2].sum(axis=-1)
-            else:
-                if self.smooth_prediction :
-                    predicted_scores = slice_scores[:, :, -2:].sum(axis=-1)
-                else:
-                    predicted_scores = slice_scores[:, :, -1]
+            slicer = self.prediction_slice
+            predicted_scores = slice_scores[:, :, slicer]
+            if isinstance(slicer, slice):
+                predicted_scores = predicted_scores.sum(axis=-1)
 
             coffee_scores[start:stop, :] = predicted_scores
 
