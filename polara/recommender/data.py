@@ -12,14 +12,19 @@ class RecommenderData(object):
     # ('test_ratio', 'holdout_size', 'test_fold', 'shuffle_data',
     #             'test_sample', 'permute_tops', 'random_holdout', 'negative_prediction')
 
-    def __init__(self, data, userid, itemid, feedback):
+    def __init__(self, data, userid, itemid, feedback, custom_order=None):
         self.name = None
         if data.duplicated([userid, itemid]).any():
             #unstable in pandas v. 17.0, only works in <> v.17.0
             #rely on deduplicated data in many places - makes data processing more efficient
             raise NotImplementedError('Data has duplicate values')
 
-        self._data = data[[userid, itemid, feedback]].copy()
+        fields_selection = [userid, itemid, feedback]
+        self._custom_order = custom_order
+        if self._custom_order:
+            fields_selection.append(self._custom_order)
+
+        self._data = data[fields_selection].copy()
         self.fields = namedtuple('Fields', self._std_fields)
         self.fields = self.fields._make(map(eval, self._std_fields))
         self.index = namedtuple('DataIndex', self._std_fields)
@@ -263,7 +268,7 @@ class RecommenderData(object):
         training_selection = left_condition | right_condition
         test_selection = ~training_selection
 
-        self._training = self._data[training_selection].copy()
+        self._training = self._data.loc[training_selection, list(self.fields)].copy()
         self._test = self._data[test_selection].copy()
 
 
@@ -346,7 +351,8 @@ class RecommenderData(object):
         else:
             test_data = self._test
 
-        eval_grouper = test_data.groupby(userid, sort=False)[feedback]
+        order_field = self._custom_order or feedback
+        eval_grouper = test_data.groupby(userid, sort=False)[order_field]
 
         if self.random_holdout: #randomly sample data for evaluation
             eval_idx = eval_grouper.apply(random_choice, lastn).index.get_level_values(1)
