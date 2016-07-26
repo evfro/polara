@@ -355,12 +355,13 @@ class RecommenderData(object):
         eval_grouper = test_data.groupby(userid, sort=False)[order_field]
 
         if self.random_holdout: #randomly sample data for evaluation
-            eval_idx = eval_grouper.apply(random_choice, lastn).index.get_level_values(1)
+            eval_data = eval_grouper.apply(random_choice, lastn)
         elif self.negative_prediction: #try to holdout negative only examples
-            eval_idx = eval_grouper.nsmallest(lastn).index.get_level_values(1)
+            eval_data = eval_grouper.nsmallest(lastn)
         else: #standard top-score prediction mode
-            eval_idx = eval_grouper.nlargest(lastn).index.get_level_values(1)
+            eval_data = eval_grouper.nlargest(lastn)
 
+        eval_idx = eval_data.index.get_level_values(1)
         #ensure correct sorting of users in test and eval - order must be the same
         evalset = test_data.loc[eval_idx].sort_values(userid)
         testset = test_data[~test_data.index.isin(eval_idx)].sort_values(userid)
