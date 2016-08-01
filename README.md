@@ -91,3 +91,33 @@ i2i = CooccurrenceModel(data_model)
 i2i.build()
 i2i.evaluate()
 ```
+
+## Custom pipelines
+Polara by default takes care of raw data and helps to organize full evaluation pipeline, that includes splitting data into training, test and evaluation datasets, performing cross-validation and gathering results. However, if you need more control on that workflow, you can easily implement your custom  usage scenario for you own needs.
+
+### Build models without evaluation
+If you simply want to build a model on pre-processed data, then you only need to define a training set. This can be easily achived with the following lines of code (assuming you have a pandas dataframe named `train_data` with corresponding "user", "item" and "rating" columns):
+```python
+data_model = RecommenderData(train_data, 'user', 'item', 'rating')
+# mind underscores for training and test attributes,
+# this ensures no automated data-processing triggers are activated
+data_model._training = data_model._data
+data_model._test = None
+```
+Now you are ready to build your models (as in examples above) and export them to whatever workflow you currently have.
+
+### Cold-start and known-user scenarios
+By default polara makes testset and trainset disjoint by users, which allows to evaluate models against both *user cold-start* and more common *known user* scenarios (see the paper mentioned above for explanation).
+However in some situations (for example, when polara is used within a larger pipeline) you might want to implement strictly a *known user* scenario to assess the quality of your recommender system on the unseen (held-out) items for those known users. In that case your test users are exactly the same as training users. Assuming that you have prepared both training (`train_data` dataframe) and evaluation data (`test_data` dataframe), the goal can be achieved with the following code:
+```python
+from collections import namedtuple
+
+data_model = RecommenderData(train_data, 'user', 'item', 'rating')
+data_model._training = data_model._data
+testset = data_model._data
+evalset = test_data
+#the number of held-out items in evaluation set must be constant
+data_model._holdout_size = #<number of held-out items in evaluation set>
+data_model._test = namedtuple('TestData', 'testset evalset')._make([testset, evalset])
+```
+Now you can build recommender models and evaluate them within polara framework.
