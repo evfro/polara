@@ -275,19 +275,36 @@ class CoffeeModel(RecommenderModel):
         self.mlrank = defaults.mlrank
         self.chunk = defaults.test_chunk_size
         self.method = 'CoFFee'
-        self._prediction_slice = defaults.prediction_slice
+        self.flattener = defaults.flattener
         self.growth_tol = defaults.growth_tol
         self.num_iters = defaults.num_iters
         self.show_output = defaults.show_output
 
 
-    @property
-    def prediction_slice(self):
-        return self._prediction_slice
-
-    @prediction_slice.setter
-    def prediction_slice(self, ind):
-        self._prediction_slice = ind
+    @staticmethod
+    def flatten_scores(tensor_scores, flattener=None):
+        flattener = flattener or slice(None)
+        if isinstance(flattener, str):
+            slicer = slice(None)
+            flatten = getattr(np, flattener)
+            matrix_scores = flatten(tensor_scores[:, :, slicer], axis=-1)
+        elif isinstance(flattener, int):
+            slicer = flattener
+            matrix_scores = tensor_scores[:, :, slicer]
+        elif isinstance(flattener, list) or isinstance(flattener, slice):
+            slicer = flattener
+            flatten = np.sum
+            matrix_scores = flatten(tensor_scores[:, :, slicer], axis=-1)
+        elif isinstance(flattener, tuple):
+            slicer, flatten_method = flattener
+            slicer = slicer or slice(None)
+            flatten = getattr(np, flatten_method)
+            matrix_scores = flatten(tensor_scores[:, :, slicer], axis=-1)
+        elif callable(flattener):
+            matrix_scores = flattener(tensor_scores)
+        else:
+            raise ValueError('Unrecognized value for flattener attribute')
+        return matrix_scores
 
 
     def build(self):
@@ -331,6 +348,7 @@ class CoffeeModel(RecommenderModel):
 
         coffee_scores = np.empty((test_shp[0], test_shp[1]))
         chunk = self.chunk
+        flattener = self.flattener
         for i in xrange(0, test_shp[0], chunk):
             start = i
             stop = min(i+chunk, test_shp[0])
@@ -340,12 +358,7 @@ class CoffeeModel(RecommenderModel):
             slice_scores = np.tensordot(slice_scores, v, axes=(1, 0))
             slice_scores = np.tensordot(np.tensordot(slice_scores, v, axes=(2, 1)), w, axes=(1, 1))
 
-            slicer = self.prediction_slice
-            predicted_scores = slice_scores[:, :, slicer]
-            if isinstance(slicer, slice):
-                predicted_scores = predicted_scores.sum(axis=-1)
-
-            coffee_scores[start:stop, :] = predicted_scores
+            coffee_scores[start:stop, :] = self.flatten_scores(slice_scores, flattener)
 
         if self.filter_seen:
             #prevent seen items from appearing in recommendations

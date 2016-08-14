@@ -23,11 +23,10 @@ mlrank = (13, 10, 2)
 growth_tol = 0.0001
 num_iters = 25
 show_output = False
-prediction_slice = -1
+flattener = -1
 
 #RECOMMENDATIONS
 topk = 10 #number of items to return
-smooth_prediction = True #mix scores for positive feedback, e.g. 5 -> 4+5
 filter_seen = True #prevent seen items from appearing in recommendations
 
 
