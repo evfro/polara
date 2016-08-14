@@ -275,10 +275,22 @@ class CoffeeModel(RecommenderModel):
         self.mlrank = defaults.mlrank
         self.chunk = defaults.test_chunk_size
         self.method = 'CoFFee'
-        self.flattener = defaults.flattener
+        self._flattener = defaults.flattener
         self.growth_tol = defaults.growth_tol
         self.num_iters = defaults.num_iters
         self.show_output = defaults.show_output
+
+
+    @property
+    def flattener(self):
+        return self._flattener
+
+    @flattener.setter
+    def flattener(self, new_value):
+        old_value = self._flattener
+        if new_value != old_value:
+            self._flattener = new_value
+            self._recommendations = None
 
 
     @staticmethod
