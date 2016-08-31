@@ -257,9 +257,6 @@ class RecommenderData(object):
             #raise NotImplementedError('Users are not uniformly ordered! Unable to split test set reliably.')
 
         user_sessions_len = user_sessions.size()
-        if (user_sessions_len <= self._holdout_size).any():
-            raise NotImplementedError('Some users have not enough items for evaluation')
-
         user_num = user_sessions_len.size #number of unique users
         test_user_num = user_num * self._test_ratio
 
@@ -270,6 +267,11 @@ class RecommenderData(object):
 
         self._training = self._data.loc[training_selection, list(self.fields)].copy()
         self._test = self._data[test_selection].copy()
+
+        short_sessions = user_sessions_len.index[user_sessions_len <= self._holdout_size]
+        if self._test[userid].isin(short_sessions).any():
+            #TODO: maybe simply ignore those users? What to do if becomes empty?
+            raise NotImplementedError('Some test users have not enough items for evaluation')
 
 
     def _reindex_data(self):
