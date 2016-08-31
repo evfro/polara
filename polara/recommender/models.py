@@ -229,13 +229,14 @@ class SVDModel(RecommenderModel):
     def build(self):
         self._recommendations = None
         idx, val, shp = self.data.to_coo(tensor_mode=False)
-        tik = timer()
         svd_matrix = sp.sparse.coo_matrix((val, (idx[:, 0], idx[:, 1])),
                                           shape=shp, dtype=np.float64).tocsr()
+
+        tik = timer()
+        _, _, items_factors = svds(svd_matrix, k=self.rank, return_singular_vectors='vh')
         tok = timer() - tik
         print '{} model training time: {}s'.format(self.method, tok)
 
-        _, _, items_factors = svds(svd_matrix, k=self.rank, return_singular_vectors='vh')
         self._items_factors = np.ascontiguousarray(items_factors[::-1, :])
 
 
