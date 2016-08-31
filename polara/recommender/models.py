@@ -116,6 +116,12 @@ class RecommenderModel(object):
 
 
     @staticmethod
+    def topsort(a, topk):
+        parted = np.argpartition(a, -topk)[-topk:]
+        return parted[np.argsort(-a[parted])]
+
+
+    @staticmethod
     def downvote_seen_items(recs, idx_seen, min_value=None):
         idx_seen_flat = np.ravel_multi_index(idx_seen, recs.shape)
         min_value = min_value or recs.min()-1
@@ -124,7 +130,7 @@ class RecommenderModel(object):
 
     def get_topk_items(self, scores):
         topk = self.topk
-        recs = np.argsort(scores, axis=1)[:, :-topk-1:-1]
+        recs = np.apply_along_axis(topsort, 1, scores, topk)
         return recs
 
 
