@@ -1,5 +1,6 @@
 from polara.recommender.models import SVDModel
 from subprocess import call
+from shlex import split
 from os.path import join as join_path
 import sys
 import pandas as pd
@@ -104,7 +105,7 @@ class MyMediaLiteWrapper(SVDModel):
             user_mapping=self.user_mapping_file,
             item_mapping=self.item_mapping_file)
 
-        return call(run_command) if not debug else run_command
+        return call(split(run_command)) if not debug else run_command
 
 
     @staticmethod
