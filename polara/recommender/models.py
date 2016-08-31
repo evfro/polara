@@ -130,7 +130,8 @@ class RecommenderModel(object):
 
     def get_topk_items(self, scores):
         topk = self.topk
-        recs = np.apply_along_axis(topsort, 1, scores, topk)
+        # apply_along_axis is more memory efficient then argsort on full array
+        recs = np.apply_along_axis(self.topsort, 1, scores, topk)
         return recs
 
 
