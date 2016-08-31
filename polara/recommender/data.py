@@ -205,7 +205,7 @@ class RecommenderData(object):
         self._split_eval_data()
 
         self._has_changed = True
-        #TODO implement operations with this container
+        #TODO implement operations with this property container
 
 
     def update(self):
@@ -234,7 +234,7 @@ class RecommenderData(object):
 
         user_sessions = self._data.groupby(userid, sort=True) #KEEP TRUE HERE!!!!
         # if False than long sessions idx are prevalent in the beginning => non-equal size folds
-        # this is accounted for with help of is_not_uniform function
+        # this effect is taken into account with help of is_not_uniform function
         # example (run several times to see a pattern):
         # df = pd.DataFrame(index=range(10),
         #                    data={'A':list('abbcceefgg'),
