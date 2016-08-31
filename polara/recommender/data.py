@@ -301,26 +301,27 @@ class RecommenderData(object):
 
 
     def _align_test_items(self):
-        #TODO: add option to filter by whole sessions, not just items
         items_index = self.index.itemid.set_index('old')
         itemid = self.fields.itemid
-
+        #this changes int to float dtype if NaN values exist:
         self._test.loc[:, itemid] = items_index.loc[self._test[itemid].values, 'new'].values
         # need to filter those items which were not in the training set
-        unseen_items_num = self._test[itemid].isnull().sum()
-
-        if unseen_items_num > 0:
-            #'%i unseen items found in the test set. Dropping...' % unseen_items_num
+        unseen_items = self._test[itemid].isnull()
+        if unseen_items.any():
             userid = self.fields.userid
-            self._test.dropna(axis=0, subset=[itemid], inplace=True)
-
+            test_data = self._test[~unseen_items]
             # there could be insufficient data now - check again
-            valid_users_sel = self._test.groupby(userid, sort=False).size() > self._holdout_size
-            if (~valid_users_sel).any():
-                raise NotImplementedError('Some users have not enough items for evaluation')
+            valid_users_sel = test_data.groupby(userid, sort=False).size() > self._holdout_size
+            if not valid_users_sel.all():
+                nfiltered = (~valid_users_sel).sum()
+                valid_users_sel = valid_users_sel[valid_users_sel]
+                print '{} test users filtered due to insufficient number of seen items.'.format(nfiltered)
+            else:
+                print '{} unseen items filtered from testset.'.format(unseen_items.sum())
             valid_users_idx = valid_users_sel.index[valid_users_sel]
 
-            self._test = self._test.loc[self._test[userid].isin(valid_users_idx)]
+            self._test = test_data.loc[test_data[userid].isin(valid_users_idx)].copy()
+            #force int dtype after filtering NaNs
             self._test[itemid] = self._test[itemid].astype(np.int64)
             #reindex the test userids as they were filtered
             new_test_idx = self.reindex(self._test, userid, sort=False, inplace=True)
