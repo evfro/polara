@@ -189,6 +189,7 @@ class CooccurrenceModel(RecommenderModel):
     def __init__(self, *args, **kwargs):
         super(CooccurrenceModel, self).__init__(*args, **kwargs)
         self.method = 'item-to-item' #pick some meaningful name
+        self.implicit = True
 
 
     def build(self):
@@ -211,7 +212,9 @@ class CooccurrenceModel(RecommenderModel):
         i2i_matrix = self._i2i_matrix
 
         idx = (test_data[userid], test_data[itemid])
-        val = np.ones_like(test_data[feedback]) #make feedback implicit
+        val = test_data[feedback].values
+        if self.implicit:
+            val = np.ones_like(val)
         shp = (idx[0].max()+1, i2i_matrix.shape[0])
         test_matrix = sp.sparse.coo_matrix((val, idx), shape=shp,
                                            dtype=np.float64).tocsr()
