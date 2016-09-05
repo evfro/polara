@@ -11,6 +11,7 @@ from timeit import default_timer as timer
 
 class RecommenderModel(object):
     _config = ('topk', 'filter_seen', 'switch_positive', 'predict_negative')
+    _pad_const = -1
 
     def __init__(self, recommender_data):
 
@@ -122,16 +123,55 @@ class RecommenderModel(object):
 
 
     @staticmethod
-    def downvote_seen_items(recs, idx_seen, min_value=None):
-        idx_seen_flat = np.ravel_multi_index(idx_seen, recs.shape)
-        min_value = min_value or recs.min()-1
-        np.put(recs, idx_seen_flat, min_value)
+    def downvote_seen_items(recs, idx_seen, sparse=False):
+        penalty = recs.min() + 1
+
+        if sp.sparse.isspare(recs):
+        '''
+        No need to create 2 idx sets form idx lists.
+        When creating a set have to iterate over list (O(n)).
+        Intersecting set with list gives the same O(n).
+        So there's no performance gain in converting large list into set!
+        Moreover, large set creates additional memory overhead.
+        Hence, need only to create set from the test idx and calc intersection.
+        '''
+            recs_idx = pd.lib.fast_zip(list(recs.nonzero())) #larger
+            seen_idx = pd.lib.fast_zip(list(idx_seen)) #smaller
+            idx_seen_bool = np.in1d(recs_idx, set(seen_idx))
+            recs.data[idx_seen_bool] -= penalty
+        else:
+            idx_seen_flat = np.ravel_multi_index(idx_seen, recs.shape)
+            recs.flat[idx_seen_flat] -= penalty
 
 
     def get_topk_items(self, scores):
         topk = self.topk
+        if sp.sparse.isspare(scores):
+            # there can be less then topk values in some rows
+            # need to extend sorted scores to conform with evaluation matrix shape
+            # can do this by adding -1's to the right, however:
+            # this relies on the fact that there are no -1's in evaluation matrix
+            # NOTE need to ensure that this is always true
+            def topscore(x, k):
+                data = x.data.values
+                cols = x.cols.values
+                nnz = len(data)
+                if k >= nnz:
+                    cols_sorted = cols[np.argsort(-data)]
+                    # need to pad values to conform with evaluation matrix shape
+                    res = np.pad(cols_sorted, (0, k-nnz), 'constant', constant_values=self._pad_const)
+                else:
+                    # TODO verify, that even if k is relatively small, then
+                    # argpartition doesn't add too much overhead?
+                    res = cols[self.topsort(data, k)]
+                return res
+
+            idx = scores.nonzero()
+            row_data = pd.Series({'data': scores.data, 'cols': idx[1]}).groupby(idx[0], sort=True)
+            recs = np.asarray(row_data.apply(topscore, topk).tolist())
+        else:
         # apply_along_axis is more memory efficient then argsort on full array
-        recs = np.apply_along_axis(self.topsort, 1, scores, topk)
+            recs = np.apply_along_axis(self.topsort, 1, scores, topk)
         return recs
 
 
@@ -211,14 +251,14 @@ class CooccurrenceModel(RecommenderModel):
         test_data = self.data.test.testset
         i2i_matrix = self._i2i_matrix
 
-        idx = (test_data[userid], test_data[itemid])
+        idx = (test_data[userid].values, test_data[itemid].values)
         val = test_data[feedback].values
         if self.implicit:
             val = np.ones_like(val)
         shp = (idx[0].max()+1, i2i_matrix.shape[0])
         test_matrix = sp.sparse.coo_matrix((val, idx), shape=shp,
                                            dtype=np.float64).tocsr()
-        i2i_scores = test_matrix.dot(self._i2i_matrix).A
+        i2i_scores = test_matrix.dot(self._i2i_matrix)
 
         if self.filter_seen:
             #prevent seen items from appearing in recommendations
