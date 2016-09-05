@@ -166,7 +166,7 @@ class RecommenderModel(object):
                 return res
 
             idx = scores.nonzero()
-            row_data = pd.Series({'data': scores.data, 'cols': idx[1]}).groupby(idx[0], sort=True)
+            row_data = pd.DataFrame({'data': scores.data, 'cols': idx[1]}).groupby(idx[0], sort=True)
             recs = np.asarray(row_data.apply(topscore, topk).tolist())
         else:
         # apply_along_axis is more memory efficient then argsort on full array
