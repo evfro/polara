@@ -1,5 +1,6 @@
 from polara.recommender import data, defaults
 from polara.recommender.evaluation import get_hits, get_relevance_scores, get_ranking_scores
+import pandas as pd
 import numpy as np
 import scipy as sp
 import scipy.sparse
@@ -126,7 +127,7 @@ class RecommenderModel(object):
     def downvote_seen_items(recs, idx_seen, sparse=False):
         penalty = recs.min() + 1
 
-        if sp.sparse.isspare(recs):
+        if sp.sparse.issparse(recs):
         # No need to create 2 idx sets form idx lists.
         # When creating a set have to iterate over list (O(n)).
         # Intersecting set with list gives the same O(n).
@@ -144,7 +145,7 @@ class RecommenderModel(object):
 
     def get_topk_items(self, scores):
         topk = self.topk
-        if sp.sparse.isspare(scores):
+        if sp.sparse.issparse(scores):
             # there can be less then topk values in some rows
             # need to extend sorted scores to conform with evaluation matrix shape
             # can do this by adding -1's to the right, however:
