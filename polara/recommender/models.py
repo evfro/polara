@@ -127,14 +127,12 @@ class RecommenderModel(object):
         penalty = recs.min() + 1
 
         if sp.sparse.isspare(recs):
-        '''
-        No need to create 2 idx sets form idx lists.
-        When creating a set have to iterate over list (O(n)).
-        Intersecting set with list gives the same O(n).
-        So there's no performance gain in converting large list into set!
-        Moreover, large set creates additional memory overhead.
-        Hence, need only to create set from the test idx and calc intersection.
-        '''
+        # No need to create 2 idx sets form idx lists.
+        # When creating a set have to iterate over list (O(n)).
+        # Intersecting set with list gives the same O(n).
+        # So there's no performance gain in converting large list into set!
+        # Moreover, large set creates additional memory overhead.
+        # Hence, need only to create set from the test idx and calc intersection.
             recs_idx = pd.lib.fast_zip(list(recs.nonzero())) #larger
             seen_idx = pd.lib.fast_zip(list(idx_seen)) #smaller
             idx_seen_bool = np.in1d(recs_idx, set(seen_idx))
