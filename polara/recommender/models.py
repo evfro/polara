@@ -235,7 +235,9 @@ class CooccurrenceModel(RecommenderModel):
         self._recommendations = None
         idx, val, shp = self.data.to_coo(tensor_mode=False)
         #np.ones_like makes feedback implicit
-        user_item_matrix = sp.sparse.coo_matrix((np.ones_like(val), (idx[:, 0], idx[:, 1])),
+        if self.implicit:
+            val = np.ones_like(val)
+        user_item_matrix = sp.sparse.coo_matrix((val, (idx[:, 0], idx[:, 1])),
                                           shape=shp, dtype=np.float64).tocsr()
 
         i2i_matrix = user_item_matrix.T.dot(user_item_matrix)
