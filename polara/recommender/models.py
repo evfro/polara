@@ -428,9 +428,11 @@ class CoffeeModel(RecommenderModel):
         item_idx = self.data.test.testset.loc[:, itemid].values.astype(np.int64)
         fdbk_idx = self.data.test.testset.loc[:, feedback].values
 
-        fdbk_idx = self.data.index.feedback.set_index('old').loc[fdbk_idx, 'new'].values.astype(np.int64)
+        fdbk_idx = self.data.index.feedback.set_index('old').loc[fdbk_idx, 'new'].values
         if np.isnan(fdbk_idx).any():
             raise NotImplementedError('Not all values of feedback are present in training data')
+        else:
+            fdbk_idx = fdbk_idx.astype(np.int64)
 
         idx_data = (user_idx, item_idx, fdbk_idx)
         idx_flat = np.ravel_multi_index(idx_data, test_shp)
