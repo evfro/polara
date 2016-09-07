@@ -14,12 +14,13 @@ class RecommenderData(object):
 
     def __init__(self, data, userid, itemid, feedback, custom_order=None):
         self.name = None
-        if data.duplicated([userid, itemid]).any():
+        fields_selection = [userid, itemid, feedback]
+
+        if data.duplicated(fields_selection).any():
             #unstable in pandas v. 17.0, only works in <> v.17.0
             #rely on deduplicated data in many places - makes data processing more efficient
             raise NotImplementedError('Data has duplicate values')
 
-        fields_selection = [userid, itemid, feedback]
         self._custom_order = custom_order
         if self._custom_order:
             fields_selection.append(self._custom_order)
@@ -277,6 +278,7 @@ class RecommenderData(object):
     def _reindex_data(self):
         userid, itemid, feedback = self.fields
         reindex = self.reindex
+        # remove any gaps in user idx, start from 0 (both for training and test)
         user_index = [reindex(data, userid, sort=False) for data in [self._training, self._test]]
         user_index = namedtuple('UserIndex', 'training test')._make(user_index)
         self.index = self.index._replace(userid=user_index)
