@@ -266,10 +266,15 @@ class CooccurrenceModel(RecommenderModel):
         user_item_matrix = sp.sparse.coo_matrix((val, (idx[:, 0], idx[:, 1])),
                                           shape=shp, dtype=np.float64).tocsr()
 
+        tik = timer()
         i2i_matrix = user_item_matrix.T.dot(user_item_matrix)
+
         #exclude "self-links"
         diag_vals = i2i_matrix.diagonal()
         i2i_matrix -= sp.sparse.dia_matrix((diag_vals, 0), shape=i2i_matrix.shape)
+        tok = timer() - tik
+        print '{} model training time: {}s'.format(self.method, tok)
+
         self._i2i_matrix = i2i_matrix
 
 
