@@ -23,7 +23,6 @@ class RecommenderModel(object):
         self._topk = defaults.get_config(['topk'])['topk']
         self.filter_seen  = defaults.get_config(['filter_seen'])['filter_seen']
         self.switch_positive  = defaults.get_config(['switch_positive'])['switch_positive']
-        self.predict_negative = defaults.get_config(['predict_negative'])['predict_negative']
 
 
     @property
@@ -332,12 +331,6 @@ class SVDModel(RecommenderModel):
 
         svd_scores = (test_matrix.dot(v.T)).dot(v)
 
-        if self.predict_negative:
-            # this is incompatible with self.filter_seen=True
-            # as lowest scores will always return seen values in that case
-            if self.filter_seen:
-                print 'You should disable filter_seen to get reliable results with predict_negative'
-            svd_scores = -svd_scores
 
         if self.filter_seen:
             #prevent seen items from appearing in recommendations
