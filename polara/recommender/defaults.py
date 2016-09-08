@@ -15,6 +15,7 @@ negative_prediction = False #put negative feedback into evaluation set
 
 #MODELS
 switch_positive = 4 #ratings below are treated as negative feedback
+verify_integrity = True
 #svd
 svd_rank = 10
 #coffee
