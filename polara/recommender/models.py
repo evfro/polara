@@ -257,7 +257,6 @@ class CooccurrenceModel(RecommenderModel):
         super(CooccurrenceModel, self).__init__(*args, **kwargs)
         self.method = 'item-to-item' #pick some meaningful name
         self.implicit = True
-        self.dense_scores = False
 
 
     def build(self):
@@ -291,17 +290,6 @@ class CooccurrenceModel(RecommenderModel):
         i2i_scores = test_matrix.dot(self._i2i_matrix)
 
         if self.filter_seen:
-            if self.dense_scores:
-                # requires much more memory, but may slightly improve quality
-                # of recommendations as there will be no risk of having seen
-                # items in recommendations list
-                # (for topk < i2i_matrix.shape[1]-len(unseen))
-                # however, unseen items will be included almost randomly due to
-                # sorting mechanism of elements with the same score.
-                # Thus, sparse method is still prefered as it's more reliable
-                # (it's limitation is related to low generalization ability
-                # of the naive cooccurrence method itself, not to the algorithm)
-                i2i_scores = i2i_scores.A
 
             #prevent seen items from appearing in recommendations
             self.downvote_seen_items(i2i_scores, idx)
