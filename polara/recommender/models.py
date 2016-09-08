@@ -54,7 +54,6 @@ class RecommenderModel(object):
         raise NotImplementedError('This must be implemented in subclasses')
 
 
-    def get_recommendations(self):
     def _get_slices_idx(self, shape):
         try:
             fdbk_dim = self._feedback_factors.shape
@@ -114,6 +113,31 @@ class RecommenderModel(object):
     def user_recommendations(self, i):
         test_data, test_shape = self._get_test_data()
         return self.slice_recommendations(test_data, test_shape, i, i+1)
+
+
+    def get_recommendations(self):
+        if self.verify_integrity:
+            self.verify_data_integrity()
+
+        test_data, test_shape = self._get_test_data()
+
+        topk = self.topk
+        top_recs = np.empty((test_shape[0], topk), dtype=np.int64)
+
+        user_slices = self._get_slices_idx(test_shape)
+        start = user_slices[0]
+        for i in user_slices[1:]:
+            stop = i
+            scores, slice_data = self.slice_recommendations(test_data, test_shape, start, stop)
+
+            if self.filter_seen:
+                #prevent seen items from appearing in recommendations
+                self.downvote_seen_items(scores, slice_data)
+
+            top_recs[start:stop, :] = self.get_topk_items(scores)
+            start = stop
+
+        return top_recs
 
 
     def get_matched_predictions(self):
