@@ -23,6 +23,7 @@ class RecommenderModel(object):
         self._topk = defaults.get_config(['topk'])['topk']
         self.filter_seen  = defaults.get_config(['filter_seen'])['filter_seen']
         self.switch_positive  = defaults.get_config(['switch_positive'])['switch_positive']
+        self.verify_integrity =  defaults.get_config(['verify_integrity'])['verify_integrity']
 
 
     @property
@@ -191,6 +192,24 @@ class RecommenderModel(object):
         U = Qu.dot(Ur)
         V = Qv.dot(Vr.T)
         return U, V
+
+
+    def verify_data_integrity(self):
+        data = self.data
+        userid, itemid, feedback = data.fields
+
+        nunique_items = data.training[itemid].nunique()
+        nunique_test_users = data.test.testset[userid].nunique()
+
+        assert nunique_items == len(data.index.itemid)
+        assert nunique_items == data.training[itemid].max() + 1
+        assert nunique_test_users == data.test.testset[userid].max() + 1
+
+        try:
+            assert self._items_factors.shape[0] == len(data.index.itemid)
+            assert self._feedback_factors.shape[0] == len(data.index.feedback)
+        except AttributeError:
+            pass
 
 
 class NonPersonalized(RecommenderModel):
