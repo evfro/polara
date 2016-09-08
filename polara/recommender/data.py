@@ -409,6 +409,41 @@ class RecommenderData(object):
         return idx, val, shp
 
 
+    def test_to_coo(self, tensor_mode=False):
+        userid, itemid, feedback = self.fields
+        test_data = self.test.testset
+
+        user_idx = test_data[userid].values.astype(np.int64)
+        item_idx = test_data[itemid].values.astype(np.int64)
+        fdbk_val = test_data[feedback].values
+
+        if tensor_mode:
+            fdbk_idx = self.index.feedback.set_index('old').loc[fdbk_val, 'new'].values
+            if np.isnan(fdbk_idx).any():
+                raise NotImplementedError('Not all values of feedback are present in training data')
+            else:
+                fdbk_idx = fdbk_idx.astype(np.int64)
+            test_coo = (user_idx, item_idx, fdbk_idx)
+        else:
+            test_coo = (user_idx, item_idx, fdbk_val)
+
+        return test_coo
+
+
+    def get_test_shape(self, tensor_mode=False):
+        #TODO make it a property maybe
+        userid = self.fields.userid
+        num_users = self.test.testset[userid].max() + 1
+        num_items = len(self.index.itemid)
+        shape = (num_users, num_items)
+
+        if tensor_mode:
+            num_fdbks = len(self.index.feedback)
+            shape = shape + (num_fdbks,)
+
+        return shape
+
+
 class RecommenderDataPositive(RecommenderData):
     def __init__(self, pos_value, *args, **kwargs):
         super(RecommenderDataPositive, self).__init__(*args, **kwargs)
