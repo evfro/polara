@@ -45,6 +45,8 @@ svd.evaluate()
 Basic models can be extended by subclassing `RecommenderModel` class and defining two required methods: `self.build()` and `self.get_recommendations()`. Here's an example of a simple item-to-item recommender model:
 ```python
 import scipy as sp
+import scipy.sparse
+from scipy.sparse import csr_matrix
 import numpy as np
 from polara.recommender.models import RecommenderModel
 
