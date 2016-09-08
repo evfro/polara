@@ -386,7 +386,7 @@ class RecommenderData(object):
         #self._test_idx = namedtuple('TestDataIndex', 'testset evalset')._make([self._test.testset.index, self._test.evalset.index])
 
 
-    def to_coo(self, tensor_mode=True):
+    def to_coo(self, tensor_mode=False):
         userid, itemid, feedback = self.fields
         user_item_data = self.training[[userid, itemid]].values
 
