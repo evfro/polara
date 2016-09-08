@@ -332,17 +332,12 @@ class CooccurrenceModel(RecommenderModel):
 
 
     def get_recommendations(self):
-        userid, itemid, feedback = self.data.fields
-        test_data = self.data.test.testset
-        i2i_matrix = self._i2i_matrix
-
-        idx = (test_data[userid].values, test_data[itemid].values)
-        val = test_data[feedback].values
+        test_data = self.data.test_to_coo()
+        test_shape = self.data.get_test_shape()
+        test_matrix, _ = self.get_test_matrix(test_data, test_shape)
         if self.implicit:
-            val = np.ones_like(val)
-        shp = (idx[0].max()+1, i2i_matrix.shape[0])
-        test_matrix = sp.sparse.coo_matrix((val, idx), shape=shp,
-                                           dtype=np.float64).tocsr()
+            test_matrix.data = np.ones_like(test_matrix.data)
+
         i2i_scores = test_matrix.dot(self._i2i_matrix)
 
         if self.filter_seen:
