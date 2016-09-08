@@ -392,8 +392,8 @@ class SVDModel(RecommenderModel):
     def build(self):
         self._recommendations = None
         idx, val, shp = self.data.to_coo(tensor_mode=False)
-        svd_matrix = sp.sparse.coo_matrix((val, (idx[:, 0], idx[:, 1])),
-                                          shape=shp, dtype=np.float64).tocsr()
+        svd_matrix = csr_matrix((val, (idx[:, 0], idx[:, 1])),
+                                shape=shp, dtype=np.float64)
 
         tik = timer()
         _, _, items_factors = svds(svd_matrix, k=self.rank, return_singular_vectors='vh')
