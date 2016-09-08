@@ -1,14 +1,14 @@
-from polara.recommender import data, defaults
-from polara.recommender.evaluation import get_hits, get_relevance_scores, get_ranking_scores
+from timeit import default_timer as timer
 import pandas as pd
 import numpy as np
 import scipy as sp
 import scipy.sparse
+from scipy.sparse import csr_matrix
 from scipy.sparse.linalg import svds
+from polara.recommender import data, defaults
+from polara.recommender.evaluation import get_hits, get_relevance_scores, get_ranking_scores
+from polara.recommender.utils import array_split
 from polara.lib.hosvd import tucker_als
-from timeit import default_timer as timer
-
-
 
 class RecommenderModel(object):
     _config = ('topk', 'filter_seen', 'switch_positive', 'predict_negative')
