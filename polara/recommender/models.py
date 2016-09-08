@@ -400,7 +400,7 @@ class SVDModel(RecommenderModel):
         tok = timer() - tik
         print '{} model training time: {}s'.format(self.method, tok)
 
-        self._items_factors = np.ascontiguousarray(items_factors[::-1, :])
+        self._items_factors = np.ascontiguousarray(items_factors[::-1, :]).T
 
 
     def slice_recommendations(self, test_data, shape, start, stop):
