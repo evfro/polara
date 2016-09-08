@@ -55,6 +55,59 @@ class RecommenderModel(object):
 
 
     def get_recommendations(self):
+    def _get_slices_idx(self, shape):
+        try:
+            fdbk_dim = self._feedback_factors.shape
+            mult = fdbk_dim[0] + 2*fdbk_dim[1]
+        except AttributeError:
+            mult = 1
+
+        topk = self.topk
+        slices_idx = array_split(shape, topk, mult)
+        return slices_idx
+
+
+    def _get_test_data(self):
+        try:
+            tensor_mode = self._feedback_factors is not None
+        except AttributeError:
+            tensor_mode = False
+
+        test_data = self.data.test_to_coo(tensor_mode=tensor_mode)
+        test_shape = self.data.get_test_shape(tensor_mode=tensor_mode)
+        return test_data, test_shape
+
+
+    def _slice_test_data(self, test_data, start, stop):
+        user_coo, item_coo, fdbk_coo = test_data
+
+        slicer = (user_coo>=start) & (user_coo<stop)
+        # always slice over users only
+        user_slice_coo = user_coo[slicer] - start
+        item_slice_coo = item_coo[slicer]
+        fdbk_slice_coo = fdbk_coo[slicer]
+
+        return (user_slice_coo, item_slice_coo, fdbk_slice_coo)
+
+
+    def get_test_matrix(self, test_data, shape, user_slice=None):
+        if user_slice:
+            start, stop = user_slice
+            num_users = stop - start
+            coo_data = self._slice_test_data(test_data, start, stop)
+        else:
+            num_users = shape[0]
+            coo_data = test_data
+
+        user_coo, item_coo, fdbk_coo = coo_data
+        num_items = shape[1]
+        test_matrix = csr_matrix((fdbk_coo, (user_coo, item_coo)),
+                                  shape=(num_users, num_items),
+                                  dtype=np.float64)
+        return test_matrix, coo_data
+
+
+    def slice_recommendations(self, test_data, shape, start, end):
         raise NotImplementedError('This must be implemented in subclasses')
 
 
