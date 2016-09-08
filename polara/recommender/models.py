@@ -18,10 +18,7 @@ class RecommenderModel(object):
 
         self.data = recommender_data
         self._recommendations = None
-        self.method = 'Base'
-        #if not hasattr(self.data, 'test'):
-        #    print 'Submitted data is unprepared. Processing...'
-        #    self.data.prepare()
+        self.method = 'ABC'
 
         self._topk = defaults.get_config(['topk'])['topk']
         self.filter_seen  = defaults.get_config(['filter_seen'])['filter_seen']
