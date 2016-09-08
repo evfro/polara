@@ -111,6 +111,11 @@ class RecommenderModel(object):
         raise NotImplementedError('This must be implemented in subclasses')
 
 
+    def user_recommendations(self, i):
+        test_data, test_shape = self._get_test_data()
+        return self.slice_recommendations(test_data, test_shape, i, i+1)
+
+
     def get_matched_predictions(self):
         userid, itemid = self.data.fields.userid, self.data.fields.itemid
         holdout_data = self.data.test.evalset[itemid]
