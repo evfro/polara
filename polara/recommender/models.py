@@ -112,7 +112,8 @@ class RecommenderModel(object):
 
     def user_recommendations(self, i):
         test_data, test_shape = self._get_test_data()
-        return self.slice_recommendations(test_data, test_shape, i, i+1)
+        scores, seen_idx = self.slice_recommendations(test_data, test_shape, i, i+1)
+        return scores.squeeze(), seen_idx[1]
 
 
     def get_recommendations(self):
