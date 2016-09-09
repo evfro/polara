@@ -14,7 +14,7 @@ class RecommenderModel(object):
     _config = ('topk', 'filter_seen', 'switch_positive', 'verify_integrity')
     _pad_const = -1 # used for sparse data
 
-    def __init__(self, recommender_data, switch_positive=None):
+    def __init__(self, recommender_data, switch_positive=None, feedback_level=None):
 
         self.data = recommender_data
         self._recommendations = None
@@ -24,6 +24,7 @@ class RecommenderModel(object):
         self.filter_seen  = defaults.get_config(['filter_seen'])['filter_seen']
         self.switch_positive  = switch_positive or defaults.get_config(['switch_positive'])['switch_positive']
         self.verify_integrity =  defaults.get_config(['verify_integrity'])['verify_integrity']
+        self.feedback_level = feedback_level
 
 
     @property
@@ -165,6 +166,17 @@ class RecommenderModel(object):
         eval_data = self.data.test.evalset[feedback].values
         holdout = self.data.holdout_size
         feedback_data = eval_data.reshape(-1, holdout)
+
+        level = self.feedback_level
+        if level is not None:
+            try:
+                iter(level)
+                mask_level = np.in1d(feedback_data.ravel(),
+                                     level,
+                                     invert=True).reshape(feedback_data.shape)
+                feedback_data = np.ma.masked_where(mask_level, feedback_data)
+            except TypeError:
+                feedback_data = np.ma.masked_not_equal(feedback_data, level)
         return feedback_data
 
 
