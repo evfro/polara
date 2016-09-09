@@ -11,10 +11,10 @@ from polara.recommender.utils import array_split
 from polara.lib.hosvd import tucker_als
 
 class RecommenderModel(object):
-    _config = ('topk', 'filter_seen', 'switch_positive', 'predict_negative')
+    _config = ('topk', 'filter_seen', 'switch_positive', 'verify_integrity')
     _pad_const = -1 # used for sparse data
 
-    def __init__(self, recommender_data):
+    def __init__(self, recommender_data, switch_positive=None):
 
         self.data = recommender_data
         self._recommendations = None
@@ -22,7 +22,7 @@ class RecommenderModel(object):
 
         self._topk = defaults.get_config(['topk'])['topk']
         self.filter_seen  = defaults.get_config(['filter_seen'])['filter_seen']
-        self.switch_positive  = defaults.get_config(['switch_positive'])['switch_positive']
+        self.switch_positive  = switch_positive or defaults.get_config(['switch_positive'])['switch_positive']
         self.verify_integrity =  defaults.get_config(['verify_integrity'])['verify_integrity']
 
 

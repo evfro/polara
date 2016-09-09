@@ -14,7 +14,7 @@ negative_prediction = False #put negative feedback into evaluation set
 
 
 #MODELS
-switch_positive = 4 #ratings below are treated as negative feedback
+switch_positive = 0 #feedback values below are treated as negative feedback
 verify_integrity = True
 #svd
 svd_rank = 10
@@ -23,7 +23,7 @@ mlrank = (13, 10, 2)
 growth_tol = 0.0001
 num_iters = 25
 show_output = False
-flattener = -1
+flattener = slice(0, None)
 
 #RECOMMENDATIONS
 topk = 10 #number of items to return
