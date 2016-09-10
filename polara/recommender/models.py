@@ -63,15 +63,16 @@ class RecommenderModel(object):
         raise NotImplementedError('This must be implemented in subclasses')
 
 
-    def _get_slices_idx(self, shape):
-        try:
-            fdbk_dim = self._feedback_factors.shape
-            mult = fdbk_dim[0] + 2*fdbk_dim[1]
-        except AttributeError:
-            mult = 1
+    def _get_slices_idx(self, shape, result_width=None, scores_multiplier=None, dtypes=None):
+        result_width = result_width or self.topk
+        if scores_multiplier is None:
+            try:
+                fdbk_dim = self._feedback_factors.shape
+                scores_multiplier = fdbk_dim[0] + 2*fdbk_dim[1]
+            except AttributeError:
+                scores_multiplier = 1
 
-        topk = self.topk
-        slices_idx = array_split(shape, topk, mult)
+        slices_idx = array_split(shape, result_width, scores_multiplier, dtypes=dtypes)
         return slices_idx
 
 
