@@ -530,3 +530,37 @@ class CoffeeModel(RecommenderModel):
         scores = np.tensordot(np.tensordot(scores, v, axes=(2, 1)), w, axes=(1, 1))
         scores = self.flatten_scores(scores, self.flattener)
         return scores, slice_idx
+
+    # additional functionality: rating pediction
+    def get_holdout_slice(self, start, stop):
+        userid = self.data.fields.userid
+        itemid = self.data.fields.itemid
+        eval_data = self.data.test.evalset
+
+        user_sel = (eval_data[userid] >= start) & (eval_data[userid] < stop)
+        holdout_users = eval_data.loc[user_sel, userid].values.astype(np.int64) - start
+        holdout_items = eval_data.loc[user_sel, itemid].values.astype(np.int64)
+        return (holdout_users, holdout_items)
+
+
+    def predict_feedback(self):
+        flattener_old = self.flattener
+        self.flattener = 'argmax' #this will be applied along feedback axis
+        feedback_idx = self.data.index.feedback.set_index('new')
+
+        test_data, test_shape = self._get_test_data()
+        holdout_size = self.data.holdout_size
+        dtype = feedback_idx.old.dtype
+        predicted_feedback = np.empty((test_shape[0], holdout_size), dtype=dtype)
+
+        user_slices = self._get_slices_idx(test_shape, result_width=holdout_size)
+        start = user_slices[0]
+        for i in user_slices[1:]:
+            stop = i
+            predicted, _ = self.slice_recommendations(test_data, test_shape, start, stop)
+            holdout_idx = self.get_holdout_slice(start, stop)
+            feedback_values = feedback_idx.loc[predicted[holdout_idx], 'old'].values
+            predicted_feedback[start:stop, :] = feedback_values.reshape(-1, holdout_size)
+            start = stop
+        self.flattener = flattener_old
+        return predicted_feedback
