@@ -10,6 +10,11 @@ from polara.recommender.evaluation import get_hits, get_relevance_scores, get_ra
 from polara.recommender.utils import array_split
 from polara.lib.hosvd import tucker_als
 
+
+def get_default(name):
+    return defaults.get_config([name])[name]
+
+
 class RecommenderModel(object):
     _config = ('topk', 'filter_seen', 'switch_positive', 'verify_integrity')
     _pad_const = -1 # used for sparse data
@@ -20,10 +25,14 @@ class RecommenderModel(object):
         self._recommendations = None
         self.method = 'ABC'
 
-        self._topk = defaults.get_config(['topk'])['topk']
-        self.filter_seen  = defaults.get_config(['filter_seen'])['filter_seen']
-        self.switch_positive  = switch_positive or defaults.get_config(['switch_positive'])['switch_positive']
-        self.verify_integrity =  defaults.get_config(['verify_integrity'])['verify_integrity']
+        self._topk = get_default('topk')
+        self.filter_seen  = get_default('filter_seen')
+        # `switch_positive` can be used by other models during construction process
+        # (e.g. mymedialite wrapper or any other implicit model); hence, it's
+        # better to make it a model attribute, not a simple evaluation argument
+        # (in contrast to `on_feedback_level` argument of self.evaluate)
+        self.switch_positive  = switch_positive or get_default('switch_positive')
+        self.verify_integrity =  get_default('verify_integrity')
 
 
     @property
