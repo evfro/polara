@@ -14,7 +14,7 @@ class RecommenderModel(object):
     _config = ('topk', 'filter_seen', 'switch_positive', 'verify_integrity')
     _pad_const = -1 # used for sparse data
 
-    def __init__(self, recommender_data, switch_positive=None, feedback_level=None):
+    def __init__(self, recommender_data, switch_positive=None):
 
         self.data = recommender_data
         self._recommendations = None
@@ -24,7 +24,6 @@ class RecommenderModel(object):
         self.filter_seen  = defaults.get_config(['filter_seen'])['filter_seen']
         self.switch_positive  = switch_positive or defaults.get_config(['switch_positive'])['switch_positive']
         self.verify_integrity =  defaults.get_config(['verify_integrity'])['verify_integrity']
-        self.feedback_level = feedback_level
 
 
     @property
@@ -161,32 +160,31 @@ class RecommenderModel(object):
         return matched_predictions
 
 
-    def get_feedback_data(self):
+    def get_feedback_data(self, on_level=None):
         feedback = self.data.fields.feedback
         eval_data = self.data.test.evalset[feedback].values
         holdout = self.data.holdout_size
         feedback_data = eval_data.reshape(-1, holdout)
 
-        level = self.feedback_level
-        if level is not None:
+        if on_level is not None:
             try:
-                iter(level)
+                iter(on_level)
                 mask_level = np.in1d(feedback_data.ravel(),
-                                     level,
+                                     on_level,
                                      invert=True).reshape(feedback_data.shape)
                 feedback_data = np.ma.masked_where(mask_level, feedback_data)
             except TypeError:
-                feedback_data = np.ma.masked_not_equal(feedback_data, level)
+                feedback_data = np.ma.masked_not_equal(feedback_data, on_level)
         return feedback_data
 
 
-    def get_positive_feedback(self):
-        feedback_data = self.get_feedback_data()
+    def get_positive_feedback(self, on_level=None):
+        feedback_data = self.get_feedback_data(on_level)
         positive_feedback = feedback_data >= self.switch_positive
         return positive_feedback
 
 
-    def evaluate(self, method='hits', topk=None):
+    def evaluate(self, method='hits', topk=None, on_feedback_level=None):
         #support rolling back scenario for @k calculations
         if topk > self.topk:
             self.topk = topk #will also empty flush old recommendations
@@ -195,13 +193,13 @@ class RecommenderModel(object):
         matched_predictions = matched_predictions[:, :topk, :]
 
         if method == 'relevance':
-            positive_feedback = self.get_positive_feedback()
+            positive_feedback = self.get_positive_feedback(on_feedback_level)
             scores = get_relevance_scores(matched_predictions, positive_feedback)
         elif method == 'ranking':
-            feedback = self.get_feedback_data()
+            feedback = self.get_feedback_data(on_feedback_level)
             scores = get_ranking_scores(matched_predictions, feedback, self.switch_positive)
         elif method == 'hits':
-            positive_feedback = self.get_positive_feedback()
+            positive_feedback = self.get_positive_feedback(on_feedback_level)
             scores = get_hits(matched_predictions, positive_feedback)
         else:
             raise NotImplementedError
