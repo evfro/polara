@@ -10,6 +10,11 @@ from polara.recommender.evaluation import get_hits, get_relevance_scores, get_ra
 from polara.recommender.utils import array_split
 from polara.lib.hosvd import tucker_als
 
+
+def get_default(name):
+    return defaults.get_config([name])[name]
+
+
 class RecommenderModel(object):
     _config = ('topk', 'filter_seen', 'switch_positive', 'verify_integrity')
     _pad_const = -1 # used for sparse data
@@ -20,10 +25,14 @@ class RecommenderModel(object):
         self._recommendations = None
         self.method = 'ABC'
 
-        self._topk = defaults.get_config(['topk'])['topk']
-        self.filter_seen  = defaults.get_config(['filter_seen'])['filter_seen']
-        self.switch_positive  = switch_positive or defaults.get_config(['switch_positive'])['switch_positive']
-        self.verify_integrity =  defaults.get_config(['verify_integrity'])['verify_integrity']
+        self._topk = get_default('topk')
+        self.filter_seen  = get_default('filter_seen')
+        # `switch_positive` can be used by other models during construction process
+        # (e.g. mymedialite wrapper or any other implicit model); hence, it's
+        # better to make it a model attribute, not a simple evaluation argument
+        # (in contrast to `on_feedback_level` argument of self.evaluate)
+        self.switch_positive  = switch_positive or get_default('switch_positive')
+        self.verify_integrity =  get_default('verify_integrity')
 
 
     @property
@@ -54,15 +63,16 @@ class RecommenderModel(object):
         raise NotImplementedError('This must be implemented in subclasses')
 
 
-    def _get_slices_idx(self, shape):
-        try:
-            fdbk_dim = self._feedback_factors.shape
-            mult = fdbk_dim[0] + 2*fdbk_dim[1]
-        except AttributeError:
-            mult = 1
+    def _get_slices_idx(self, shape, result_width=None, scores_multiplier=None, dtypes=None):
+        result_width = result_width or self.topk
+        if scores_multiplier is None:
+            try:
+                fdbk_dim = self._feedback_factors.shape
+                scores_multiplier = fdbk_dim[0] + 2*fdbk_dim[1]
+            except AttributeError:
+                scores_multiplier = 1
 
-        topk = self.topk
-        slices_idx = array_split(shape, topk, mult)
+        slices_idx = array_split(shape, result_width, scores_multiplier, dtypes=dtypes)
         return slices_idx
 
 
@@ -160,21 +170,31 @@ class RecommenderModel(object):
         return matched_predictions
 
 
-    def get_feedback_data(self):
+    def get_feedback_data(self, on_level=None):
         feedback = self.data.fields.feedback
         eval_data = self.data.test.evalset[feedback].values
         holdout = self.data.holdout_size
         feedback_data = eval_data.reshape(-1, holdout)
+
+        if on_level is not None:
+            try:
+                iter(on_level)
+                mask_level = np.in1d(feedback_data.ravel(),
+                                     on_level,
+                                     invert=True).reshape(feedback_data.shape)
+                feedback_data = np.ma.masked_where(mask_level, feedback_data)
+            except TypeError:
+                feedback_data = np.ma.masked_not_equal(feedback_data, on_level)
         return feedback_data
 
 
-    def get_positive_feedback(self):
-        feedback_data = self.get_feedback_data()
+    def get_positive_feedback(self, on_level=None):
+        feedback_data = self.get_feedback_data(on_level)
         positive_feedback = feedback_data >= self.switch_positive
         return positive_feedback
 
 
-    def evaluate(self, method='hits', topk=None):
+    def evaluate(self, method='hits', topk=None, on_feedback_level=None):
         #support rolling back scenario for @k calculations
         if topk > self.topk:
             self.topk = topk #will also empty flush old recommendations
@@ -183,13 +203,13 @@ class RecommenderModel(object):
         matched_predictions = matched_predictions[:, :topk, :]
 
         if method == 'relevance':
-            positive_feedback = self.get_positive_feedback()
+            positive_feedback = self.get_positive_feedback(on_feedback_level)
             scores = get_relevance_scores(matched_predictions, positive_feedback)
         elif method == 'ranking':
-            feedback = self.get_feedback_data()
+            feedback = self.get_feedback_data(on_feedback_level)
             scores = get_ranking_scores(matched_predictions, feedback, self.switch_positive)
         elif method == 'hits':
-            positive_feedback = self.get_positive_feedback()
+            positive_feedback = self.get_positive_feedback(on_feedback_level)
             scores = get_hits(matched_predictions, positive_feedback)
         else:
             raise NotImplementedError
@@ -510,3 +530,37 @@ class CoffeeModel(RecommenderModel):
         scores = np.tensordot(np.tensordot(scores, v, axes=(2, 1)), w, axes=(1, 1))
         scores = self.flatten_scores(scores, self.flattener)
         return scores, slice_idx
+
+    # additional functionality: rating pediction
+    def get_holdout_slice(self, start, stop):
+        userid = self.data.fields.userid
+        itemid = self.data.fields.itemid
+        eval_data = self.data.test.evalset
+
+        user_sel = (eval_data[userid] >= start) & (eval_data[userid] < stop)
+        holdout_users = eval_data.loc[user_sel, userid].values.astype(np.int64) - start
+        holdout_items = eval_data.loc[user_sel, itemid].values.astype(np.int64)
+        return (holdout_users, holdout_items)
+
+
+    def predict_feedback(self):
+        flattener_old = self.flattener
+        self.flattener = 'argmax' #this will be applied along feedback axis
+        feedback_idx = self.data.index.feedback.set_index('new')
+
+        test_data, test_shape = self._get_test_data()
+        holdout_size = self.data.holdout_size
+        dtype = feedback_idx.old.dtype
+        predicted_feedback = np.empty((test_shape[0], holdout_size), dtype=dtype)
+
+        user_slices = self._get_slices_idx(test_shape, result_width=holdout_size)
+        start = user_slices[0]
+        for i in user_slices[1:]:
+            stop = i
+            predicted, _ = self.slice_recommendations(test_data, test_shape, start, stop)
+            holdout_idx = self.get_holdout_slice(start, stop)
+            feedback_values = feedback_idx.loc[predicted[holdout_idx], 'old'].values
+            predicted_feedback[start:stop, :] = feedback_values.reshape(-1, holdout_size)
+            start = stop
+        self.flattener = flattener_old
+        return predicted_feedback

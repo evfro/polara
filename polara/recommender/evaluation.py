@@ -3,15 +3,20 @@ import numpy as np
 from collections import namedtuple
 
 
+def unmask(x):
+    # return `None` instead of single  `mask` value
+    return None if x is np.ma.masked else x
+
+
 def get_hits(matched_predictions, positive_feedback):
     reldata = get_relevance_data(matched_predictions, positive_feedback)
     true_pos, false_pos = reldata.tp, reldata.fp
     true_neg, false_neg = reldata.tn, reldata.fn
 
-    true_pos_hits = true_pos.sum()
-    false_pos_hits = false_pos.sum()
-    true_neg_hits = true_neg.sum()
-    false_neg_hits = false_neg.sum()
+    true_pos_hits = unmask(true_pos.sum())
+    false_pos_hits = unmask(false_pos.sum())
+    true_neg_hits = unmask(true_neg.sum())
+    false_neg_hits = unmask(false_neg.sum())
 
     hits = namedtuple('Hits', ['true_positive', 'true_negative', 'false_positive', 'false_negative'])
     hits = hits._make([true_pos_hits, true_neg_hits, false_pos_hits, false_neg_hits])
@@ -36,11 +41,11 @@ def get_relevance_scores(matched_predictions, positive_feedback):
     miss_rate = false_neg / (false_neg + true_pos)
 
     #average over all users
-    precision = np.nansum(precision) / users_num
-    recall = np.nansum(recall) / users_num
-    fallout = np.nansum(fallout) / users_num
-    specifity = np.nansum(specifity) / users_num
-    miss_rate = np.nansum(miss_rate) / users_num
+    precision = unmask(np.nansum(precision) / users_num)
+    recall = unmask(np.nansum(recall) / users_num)
+    fallout = unmask(np.nansum(fallout) / users_num)
+    specifity = unmask(np.nansum(specifity) / users_num)
+    miss_rate = unmask(np.nansum(miss_rate) / users_num)
 
     scores = namedtuple('Relevance', ['precision', 'recall', 'fallout', 'specifity', 'miss_rate'])
     scores = scores._make([precision, recall, fallout, specifity, miss_rate])
@@ -52,9 +57,10 @@ def get_ranking_scores(matched_predictions, feedback_data, switch_positive, alte
     ideal_scores_idx = np.argsort(feedback_data, axis=1)[:, ::-1] #returns column index only
     ideal_scores_idx = np.ravel_multi_index((np.arange(feedback_data.shape[0])[:, None], ideal_scores_idx), dims=feedback_data.shape)
 
+    where = np.ma.where if np.ma.is_masked(feedback_data) else np.where
     is_positive = feedback_data >= switch_positive
-    positive_feedback = np.where(is_positive, feedback_data, 0)
-    negative_feedback = np.where(~is_positive, -feedback_data, 0)
+    positive_feedback = where(is_positive, feedback_data, 0)
+    negative_feedback = where(~is_positive, -feedback_data, 0)
 
     relevance_scores_pos = (matched_predictions * positive_feedback[:, None, :]).sum(axis=2)
     relevance_scores_neg = (matched_predictions * negative_feedback[:, None, :]).sum(axis=2)
@@ -75,8 +81,8 @@ def get_ranking_scores(matched_predictions, feedback_data, switch_positive, alte
     dcl = (relevance_scores_neg / -discount[:topk]).sum(axis=1)
     idcg = (ideal_scores_pos / discount[:holdout]).sum(axis=1)
     idcl = (ideal_scores_neg / -discount[:holdout]).sum(axis=1)
-    ndcg = np.nansum(dcg / idcg) / users_num
-    ndcl = np.nansum(dcl / idcl) / users_num
+    ndcg = unmask(np.nansum(dcg / idcg) / users_num)
+    ndcl = unmask(np.nansum(dcl / idcl) / users_num)
     ranking_score = namedtuple('Ranking', ['nDCG', 'nDCL'])._make([ndcg, ndcl])
     return ranking_score
 
