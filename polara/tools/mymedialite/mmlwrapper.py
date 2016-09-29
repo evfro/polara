@@ -158,23 +158,23 @@ class MyMediaLiteWrapper(SVDModel):
                 self._items_biases = None
 
             self._users_factors = user_factors_full
-            self._items_factors = item_factors_full.T
+            self._items_factors = item_factors_full
         else:
             self._users_factors = users_factors['col3'].values.reshape(nu, nf)
-            self._items_factors = items_factors['col3'].values.reshape(ni, nf).T
+            self._items_factors = items_factors['col3'].values.reshape(ni, nf)
 
 
     def _make_factors_orthogonal(self):
         if self._items_biases is None:
-            u, v = self._users_factors, self._items_factors.T
+            u, v = self._users_factors, self._items_factors
         else:
             u, v, b = self._users_factors, self._items_factors, self._items_biases
             u = np.hstack((u, np.ones((u.shape[0], 1))))
-            v = np.vstack((v, b)).T
+            v = np.hstack((v, b[:, np.newaxis]))
 
         U, V = self.orthogonalize(u, v)
         self._users_factors = U
-        self._items_factors = V.T
+        self._items_factors = V
 
 
     def build(self):
