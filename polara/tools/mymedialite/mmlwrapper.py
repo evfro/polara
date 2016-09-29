@@ -1,7 +1,6 @@
 from polara.recommender.models import SVDModel
 from subprocess import call
 from shlex import split
-from os.path import join as join_path
 import sys
 import pandas as pd
 import numpy as np
@@ -27,6 +26,9 @@ command_template = (
     ' --save-model={saved_model_path}'
     ' --recommender={algo}'
     ' --recommender-options={options}')
+
+def join_path(*paths):
+    return '/'.join([p.rstrip('/') for p in paths])
 
 
 class MyMediaLiteWrapper(SVDModel):
