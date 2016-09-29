@@ -45,6 +45,8 @@ svd.evaluate()
 Basic models can be extended by subclassing `RecommenderModel` class and defining two required methods: `self.build()` and `self.get_recommendations()`. Here's an example of a simple item-to-item recommender model:
 ```python
 import scipy as sp
+import scipy.sparse
+from scipy.sparse import csr_matrix
 import numpy as np
 from polara.recommender.models import RecommenderModel
 
@@ -52,13 +54,15 @@ class CooccurrenceModel(RecommenderModel):
     def __init__(self, *args, **kwargs):
         super(CooccurrenceModel, self).__init__(*args, **kwargs)
         self.method = 'item-to-item' #pick some meaningful name
+        self.implicit = True # will convert feedback values to all ones
 
     def build(self):
         self._recommendations = None
-        idx, val, shp = self.data.to_coo(tensor_mode=False)
-        #np.ones_like makes feedback implicit
-        user_item_matrix = sp.sparse.coo_matrix((np.ones_like(val), (idx[:, 0], idx[:, 1])),
-                                          shape=shp, dtype=np.float64).tocsr()
+        idx, val, shp = self.data.to_coo()
+        if self.implicit:
+            val = np.ones_like(val)
+        user_item_matrix = csr_matrix((val, (idx[:, 0], idx[:, 1])),
+                                        shape=shp, dtype=np.float64)
 
         i2i_matrix = user_item_matrix.T.dot(user_item_matrix)
         #exclude "self-links"
@@ -67,20 +71,16 @@ class CooccurrenceModel(RecommenderModel):
         self._i2i_matrix = i2i_matrix
 
     def get_recommendations(self):
-        userid, itemid, feedback = self.data.fields
-        test_data = self.data.test.testset
-        i2i_matrix = self._i2i_matrix
+        test_data = self.data.test_to_coo()
+        test_shape = self.data.get_test_shape()
+        test_matrix, _ = self.get_test_matrix(test_data, test_shape)
+        if self.implicit:
+            test_matrix.data = np.ones_like(test_matrix.data)
 
-        idx = (test_data[userid], test_data[itemid])
-        val = np.ones_like(test_data[feedback]) #make feedback implicit
-        shp = (idx[0].max()+1, i2i_matrix.shape[0])
-        test_matrix = sp.sparse.coo_matrix((val, idx), shape=shp,
-                                           dtype=np.float64).tocsr()
-        i2i_scores = test_matrix.dot(self._i2i_matrix).A
-
+        i2i_scores = test_matrix.dot(self._i2i_matrix)
         if self.filter_seen:
-            #prevent seen items from appearing in recommendations
-            self.downvote_seen_items(i2i_scores, idx)
+            # prevent seen items from appearing in recommendations
+            self.downvote_seen_items(i2i_scores, test_data)
 
         top_recs = self.get_topk_items(i2i_scores)
         return top_recs

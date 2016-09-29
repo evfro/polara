@@ -14,8 +14,8 @@ negative_prediction = False #put negative feedback into evaluation set
 
 
 #MODELS
-switch_positive = 4 #ratings below are treated as negative feedback
-predict_negative = False #predict low-rated items
+switch_positive = 0 #feedback values below are treated as negative feedback
+verify_integrity = True
 #svd
 svd_rank = 10
 #coffee
@@ -23,10 +23,10 @@ mlrank = (13, 10, 2)
 growth_tol = 0.0001
 num_iters = 25
 show_output = False
+flattener = slice(0, None)
 
 #RECOMMENDATIONS
 topk = 10 #number of items to return
-smooth_prediction = True #mix scores for positive feedback, e.g. 5 -> 4+5
 filter_seen = True #prevent seen items from appearing in recommendations
 
 

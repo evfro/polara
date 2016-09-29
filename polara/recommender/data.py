@@ -12,14 +12,20 @@ class RecommenderData(object):
     # ('test_ratio', 'holdout_size', 'test_fold', 'shuffle_data',
     #             'test_sample', 'permute_tops', 'random_holdout', 'negative_prediction')
 
-    def __init__(self, data, userid, itemid, feedback):
+    def __init__(self, data, userid, itemid, feedback, custom_order=None):
         self.name = None
-        if data.duplicated([userid, itemid]).any():
+        fields_selection = [userid, itemid, feedback]
+
+        if data.duplicated(fields_selection).any():
             #unstable in pandas v. 17.0, only works in <> v.17.0
             #rely on deduplicated data in many places - makes data processing more efficient
             raise NotImplementedError('Data has duplicate values')
 
-        self._data = data[[userid, itemid, feedback]].copy()
+        self._custom_order = custom_order
+        if self._custom_order:
+            fields_selection.append(self._custom_order)
+
+        self._data = data[fields_selection].copy()
         self.fields = namedtuple('Fields', self._std_fields)
         self.fields = self.fields._make(map(eval, self._std_fields))
         self.index = namedtuple('DataIndex', self._std_fields)
@@ -200,7 +206,7 @@ class RecommenderData(object):
         self._split_eval_data()
 
         self._has_changed = True
-        #TODO implement operations with this container
+        #TODO implement operations with this property container
 
 
     def update(self):
@@ -229,7 +235,7 @@ class RecommenderData(object):
 
         user_sessions = self._data.groupby(userid, sort=True) #KEEP TRUE HERE!!!!
         # if False than long sessions idx are prevalent in the beginning => non-equal size folds
-        # this is accounted for with help of is_not_uniform function
+        # this effect is taken into account with help of is_not_uniform function
         # example (run several times to see a pattern):
         # df = pd.DataFrame(index=range(10),
         #                    data={'A':list('abbcceefgg'),
@@ -252,9 +258,6 @@ class RecommenderData(object):
             #raise NotImplementedError('Users are not uniformly ordered! Unable to split test set reliably.')
 
         user_sessions_len = user_sessions.size()
-        if (user_sessions_len <= self._holdout_size).any():
-            raise NotImplementedError('Some users have not enough items for evaluation')
-
         user_num = user_sessions_len.size #number of unique users
         test_user_num = user_num * self._test_ratio
 
@@ -263,13 +266,19 @@ class RecommenderData(object):
         training_selection = left_condition | right_condition
         test_selection = ~training_selection
 
-        self._training = self._data[training_selection].copy()
+        self._training = self._data.loc[training_selection, list(self.fields)].copy()
         self._test = self._data[test_selection].copy()
+
+        short_sessions = user_sessions_len.index[user_sessions_len <= self._holdout_size]
+        if self._test[userid].isin(short_sessions).any():
+            #TODO: maybe simply ignore those users? What to do if becomes empty?
+            raise NotImplementedError('Some test users have not enough items for evaluation')
 
 
     def _reindex_data(self):
         userid, itemid, feedback = self.fields
         reindex = self.reindex
+        # remove any gaps in user idx, start from 0 (both for training and test)
         user_index = [reindex(data, userid, sort=False) for data in [self._training, self._test]]
         user_index = namedtuple('UserIndex', 'training test')._make(user_index)
         self.index = self.index._replace(userid=user_index)
@@ -294,26 +303,27 @@ class RecommenderData(object):
 
 
     def _align_test_items(self):
-        #TODO: add option to filter by whole sessions, not just items
         items_index = self.index.itemid.set_index('old')
         itemid = self.fields.itemid
-
+        #this changes int to float dtype if NaN values exist:
         self._test.loc[:, itemid] = items_index.loc[self._test[itemid].values, 'new'].values
         # need to filter those items which were not in the training set
-        unseen_items_num = self._test[itemid].isnull().sum()
-
-        if unseen_items_num > 0:
-            #'%i unseen items found in the test set. Dropping...' % unseen_items_num
+        unseen_items = self._test[itemid].isnull()
+        if unseen_items.any():
             userid = self.fields.userid
-            self._test.dropna(axis=0, subset=[itemid], inplace=True)
-
+            test_data = self._test[~unseen_items]
             # there could be insufficient data now - check again
-            valid_users_sel = self._test.groupby(userid, sort=False).size() > self._holdout_size
-            if (~valid_users_sel).any():
-                raise NotImplementedError('Some users have not enough items for evaluation')
+            valid_users_sel = test_data.groupby(userid, sort=False).size() > self._holdout_size
+            if not valid_users_sel.all():
+                nfiltered = (~valid_users_sel).sum()
+                valid_users_sel = valid_users_sel[valid_users_sel]
+                print '{} test users filtered due to insufficient number of seen items.'.format(nfiltered)
+            else:
+                print '{} unseen items filtered from testset.'.format(unseen_items.sum())
             valid_users_idx = valid_users_sel.index[valid_users_sel]
 
-            self._test = self._test.loc[self._test[userid].isin(valid_users_idx)]
+            self._test = test_data.loc[test_data[userid].isin(valid_users_idx)].copy()
+            #force int dtype after filtering NaNs
             self._test[itemid] = self._test[itemid].astype(np.int64)
             #reindex the test userids as they were filtered
             new_test_idx = self.reindex(self._test, userid, sort=False, inplace=True)
@@ -346,15 +356,17 @@ class RecommenderData(object):
         else:
             test_data = self._test
 
-        eval_grouper = test_data.groupby(userid, sort=False)[feedback]
+        order_field = self._custom_order or feedback
+        eval_grouper = test_data.groupby(userid, sort=False)[order_field]
 
         if self.random_holdout: #randomly sample data for evaluation
-            eval_idx = eval_grouper.apply(random_choice, lastn).index.get_level_values(1)
+            eval_data = eval_grouper.apply(random_choice, lastn)
         elif self.negative_prediction: #try to holdout negative only examples
-            eval_idx = eval_grouper.nsmallest(lastn).index.get_level_values(1)
+            eval_data = eval_grouper.nsmallest(lastn)
         else: #standard top-score prediction mode
-            eval_idx = eval_grouper.nlargest(lastn).index.get_level_values(1)
+            eval_data = eval_grouper.nlargest(lastn)
 
+        eval_idx = eval_data.index.get_level_values(1)
         #ensure correct sorting of users in test and eval - order must be the same
         evalset = test_data.loc[eval_idx].sort_values(userid)
         testset = test_data[~test_data.index.isin(eval_idx)].sort_values(userid)
@@ -374,7 +386,7 @@ class RecommenderData(object):
         #self._test_idx = namedtuple('TestDataIndex', 'testset evalset')._make([self._test.testset.index, self._test.evalset.index])
 
 
-    def to_coo(self, tensor_mode=True):
+    def to_coo(self, tensor_mode=False):
         userid, itemid, feedback = self.fields
         user_item_data = self.training[[userid, itemid]].values
 
@@ -395,6 +407,41 @@ class RecommenderData(object):
         idx = idx.astype(np.int64)
         val = np.ascontiguousarray(val)
         return idx, val, shp
+
+
+    def test_to_coo(self, tensor_mode=False):
+        userid, itemid, feedback = self.fields
+        test_data = self.test.testset
+
+        user_idx = test_data[userid].values.astype(np.int64)
+        item_idx = test_data[itemid].values.astype(np.int64)
+        fdbk_val = test_data[feedback].values
+
+        if tensor_mode:
+            fdbk_idx = self.index.feedback.set_index('old').loc[fdbk_val, 'new'].values
+            if np.isnan(fdbk_idx).any():
+                raise NotImplementedError('Not all values of feedback are present in training data')
+            else:
+                fdbk_idx = fdbk_idx.astype(np.int64)
+            test_coo = (user_idx, item_idx, fdbk_idx)
+        else:
+            test_coo = (user_idx, item_idx, fdbk_val)
+
+        return test_coo
+
+
+    def get_test_shape(self, tensor_mode=False):
+        #TODO make it a property maybe
+        userid = self.fields.userid
+        num_users = self.test.testset[userid].max() + 1
+        num_items = len(self.index.itemid)
+        shape = (num_users, num_items)
+
+        if tensor_mode:
+            num_fdbks = len(self.index.feedback)
+            shape = shape + (num_fdbks,)
+
+        return shape
 
 
 class RecommenderDataPositive(RecommenderData):
