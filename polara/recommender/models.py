@@ -142,7 +142,12 @@ class RecommenderModel(object):
             scores, slice_data = self.slice_recommendations(test_data, test_shape, start, stop)
 
             if self.filter_seen:
-                #prevent seen items from appearing in recommendations
+                # prevent seen items from appearing in recommendations
+                # NOTE: in case of sparse models (e.g. simple item-to-item)
+                # there's a risk of having seen items in recommendations list
+                # (for topk < i2i_matrix.shape[1]-len(unseen))
+                # this is related to low generalization ability
+                # of the naive cooccurrence method itself, not to the algorithm
                 self.downvote_seen_items(scores, slice_data)
 
             top_recs[start:stop, :] = self.get_topk_items(scores)
@@ -381,25 +386,14 @@ class CooccurrenceModel(RecommenderModel):
         self._i2i_matrix = i2i_matrix
 
 
-    def get_recommendations(self):
-        test_data = self.data.test_to_coo()
-        test_shape = self.data.get_test_shape()
-        test_matrix, _ = self.get_test_matrix(test_data, test_shape)
+    def slice_recommendations(self, test_data, shape, start, stop):
+        test_matrix, slice_data = self.get_test_matrix(test_data, shape, (start, stop))
+
         if self.implicit:
             test_matrix.data = np.ones_like(test_matrix.data)
 
-        i2i_scores = test_matrix.dot(self._i2i_matrix)
-
-        if self.filter_seen:
-            # prevent seen items from appearing in recommendations;
-            # caution: there's a risk of having seen items in the list
-            # (for topk < i2i_matrix.shape[1]-len(unseen))
-            # this is related to low generalization ability
-            # of the naive cooccurrence method itself, not to the algorithm
-            self.downvote_seen_items(i2i_scores, test_data)
-
-        top_recs = self.get_topk_items(i2i_scores)
-        return top_recs
+        scores = test_matrix.dot(self._i2i_matrix)
+        return scores, slice_data
 
 
 class SVDModel(RecommenderModel):
