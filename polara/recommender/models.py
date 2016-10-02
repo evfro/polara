@@ -283,7 +283,18 @@ class RecommenderModel(object):
 
             idx = scores.nonzero()
             row_data = pd.DataFrame({'data': scores.data, 'cols': idx[1]}).groupby(idx[0], sort=True)
-            recs = np.asarray(row_data.apply(topscore, topk).tolist())
+            nnz_users = row_data.grouper.levels[0]
+            num_users = scores.shape[0]
+            if len(nnz_users) < num_users:
+                # scores may have zero-valued rows, this breaks get_topk_items
+                # as scores.nonzero() will filter out indices of those rows.
+                # Need to restore full data with zeros in that case.
+                recs = np.empty((num_users, topk))
+                zero_rows = np.in1d(np.arange(num_users), nnz_users, assume_unique=True, invert=True)
+                recs[zero_rows, :] = self._pad_const
+                recs[~zero_rows, :] = np.asarray(row_data.apply(topscore, topk).tolist())
+            else:
+                recs = np.asarray(row_data.apply(topscore, topk).tolist())
         else:
         # apply_along_axis is more memory efficient then argsort on full array
             recs = np.apply_along_axis(self.topsort, 1, scores, topk)
