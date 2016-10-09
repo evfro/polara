@@ -340,7 +340,6 @@ class RecommenderData(object):
 
         if self._change_properties: #
             print 'Updating test data.'
-            #print 'preparing new test and eval data'
             self._test = self._test_old
             self._has_updated = True
             self._change_properties.clear()
@@ -404,7 +403,7 @@ class RecommenderData(object):
             val = self.training[feedback].values
 
         shp = tuple(idx.max(axis=0) + 1)
-        idx = idx.astype(np.int64)
+        idx = idx.astype(np.intp)
         val = np.ascontiguousarray(val)
         return idx, val, shp
 
@@ -413,8 +412,8 @@ class RecommenderData(object):
         userid, itemid, feedback = self.fields
         test_data = self.test.testset
 
-        user_idx = test_data[userid].values.astype(np.int64)
-        item_idx = test_data[itemid].values.astype(np.int64)
+        user_idx = test_data[userid].values.astype(np.intp)
+        item_idx = test_data[itemid].values.astype(np.intp)
         fdbk_val = test_data[feedback].values
 
         if tensor_mode:
@@ -422,7 +421,7 @@ class RecommenderData(object):
             if np.isnan(fdbk_idx).any():
                 raise NotImplementedError('Not all values of feedback are present in training data')
             else:
-                fdbk_idx = fdbk_idx.astype(np.int64)
+                fdbk_idx = fdbk_idx.astype(np.intp)
             test_coo = (user_idx, item_idx, fdbk_idx)
         else:
             test_coo = (user_idx, item_idx, fdbk_val)
