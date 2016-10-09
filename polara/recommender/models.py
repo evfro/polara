@@ -7,8 +7,9 @@ from scipy.sparse import csr_matrix
 from scipy.sparse.linalg import svds
 from polara.recommender import data, defaults
 from polara.recommender.evaluation import get_hits, get_relevance_scores, get_ranking_scores
-from polara.recommender.utils import array_split
+from polara.recommender.utils import array_split, NNZ_MAX
 from polara.lib.hosvd import tucker_als
+from polara.lib.sparse import csc_matvec
 
 
 def get_default(name):
@@ -378,6 +379,7 @@ class CooccurrenceModel(RecommenderModel):
         super(CooccurrenceModel, self).__init__(*args, **kwargs)
         self.method = 'item-to-item' #pick some meaningful name
         self.implicit = True
+        self.dense_output = False
 
 
     def build(self):
@@ -390,7 +392,7 @@ class CooccurrenceModel(RecommenderModel):
         user_item_matrix = csr_matrix((val, (idx[:, 0], idx[:, 1])),
                                         shape=shp, dtype=val.dtype)
         tik = timer()
-        i2i_matrix = user_item_matrix.T.dot(user_item_matrix)
+        i2i_matrix = user_item_matrix.T.dot(user_item_matrix) # gives CSC format
 
         #exclude "self-links"
         diag_vals = i2i_matrix.diagonal()
@@ -402,13 +404,36 @@ class CooccurrenceModel(RecommenderModel):
         self._i2i_matrix = i2i_matrix
 
 
+    def _sparse_dot(self, tst_mat, i2i_mat):
+    # scipy always returns sparse result, even if dot product is actually dense
+    # this function offers solution to this problem
+    # it also takes care on sparse result w.r.t. to further processing
+        if self.dense_output: # calculate dense result directly
+        # TODO implement matmat multiplication instead of iteration with matvec
+            res_type = np.result_type(i2i_mat.dtype, tst_mat.dtype)
+            scores = np.empty((tst_mat.shape[0], i2i_mat.shape[1]), dtype=res_type)
+            for i in xrange(tst_mat.shape[0]):
+                v = tst_mat.getrow(i)
+                scores[i, :] = csc_matvec(i2i_mat, v, dense_output=True, dtype=res_type)
+        else:
+            scores = tst_mat.dot(i2i_mat.T)
+            # NOTE even though not neccessary for symmetric i2i matrix,
+            # transpose helps to avoid expensive conversion to CSR (performed by scipy)
+            if scores.nnz > NNZ_MAX:
+                # too many nnz lead to undesired memory overhead in downvote_seen_items
+                scores = scores.todense()
+        return scores
+
+
     def slice_recommendations(self, test_data, shape, start, stop):
         test_matrix, slice_data = self.get_test_matrix(test_data, shape, (start, stop))
+        # NOTE CSR format is mandatory for proper handling of signle user
+        # recommendations, as vector of shape (1, N) in CSC format is inefficient
 
         if self.implicit:
             test_matrix.data =  np.sign(test_matrix.data, dtype=np.int64)
 
-        scores = test_matrix.dot(self._i2i_matrix)
+        scores = self._sparse_dot(test_matrix, self._i2i_matrix)
         return scores, slice_data
 
 
