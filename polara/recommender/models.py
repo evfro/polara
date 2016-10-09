@@ -100,12 +100,14 @@ class RecommenderModel(object):
 
 
     def get_test_matrix(self, test_data, shape, user_slice=None):
+        num_users_all = shape[0]
         if user_slice:
             start, stop = user_slice
+            stop = min(stop, num_users_all)
             num_users = stop - start
             coo_data = self._slice_test_data(test_data, start, stop)
         else:
-            num_users = shape[0]
+            num_users = num_users_all
             coo_data = test_data
 
         user_coo, item_coo, fdbk_coo = coo_data
