@@ -114,7 +114,7 @@ class RecommenderModel(object):
         num_items = shape[1]
         test_matrix = csr_matrix((fdbk_coo, (user_coo, item_coo)),
                                   shape=(num_users, num_items),
-                                  dtype=np.float64)
+                                  dtype=fdbk_coo.dtype)
         return test_matrix, coo_data
 
 
@@ -383,16 +383,17 @@ class CooccurrenceModel(RecommenderModel):
         idx, val, shp = self.data.to_coo()
 
         if self.implicit:
-            val = np.ones_like(val)
+            val = np.sign(val, dtype=np.int64) # allows negative values as well
 
         user_item_matrix = csr_matrix((val, (idx[:, 0], idx[:, 1])),
-                                        shape=shp, dtype=np.float64)
+                                        shape=shp, dtype=val.dtype)
         tik = timer()
         i2i_matrix = user_item_matrix.T.dot(user_item_matrix)
 
         #exclude "self-links"
         diag_vals = i2i_matrix.diagonal()
-        i2i_matrix -= sp.sparse.dia_matrix((diag_vals, 0), shape=i2i_matrix.shape)
+        i2i_matrix -= sp.sparse.dia_matrix((diag_vals, 0), shape=i2i_matrix.shape,
+                                                            dtype=i2i_matrix.dtype)
         tok = timer() - tik
         print '{} model training time: {}s'.format(self.method, tok)
 
@@ -403,7 +404,7 @@ class CooccurrenceModel(RecommenderModel):
         test_matrix, slice_data = self.get_test_matrix(test_data, shape, (start, stop))
 
         if self.implicit:
-            test_matrix.data = np.ones_like(test_matrix.data)
+            test_matrix.data =  np.sign(test_matrix.data, dtype=np.int64)
 
         scores = test_matrix.dot(self._i2i_matrix)
         return scores, slice_data
