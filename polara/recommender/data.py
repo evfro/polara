@@ -502,3 +502,60 @@ class BinaryDataMixin(object):
         evalset.loc[:, userid] = evalset[userid].map(new_test_idx.set_index('old').new)
         new_test_idx.old = new_test_idx.old.map(self.index.userid.test.set_index('new').old)
         self.index.userid._replace(test=new_test_idx)
+
+
+class LongTailMixin(object):
+    def __init__(self, *args, **kwargs):
+        self.long_tail_holdout = kwargs.pop('long_tail_holdout', False)
+        # use predefined list if defined
+        self.short_head_items = kwargs.pop('short_head_items', None)
+        # amount of feedback accumulated in short head
+        self.head_feedback_frac = kwargs.pop('head_feedback_frac', 0.33)
+        # fraction of popular items considered as short head
+        self.head_items_frac = kwargs.pop('head_items_frac', None)
+        self._long_tail_items = None
+        super(LongTailMixin, self).__init__(*args, **kwargs)
+
+    @property
+    def long_tail_items(self):
+        if self.short_head_items is not None:
+            short_head = self.short_head_items
+            long_tail = self.index.itemid.query('old not in @short_head').new.values
+        else:
+            long_tail = self._get_long_tail()
+        return long_tail
+
+    def _get_long_tail(self):
+        itemid = self.fields.itemid
+        popularity = self.training[itemid].value_counts(ascending=False, normalize=True)
+        tail_idx = None
+
+        if self.head_items_frac:
+            self.head_feedback_frac = None # could in principle calculate real value instead
+            items_frac = np.arange(1, len(popularity)+1) / len(popularity)
+            tail_idx = items_frac > self.head_items_frac
+
+        if self.head_feedback_frac:
+            tail_idx = popularity.cumsum().values > self.head_feedback_frac
+
+        if tail_idx is None:
+            long_tail = None
+            self.long_tail_holdout = False
+        else:
+            long_tail = popularity.index[tail_idx]
+
+        return long_tail
+
+    def _sample_holdout(self, data):
+        if self.long_tail_holdout:
+            itemid = self.fields.itemid
+            long_tail_sel = data[itemid].isin(self.long_tail_items)
+            self.__head_data = data[~long_tail_sel]
+            data = data[long_tail_sel]
+        return super(LongTailMixin, self)._sample_holdout(data)
+
+    def _sample_test_data(self, data):
+        if self.long_tail_holdout:
+            data = pd.concat([self.__head_data, data], copy=True)
+            del self.__head_data
+        return super(LongTailMixin, self)._sample_test_data(data)
