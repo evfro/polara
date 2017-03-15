@@ -4,6 +4,10 @@ import numpy as np
 from collections import namedtuple
 
 
+def random_choice(df, num, random_state):
+    return df.iloc[random_state.choice(df.shape[0], num, replace=False)]
+
+
 class RecommenderData(object):
     _std_fields = ('userid', 'itemid', 'feedback')
     _datawise_properties = {'_shuffle_data', '_test_ratio', '_test_fold'}
@@ -333,20 +337,14 @@ class RecommenderData(object):
             self.index.userid.test.loc[new_test_idx['old'].values, 'new'] = new_test_idx['new'].values
 
 
-    def _split_eval_data(self, renew=False):
-        def random_choice(df, num):
-            # TODO add control with RandomState
-            return df.iloc[np.random.choice(df.shape[0], num, replace=False)]
+    def _split_eval_data(self):
+        userid, feedback = self.fields.userid, self.fields.feedback
 
         if self._change_properties: #
             print 'Updating test data.'
             self._test = self._test_old
             self._has_updated = True
             self._change_properties.clear()
-
-        userid, itemid, feedback = self.fields
-        lastn = self._holdout_size
-        test_sample = self._test_sample
 
         # data may have many items with top ratings and result depends on how
         # they are sorted. randomizing the data helps to avoid biases
@@ -355,34 +353,59 @@ class RecommenderData(object):
         else:
             test_data = self._test
 
-        order_field = self._custom_order or feedback
-        eval_grouper = test_data.groupby(userid, sort=False)[order_field]
+        # split holdout items from the rest of the test data
+        holdout = self._sample_holdout(test_data)
+        evalidx = holdout.index.get_level_values(1)
+        evalset = test_data.loc[evalidx]
 
-        if self.random_holdout: #randomly sample data for evaluation
-            eval_data = eval_grouper.apply(random_choice, lastn)
-        elif self.negative_prediction: #try to holdout negative only examples
-            eval_data = eval_grouper.nsmallest(lastn)
-        else: #standard top-score prediction mode
-            eval_data = eval_grouper.nlargest(lastn)
+        # get test users whos items were hidden
+        testset = test_data[~test_data.index.isin(evalidx)]
+        # leave at most self.test_sample items for every test user
+        testset = self._sample_testset(testset)
 
-        eval_idx = eval_data.index.get_level_values(1)
-        #ensure correct sorting of users in test and eval - order must be the same
-        evalset = test_data.loc[eval_idx].sort_values(userid)
-        testset = test_data[~test_data.index.isin(eval_idx)].sort_values(userid)
-
-        if isinstance(test_sample, int):
-            if test_sample > 0:
-                testset = (testset.groupby(userid, sort=False, group_keys=False)
-                                    .apply(random_choice, test_sample))
-            elif test_sample < 0: #leave only the most negative feedback from user
-                test_idx = (testset.groupby(userid, sort=False)[feedback]
-                                    .nsmallest(-test_sample).index.get_level_values(1))
-                testset = testset.loc[test_idx]
+        # ensure identical ordering of users in testset and holdout
+        testset = testset.sort_values(userid)
+        evalset = evalset.sort_values(userid)
 
         self._test_old = self._test
-        #TODO make it computed from index data and _data, instead of storing in memory
+        #TODO make it computed from index data and _data
+        #self._test_idx = namedtuple('TestDataIndex', 'testset evalset')
+        #           ._make([self._test.testset.index, self._test.evalset.index])
         self._test = namedtuple('TestData', 'testset evalset')._make([testset, evalset])
-        #self._test_idx = namedtuple('TestDataIndex', 'testset evalset')._make([self._test.testset.index, self._test.evalset.index])
+
+
+    def _sample_holdout(self, data):
+        userid, feedback = self.fields.userid, self.fields.feedback
+        order_field = self._custom_order or feedback
+        grouper = data.groupby(userid, sort=False)[order_field]
+
+        if self.random_holdout: #randomly sample data for evaluation
+            holdout = grouper.apply(random_choice, self._holdout_size, self.random_state or np.random)
+        elif self.negative_prediction: #try to holdout negative only examples
+            holdout = grouper.nsmallest(self._holdout_size)
+        else: #standard top-score prediction mode
+            holdout = grouper.nlargest(self._holdout_size)
+
+        return holdout
+
+
+    def _sample_testset(self, data):
+        test_sample = self.test_sample
+        if not isinstance(test_sample, int):
+            return data
+
+        userid, feedback = self.fields.userid, self.fields.feedback
+        if test_sample > 0:
+            sampled = (data.groupby(userid, sort=False, group_keys=False)
+                            .apply(random_choice, test_sample, self.random_state or np.random))
+        elif test_sample < 0: #leave only the most negative feedback from user
+            idx = (data.groupby(userid, sort=False)[feedback]
+                        .nsmallest(-test_sample).index.get_level_values(1))
+            sampled = data.loc[idx]
+        else:
+            sampled = data
+
+        return sampled
 
 
     def to_coo(self, tensor_mode=False):
