@@ -1,3 +1,4 @@
+from collections import namedtuple
 from timeit import default_timer as timer
 import pandas as pd
 import numpy as np
@@ -131,12 +132,69 @@ class RecommenderModel(object):
         raise NotImplementedError('This must be implemented in subclasses')
 
 
-    def user_recommendations(self, i):
+    def _user_scores(self, i):
+        # should not be exposed, designed for use within framework
+        # operates on internal itemid's
         test_data, test_shape = self._get_test_data()
         scores, seen_idx = self.slice_recommendations(test_data, test_shape, i, i+1)
-        if not sp.sparse.issparse(scores):
-            scores = scores.squeeze()
-        return scores, seen_idx[1]
+
+        if self.filter_seen:
+            self.downvote_seen_items(scores, seen_idx)
+
+        return scores, seen_idx
+
+
+    def _make_user(self, user_info):
+        # converts external user info into internal representation
+        userid, itemid, feedback = self.data.fields
+
+        if isinstance(user_info, dict):
+            user_info = user_info.items()
+        try:
+            items_data, feedback_data = zip(*user_info)
+        except TypeError:
+            items_data = user_info
+            feedback_val = self.data.training[feedback].max()
+            feedback_data = [feedback_val]*len(items_data)
+
+        # need to convert itemid's to internal representation
+        # conversion is not required for feedback (it's made in *to_coo functions, if needed)
+        items_data = self.data.index.itemid.set_index('old').loc[items_data, 'new'].values
+        user_data = pd.DataFrame({userid:[0]*len(items_data),
+                                itemid:items_data,
+                                feedback:feedback_data})
+        return user_data
+
+
+    def show_recommendations(self, user_info, topk=None):
+        # convenience function to model users and get recs
+        # operates on external itemid's
+        if isinstance(user_info, int):
+            scores, seen_idx = self._user_scores(user_info)
+        else:
+            testset = self.data.test.testset
+            evalset = self.data.test.evalset
+            user_data = self._make_user(user_info)
+            try:
+                # makes a "fake" test user
+                self.data._test = namedtuple('TestData', 'testset evalset')._make([user_data, None])
+                scores, seen_idx = self._user_scores(0)
+            finally:
+                # restore original data - prevent information loss
+                self.data._test = namedtuple('TestData', 'testset evalset')._make([testset, evalset])
+
+        _topk = self.topk
+        self.topk = topk or _topk
+        # takes care of both sparse and dense recommendation lists
+        top_recs = self.get_topk_items(scores).squeeze() #remove singleton
+        self.topk = _topk
+
+        seen_idx = seen_idx[1] # only items idx
+        # covert back to external representation
+        item_idx_map = self.data.index.itemid.set_index('new')
+        top_recs = item_idx_map.loc[top_recs, 'old'].values
+        seen_items = item_idx_map.loc[seen_idx, 'old'].values
+        return top_recs, seen_items
 
 
     def get_recommendations(self):
