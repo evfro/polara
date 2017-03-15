@@ -307,12 +307,16 @@ class RecommenderModel(object):
 
 
     @staticmethod
-    def orthogonalize(u, v):
+    def orthogonalize(u, v, complete=False):
         Qu, Ru = np.linalg.qr(u)
         Qv, Rv = np.linalg.qr(v)
-        Ur, Sr, Vr = np.linalg.svd(Ru.dot(Rv.T))
-        U = Qu.dot(Ur)
-        V = Qv.dot(Vr.T)
+        if complete:
+            # it's not needed for folding-in, as Ur and Vr will cancel out anyway
+            Ur, Sr, Vr = np.linalg.svd(Ru.dot(Rv.T))
+            U = Qu.dot(Ur)
+            V = Qv.dot(Vr.T)
+        else:
+            U, V = Qu, Qv
         return U, V
 
 
