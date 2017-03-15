@@ -100,6 +100,14 @@ class RecommenderModel(object):
         return (user_slice_coo, item_slice_coo, fdbk_slice_coo)
 
 
+    def get_training_matrix(self, dtype=None):
+        idx, val, shp = self.data.to_coo(tensor_mode=False)
+        dtype = dtype or val.dtype
+        matrix = csr_matrix((val, (idx[:, 0], idx[:, 1])),
+                            shape=shp, dtype=dtype)
+        return matrix
+
+
     def get_test_matrix(self, test_data, shape, user_slice=None):
         num_users_all = shape[0]
         if user_slice:
