@@ -35,7 +35,7 @@ class RecommenderData(object):
         self._has_updated = False #indicated whether test data has been changed
         self._has_changed = False #indicated whether full data has been changed
         self._change_properties = set() #container for changed properties
-        self.random_seed = None #use with shuffle_data and permute_tops property
+        self.random_state = None #use with shuffle_data, permute_tops, random_choice
 
 
     def _set_defaults(self, params=None):
@@ -194,7 +194,7 @@ class RecommenderData(object):
     def prepare(self):
         print 'Preparing data'
         if self._shuffle_data:
-            self._data = self._data.sample(frac=1, random_state=self.random_seed)
+            self._data = self._data.sample(frac=1, random_state=self.random_state)
         elif '_shuffle_data' in self._change_properties:
             print 'Recovering original data state due to change in shuffle_data.'
             self._data = self._data.sort_index()
@@ -351,7 +351,7 @@ class RecommenderData(object):
         # data may have many items with top ratings and result depends on how
         # they are sorted. randomizing the data helps to avoid biases
         if self.permute_tops:
-            test_data = self._test.sample(frac=1, random_state=self.random_seed)
+            test_data = self._test.sample(frac=1, random_state=self.random_state)
         else:
             test_data = self._test
 
