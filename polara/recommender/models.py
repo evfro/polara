@@ -265,7 +265,11 @@ class RecommenderModel(object):
                 lowered = recs.data.min() - (seen_data.max() - seen_data) - 1
                 recs.data[idx_seen_bool] = lowered
         else:
-            idx_seen_flat = np.ravel_multi_index(idx_seen, recs.shape)
+            try:
+                idx_seen_flat = np.ravel_multi_index(idx_seen, recs.shape)
+            except ValueError:
+                # make compatible for single user recommendations
+                idx_seen_flat = idx_seen
             seen_data = recs.flat[idx_seen_flat]
             # move seen items scores below minimum value
             lowered = recs.min() - (seen_data.max() - seen_data) - 1
