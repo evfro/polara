@@ -457,11 +457,13 @@ class SVDModel(RecommenderModel):
         self.method = 'SVD'
 
 
-    def build(self):
+    def build(self, operator=None):
         self._recommendations = None
-        idx, val, shp = self.data.to_coo(tensor_mode=False)
-        svd_matrix = csr_matrix((val, (idx[:, 0], idx[:, 1])),
-                                shape=shp, dtype=np.float64)
+
+        if operator is None:
+            svd_matrix = self.get_training_matrix(dtype=np.float64)
+        else:
+            svd_matrix = operator
 
         tik = timer()
         _, _, items_factors = svds(svd_matrix, k=self.rank, return_singular_vectors='vh')
