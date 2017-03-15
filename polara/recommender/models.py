@@ -406,9 +406,9 @@ class CooccurrenceModel(RecommenderModel):
         i2i_matrix = user_item_matrix.T.dot(user_item_matrix) # gives CSC format
 
         #exclude "self-links"
-        diag_vals = i2i_matrix.diagonal()
-        i2i_matrix -= sp.sparse.dia_matrix((diag_vals, 0), shape=i2i_matrix.shape,
-                                                            dtype=i2i_matrix.dtype)
+        i2i_matrix.setdiag(0)
+        i2i_matrix.eliminate_zeros()
+
         tok = timer() - tik
         print '{} model training time: {}s'.format(self.method, tok)
 
