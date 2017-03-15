@@ -396,13 +396,12 @@ class CooccurrenceModel(RecommenderModel):
 
     def build(self):
         self._recommendations = None
-        idx, val, shp = self.data.to_coo()
 
+        user_item_matrix = self.get_training_matrix()
         if self.implicit:
-            val = np.sign(val, dtype=np.int64) # allows negative values as well
+            # np.sign allows for negative values as well
+            user_item_matrix.data = np.sign(user_item_matrix.data, dtype=np.int64)
 
-        user_item_matrix = csr_matrix((val, (idx[:, 0], idx[:, 1])),
-                                        shape=shp, dtype=val.dtype)
         tik = timer()
         i2i_matrix = user_item_matrix.T.dot(user_item_matrix) # gives CSC format
 
