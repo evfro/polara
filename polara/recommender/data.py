@@ -466,18 +466,39 @@ class RecommenderData(object):
         return shape
 
 
-class RecommenderDataPositive(RecommenderData):
-    def __init__(self, pos_value, *args, **kwargs):
-        super(RecommenderDataPositive, self).__init__(*args, **kwargs)
-        self.pos_value = pos_value
+class BinaryDataMixin(object):
+    def __init__(self, *args, **kwargs):
+        self.binary_threshold = kwargs.pop('binary_threshold', None)
+        super(BinaryDataMixin, self).__init__(*args, **kwargs)
+
+    def _binarize(self, data, return_filtered_users=False):
+        feedback = self.fields.feedback
+        data = data[data[feedback] >= self.binary_threshold].copy()
+        data[feedback] = np.ones_like(data[feedback])
+        return data
 
     def _split_test_data(self):
-        super(RecommenderDataPositive, self)._split_test_data()
-        self._get_positive_only()
+        super(BinaryDataMixin, self)._split_test_data()
+        if self.binary_threshold is not None:
+            self._training = self._binarize(self._training)
 
-    def _get_positive_only(self):
-        userid, feedback = self.fields.userid, self.fields.feedback
-        pos_only_data = self._training.loc[self._training[feedback] >= self.pos_value]
-        valid_users = pos_only_data.groupby(userid, sort=False).size() > self.holdout_size
-        user_idx = valid_users.index[valid_users]
-        self._training = pos_only_data[pos_only_data.userid.isin(user_idx)].copy()
+    def _split_eval_data(self):
+        super(BinaryDataMixin, self)._split_eval_data()
+        if self.binary_threshold is not None:
+            userid = self.fields.userid
+            testset = self._binarize(self.test.testset)
+            test_users = testset[userid].unique()
+            user_sel = self.test.evalset[userid].isin(test_users)
+            evalset = self.test.evalset[user_sel].copy()
+            self._test = namedtuple('TestData', 'testset evalset')._make([testset, evalset])
+            if len(test_users) != (testset.userid.max()+1):
+                # remove gaps in test user indices
+                self._update_test_user_index()
+
+    def _update_test_user_index(self):
+        testset, evalset = self._test
+        userid = self.fields.userid
+        new_test_idx = self.reindex(testset, userid, sort=False, inplace=True)
+        evalset.loc[:, userid] = evalset[userid].map(new_test_idx.set_index('old').new)
+        new_test_idx.old = new_test_idx.old.map(self.index.userid.test.set_index('new').old)
+        self.index.userid._replace(test=new_test_idx)
