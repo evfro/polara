@@ -494,7 +494,7 @@ class CooccurrenceModel(RecommenderModel):
             # transpose helps to avoid expensive conversion to CSR (performed by scipy)
             if scores.nnz > NNZ_MAX:
                 # too many nnz lead to undesired memory overhead in downvote_seen_items
-                scores = scores.todense()
+                scores = scores.toarray(order='C')
         return scores
 
 
