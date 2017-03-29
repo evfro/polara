@@ -8,8 +8,8 @@ def unmask(x):
     return None if x is np.ma.masked else x
 
 
-def get_hits(matched_predictions, positive_feedback):
-    reldata = get_relevance_data(matched_predictions, positive_feedback)
+def get_hits(matched_predictions, positive_feedback, not_rated_penalty):
+    reldata = get_relevance_data(matched_predictions, positive_feedback, not_rated_penalty)
     true_pos, false_pos = reldata.tp, reldata.fp
     true_neg, false_neg = reldata.tn, reldata.fn
 
@@ -23,9 +23,9 @@ def get_hits(matched_predictions, positive_feedback):
     return hits
 
 
-def get_relevance_scores(matched_predictions, positive_feedback):
+def get_relevance_scores(matched_predictions, positive_feedback, not_rated_penalty):
     users_num = matched_predictions.shape[0]
-    reldata = get_relevance_data(matched_predictions, positive_feedback)
+    reldata = get_relevance_data(matched_predictions, positive_feedback, not_rated_penalty)
     true_pos, false_pos = reldata.tp, reldata.fp
     true_neg, false_neg = reldata.tn, reldata.fn
 
@@ -87,7 +87,7 @@ def get_ranking_scores(matched_predictions, feedback_data, switch_positive, alte
     return ranking_score
 
 
-def get_relevance_data(matched_items, positive_feedback, not_rated_penalty=0):
+def get_relevance_data(matched_items, positive_feedback, not_rated_penalty):
     negative_feedback = ~positive_feedback
     missed_items = ~matched_items
 

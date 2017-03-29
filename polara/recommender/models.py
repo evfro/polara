@@ -35,6 +35,7 @@ class RecommenderModel(object):
         # (in contrast to `on_feedback_level` argument of self.evaluate)
         self.switch_positive  = switch_positive or get_default('switch_positive')
         self.verify_integrity =  get_default('verify_integrity')
+        self.not_rated_penalty = 0
 
 
     @property
@@ -280,13 +281,13 @@ class RecommenderModel(object):
 
         if method == 'relevance':
             positive_feedback = self.get_positive_feedback(on_feedback_level)
-            scores = get_relevance_scores(matched_predictions, positive_feedback)
+            scores = get_relevance_scores(matched_predictions, positive_feedback, self.not_rated_penalty)
         elif method == 'ranking':
             feedback = self.get_feedback_data(on_feedback_level)
             scores = get_ranking_scores(matched_predictions, feedback, self.switch_positive)
         elif method == 'hits':
             positive_feedback = self.get_positive_feedback(on_feedback_level)
-            scores = get_hits(matched_predictions, positive_feedback)
+            scores = get_hits(matched_predictions, positive_feedback, self.not_rated_penalty)
         else:
             raise NotImplementedError
         return scores
