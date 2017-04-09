@@ -463,7 +463,7 @@ class CooccurrenceModel(RecommenderModel):
         user_item_matrix = self.get_training_matrix()
         if self.implicit:
             # np.sign allows for negative values as well
-            user_item_matrix.data = np.sign(user_item_matrix.data, dtype=np.int64)
+            user_item_matrix.data = np.sign(user_item_matrix.data)
 
         tik = timer()
         i2i_matrix = user_item_matrix.T.dot(user_item_matrix) # gives CSC format
@@ -505,7 +505,7 @@ class CooccurrenceModel(RecommenderModel):
         # recommendations, as vector of shape (1, N) in CSC format is inefficient
 
         if self.implicit:
-            test_matrix.data =  np.sign(test_matrix.data, dtype=np.int64)
+            test_matrix.data =  np.sign(test_matrix.data)
 
         scores = self._sparse_dot(test_matrix, self._i2i_matrix)
         return scores, slice_data
