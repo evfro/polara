@@ -491,7 +491,7 @@ class BinaryDataMixin(object):
             user_sel = self.test.evalset[userid].isin(test_users)
             evalset = self.test.evalset[user_sel].copy()
             self._test = namedtuple('TestData', 'testset evalset')._make([testset, evalset])
-            if len(test_users) != (testset.userid.max()+1):
+            if len(test_users) != (testset[userid].max()+1):
                 # remove gaps in test user indices
                 self._update_test_user_index()
 
