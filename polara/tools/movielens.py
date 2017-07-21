@@ -48,6 +48,7 @@ def get_movielens_data(local_file=None, get_ratings=True, get_genres=False,
                                         names=['movieid', 'imdbid', 'tmdbid'])
 
     res = [data for data in [ml_data, ml_genres, mapping] if data is not None]
+    if len(res)==1: res = res[0]
     return res
 
 
