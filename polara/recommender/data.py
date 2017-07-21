@@ -333,7 +333,7 @@ class RecommenderData(object):
             new_test_idx = self.reindex(self._test, userid, sort=False, inplace=True)
             #update index info accordingly
             old_test_idx = self.index.userid.test
-            self.index.userid._replace(test=old_test_idx[old_test_idx['new'].isin(valid_users_idx)])
+            self.index = self.index._replace(userid=self.index.userid._replace(test=old_test_idx[old_test_idx['new'].isin(valid_users_idx)]))
             self.index.userid.test.loc[new_test_idx['old'].values, 'new'] = new_test_idx['new'].values
 
 
@@ -501,7 +501,7 @@ class BinaryDataMixin(object):
         new_test_idx = self.reindex(testset, userid, sort=False, inplace=True)
         evalset.loc[:, userid] = evalset[userid].map(new_test_idx.set_index('old').new)
         new_test_idx.old = new_test_idx.old.map(self.index.userid.test.set_index('new').old)
-        self.index.userid._replace(test=new_test_idx)
+        self.index = self.index._replace(userid=self.index.userid._replace(test=new_test_idx))
 
 
 class LongTailMixin(object):
