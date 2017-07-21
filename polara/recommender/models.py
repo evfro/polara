@@ -339,6 +339,7 @@ class RecommenderModel(object):
     def get_topk_items(self, scores):
         topk = self.topk
         if sp.sparse.issparse(scores):
+            assert scores.format == 'csr'
             # there can be less then topk values in some rows
             # need to extend sorted scores to conform with evaluation matrix shape
             # can do this by adding -1's to the right, however:
