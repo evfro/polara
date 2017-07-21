@@ -256,12 +256,13 @@ class RecommenderModel(object):
         if on_level is not None:
             try:
                 iter(on_level)
+            except TypeError:
+                feedback_data = np.ma.masked_not_equal(feedback_data, on_level)
+            else:
                 mask_level = np.in1d(feedback_data.ravel(),
                                      on_level,
                                      invert=True).reshape(feedback_data.shape)
                 feedback_data = np.ma.masked_where(mask_level, feedback_data)
-            except TypeError:
-                feedback_data = np.ma.masked_not_equal(feedback_data, on_level)
         return feedback_data
 
 
