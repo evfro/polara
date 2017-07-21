@@ -17,6 +17,20 @@ def get_default(name):
     return defaults.get_config([name])[name]
 
 
+class Timer():
+    def __init__(self, model_name='Model'):
+        self.model_name = model_name
+        self.message = '{} training time: {}s'
+
+    def __enter__(self):
+        self.start = timer()
+        return None  # could return anything, to be used like this: with Timer("Message") as value:
+
+    def __exit__(self, type, value, traceback):
+        elapsed_time = timer() - self.start
+        print(self.message.format(self.model_name, elapsed_time))
+
+
 class RecommenderModel(object):
     _config = ('topk', 'filter_seen', 'switch_positive', 'verify_integrity')
     _pad_const = -1 # used for sparse data
@@ -467,15 +481,10 @@ class CooccurrenceModel(RecommenderModel):
             # np.sign allows for negative values as well
             user_item_matrix.data = np.sign(user_item_matrix.data)
 
-        tik = timer()
-        i2i_matrix = user_item_matrix.T.dot(user_item_matrix) # gives CSC format
-
-        #exclude "self-links"
-        i2i_matrix.setdiag(0)
-        i2i_matrix.eliminate_zeros()
-
-        tok = timer() - tik
-        print '{} model training time: {}s'.format(self.method, tok)
+        with Timer(self.method):
+            i2i_matrix = user_item_matrix.T.dot(user_item_matrix) # gives CSC format
+            i2i_matrix.setdiag(0) #exclude "self-links"
+            i2i_matrix.eliminate_zeros()
 
         self._i2i_matrix = i2i_matrix
 
@@ -523,16 +532,10 @@ class SVDModel(RecommenderModel):
 
     def build(self, operator=None):
         self._recommendations = None
+        svd_matrix = operator or self.get_training_matrix(dtype=np.float64)
 
-        if operator is None:
-            svd_matrix = self.get_training_matrix(dtype=np.float64)
-        else:
-            svd_matrix = operator
-
-        tik = timer()
-        _, _, items_factors = svds(svd_matrix, k=self.rank, return_singular_vectors='vh')
-        tok = timer() - tik
-        print '{} model training time: {}s'.format(self.method, tok)
+        with Timer(self.method):
+            _, _, items_factors = svds(svd_matrix, k=self.rank, return_singular_vectors='vh')
 
         self._items_factors = np.ascontiguousarray(items_factors[::-1, :]).T
 
@@ -598,14 +601,14 @@ class CoffeeModel(RecommenderModel):
     def build(self):
         self._recommendations = None
         idx, val, shp = self.data.to_coo(tensor_mode=True)
-        tik = timer()
-        users_factors, items_factors, feedback_factors, core = \
-                            tucker_als(idx, val, shp, self.mlrank,
-                            growth_tol=self.growth_tol,
-                            iters = self.num_iters,
-                            batch_run=not self.show_output)
-        tok = timer() - tik
-        print '{} model training time: {}s'.format(self.method, tok)
+        
+        with Timer(self.method):
+            users_factors, items_factors, feedback_factors, core = \
+                                tucker_als(idx, val, shp, self.mlrank,
+                                growth_tol=self.growth_tol,
+                                iters = self.num_iters,
+                                batch_run=not self.show_output)
+
         self._users_factors = users_factors
         self._items_factors = items_factors
         self._feedback_factors = feedback_factors
