@@ -29,16 +29,17 @@ def get_relevance_scores(matched_predictions, positive_feedback, not_rated_penal
     true_pos, false_pos = reldata.tp, reldata.fp
     true_neg, false_neg = reldata.tn, reldata.fn
 
-    # true positive rate
-    precision = true_pos / (true_pos + false_pos)
-    # sensitivity
-    recall = true_pos / (true_pos + false_neg)
-    # false positive rate
-    fallout = false_pos / (false_pos + true_neg)
-    # true negative rate
-    specifity = true_neg / (false_pos + true_neg)
-    # false negative rate
-    miss_rate = false_neg / (false_neg + true_pos)
+    with np.errstate(invalid='ignore'):
+        # true positive rate
+        precision = true_pos / (true_pos + false_pos)
+        # sensitivity
+        recall = true_pos / (true_pos + false_neg)
+        # false positive rate
+        fallout = false_pos / (false_pos + true_neg)
+        # true negative rate
+        specifity = true_neg / (false_pos + true_neg)
+        # false negative rate
+        miss_rate = false_neg / (false_neg + true_pos)
 
     #average over all users
     precision = unmask(np.nansum(precision) / users_num)
@@ -81,8 +82,11 @@ def get_ranking_scores(matched_predictions, feedback_data, switch_positive, alte
     dcl = (relevance_scores_neg / -discount[:topk]).sum(axis=1)
     idcg = (ideal_scores_pos / discount[:holdout]).sum(axis=1)
     idcl = (ideal_scores_neg / -discount[:holdout]).sum(axis=1)
-    ndcg = unmask(np.nansum(dcg / idcg) / users_num)
-    ndcl = unmask(np.nansum(dcl / idcl) / users_num)
+
+    with np.errstate(invalid='ignore'):
+        ndcg = unmask(np.nansum(dcg / idcg) / users_num)
+        ndcl = unmask(np.nansum(dcl / idcl) / users_num)
+
     ranking_score = namedtuple('Ranking', ['nDCG', 'nDCL'])._make([ndcg, ndcl])
     return ranking_score
 
