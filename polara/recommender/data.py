@@ -55,10 +55,26 @@ class RecommenderData(object):
         self.index = self.index._make([None]*len(self._std_fields))
 
         self._set_defaults()
-        self._has_updated = False #indicated whether test data has been changed
-        self._has_changed = False #indicated whether full data has been changed
         self._change_properties = set() #container for changed properties
         self.random_state = None #use with shuffle_data, permute_tops, random_choice
+
+        self._attached_models = {'on_change': {}, 'on_update': {}}
+        # on_change indicates whether full data has been changed
+        # on_update indicates whether only test data has been changed
+
+
+    def _get_attached_models(self, event):
+        return self._attached_models[event]
+
+    def _attach_model(self, event, model, callback):
+        self._get_attached_models(event)[model] = callback
+
+    def _detach_model(self, event, model):
+        del self._get_attached_models(event)[model]
+
+    def _notify(self, event):
+        for model, callback in self._get_attached_models(event).iteritems():
+            getattr(model, callback)()
 
 
     def _set_defaults(self, params=None):
@@ -171,18 +187,6 @@ class RecommenderData(object):
             self.prepare()
         return self._training
 
-    @property
-    def has_changed(self):
-        value = self._has_changed
-        self._has_changed = False #this is an indicator property, reset once read
-        return value
-
-    @property
-    def has_updated(self):
-        value = self._has_updated
-        self._has_updated = False #this is an indicator property, reset once read
-        return value
-
 
     def _lazy_data_update(self, data_property):
         self._change_properties.add(data_property)
@@ -229,8 +233,7 @@ class RecommenderData(object):
         self._align_test_items()
         self._split_eval_data()
 
-        self._has_changed = True
-        #TODO implement operations with this property container
+        self._notify('on_change')
 
 
     def update(self):
@@ -363,7 +366,8 @@ class RecommenderData(object):
         if self._change_properties: #
             print 'Updating test data.'
             self._test = self._test_old
-            self._has_updated = True
+
+            self._notify('on_update')
             self._change_properties.clear()
 
         # data may have many items with top ratings and result depends on how
