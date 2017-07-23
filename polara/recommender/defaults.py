@@ -1,6 +1,6 @@
 import sys
 
-#INITIALIZATION
+#DATA
 #properties that require rebuilding test data:
 test_ratio = 0.2 #split 80% of users for training, 20% for test
 test_fold = 5 #which fold to use for test data
@@ -24,6 +24,7 @@ growth_tol = 0.0001
 num_iters = 25
 show_output = False
 flattener = slice(0, None)
+
 
 #RECOMMENDATIONS
 topk = 10 #number of items to return

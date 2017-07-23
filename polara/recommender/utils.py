@@ -1,13 +1,22 @@
 from __future__ import division
+import sys
 import numpy as np
 from polara.tools.systools import get_available_memory
 
 
-MEMORY_HARD_LIMIT = 1 # in gigbytes, default=1
+MEMORY_HARD_LIMIT = 1 # in gigbytes, default=1, depends on hardware
 # varying this value may significantly impact performance
 # setting it to None or large value typically reduces performance,
 # as iterating over a smaller number of huge arrays takes longer
 # than over a higher number of smaller arrays
+
+tuplsize = sys.getsizeof(())
+itemsize = np.dtype(np.intp).itemsize
+pntrsize = sys.getsizeof(1.0)
+# size of list of tuples of indices - to estimate when to convert sparse matrix to dense
+# based on http://stackoverflow.com/questions/15641344/python-memory-consumption-dict-vs-list-of-tuples
+# and https://code.tutsplus.com/tutorials/understand-how-much-memory-your-python-objects-use--cms-25609
+NNZ_MAX = int(MEMORY_HARD_LIMIT * (1024**3) / (tuplsize + 2*(pntrsize + itemsize)))
 
 
 def range_division(length, fit_size):

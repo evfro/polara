@@ -33,9 +33,10 @@ A special effort was made to make a *recsys for humans*, which stresses on the e
 from polara.recommender.data import RecommenderData
 from polara.recommender.models import SVDModel
 from polara.tools.movielens import get_movielens_data
-
+# get data and convert it into appropriate format
 ml_data = get_movielens_data(get_genres=False)
 data_model = RecommenderData(ml_data, 'userid', 'movieid', 'rating')
+# build PureSVD model and evaluate it
 svd = SVDModel(data_model)
 svd.build()
 svd.evaluate()
@@ -44,44 +45,33 @@ svd.evaluate()
 ## Creating new recommender models
 Basic models can be extended by subclassing `RecommenderModel` class and defining two required methods: `self.build()` and `self.get_recommendations()`. Here's an example of a simple item-to-item recommender model:
 ```python
-import scipy as sp
-import scipy.sparse
-from scipy.sparse import csr_matrix
-import numpy as np
 from polara.recommender.models import RecommenderModel
 
 class CooccurrenceModel(RecommenderModel):
     def __init__(self, *args, **kwargs):
         super(CooccurrenceModel, self).__init__(*args, **kwargs)
-        self.method = 'item-to-item' #pick some meaningful name
-        self.implicit = True # will convert feedback values to all ones
+        self.method = 'item-to-item' # pick some meaningful name
 
     def build(self):
-        self._recommendations = None
-        idx, val, shp = self.data.to_coo()
-        if self.implicit:
-            val = np.ones_like(val)
-        user_item_matrix = csr_matrix((val, (idx[:, 0], idx[:, 1])),
-                                        shape=shp, dtype=np.float64)
-
-        i2i_matrix = user_item_matrix.T.dot(user_item_matrix)
-        #exclude "self-links"
-        diag_vals = i2i_matrix.diagonal()
-        i2i_matrix -= sp.sparse.dia_matrix((diag_vals, 0), shape=i2i_matrix.shape)
+        # build model - calculate item-to-item matrix
+        user_item_matrix = self.get_training_matrix()
+        # rating matrix product  R^T R  gives cooccurrences count
+        i2i_matrix = user_item_matrix.T.dot(user_item_matrix) # gives CSC format
+        i2i_matrix.setdiag(0) # exclude "self-links"
+        i2i_matrix.eliminate_zeros() # ensure only non-zero elements are stored
+        # store matrix for generating recommendations
         self._i2i_matrix = i2i_matrix
 
     def get_recommendations(self):
-        test_data = self.data.test_to_coo()
-        test_shape = self.data.get_test_shape()
+        # get test users information and generate top-k recommendations
+        test_data, test_shape = self._get_test_data()
         test_matrix, _ = self.get_test_matrix(test_data, test_shape)
-        if self.implicit:
-            test_matrix.data = np.ones_like(test_matrix.data)
-
+        # calculate predicted scores
         i2i_scores = test_matrix.dot(self._i2i_matrix)
         if self.filter_seen:
             # prevent seen items from appearing in recommendations
             self.downvote_seen_items(i2i_scores, test_data)
-
+        # generate top-k recommendations for every test user
         top_recs = self.get_topk_items(i2i_scores)
         return top_recs
 ```
