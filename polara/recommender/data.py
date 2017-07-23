@@ -8,6 +8,22 @@ def random_choice(df, num, random_state):
     return df.iloc[random_state.choice(df.shape[0], num, replace=False)]
 
 
+def filter_by_length(data, userid='userid', min_session_length=3):
+    """Filters users with insufficient number of items"""
+    if data.duplicated().any():
+        raise NotImplementedError
+
+    sz = data[userid].value_counts(sort=False)
+    has_valid_session_length = sz >= min_session_length
+    if not has_valid_session_length.all():
+        valid_users = sz.index[has_valid_session_length]
+        new_data =  data[data[userid].isin(valid_users)].copy()
+        print 'Sessions are filtered by length'
+    else:
+        new_data = data
+    return new_data
+
+
 class RecommenderData(object):
     _std_fields = ('userid', 'itemid', 'feedback')
     _datawise_properties = {'_shuffle_data', '_test_ratio', '_test_fold'}
