@@ -47,11 +47,6 @@ def build_models(models):
         model.build()
 
 
-def refresh_models(models):
-    for model in models:
-        model._recommendations = None
-
-
 def consolidate(scores, params, metrics):
     res = {}
     for i, metric in enumerate(metrics):
@@ -72,45 +67,32 @@ def consolidate_folds(scores, folds, metrics, index_names = ['fold', 'top-n']):
 def holdout_test_pair(model1, model2, holdout_sizes=[1], metrics=['hits']):
     holdout_scores = []
     models = [model1, model2]
-    check_updates(models)
 
     data1 = model1.data
     data2 = model2.data
     for i in holdout_sizes:
         print i,
         data1.holdout_size = i
+        data1.update()
         data2.holdout_size = i
-        data1.update()
-        data1.update()
+        data2.update()
 
-        refresh_models(models)
         metric_scores = evaluate_models(models, metrics)
         holdout_scores.append(metric_scores)
 
     return consolidate(holdout_scores, holdout_sizes, metrics)
 
 
-def check_updates(models):
-    data = models[0].data
-    if data.has_changed: #Rebuild models entirely
-        print 'Data has been changed. Rebuiding the models.'
-        build_models(models)
-    elif data.has_updated: #just force recommendations renewal
-        print 'Test data has been updated. Refreshing the models.'
-        refresh_models(models)
-
-
 def holdout_test(models, holdout_sizes=[1], metrics=['hits']):
-    #check_updates(models) #will rebuild or renew models if data was manipulated in previous experiments
     holdout_scores = []
     data = models[0].data
     assert all([model.data is data for model in models[1:]]) #check that data is shared across models
 
+    build_models(models)
     for i in holdout_sizes:
         print i,
         data.holdout_size = i
-        data.update() #can be omitted but it's more safe
-        refresh_models(models) #test data is updated - clear old recommendations
+        data.update()
 
         metric_scores = evaluate_models(models, metrics)
         holdout_scores.append(metric_scores)
@@ -121,11 +103,12 @@ def holdout_test(models, holdout_sizes=[1], metrics=['hits']):
 def topk_test(models, topk_list=[10], metrics=['hits']):
     topk_scores = []
     data = models[0].data
-    data.update()
-    check_updates(models) #will rebuild or renew models if data was manipulated in previous experiments
     assert all([model.data is data for model in models[1:]]) #check that data is shared across models
+
+    data.update()
     topk_list = list(reversed(sorted(topk_list))) #start from max topk and rollback
 
+    build_models(models)
     for topk in topk_list:
         print topk,
         metric_scores = evaluate_models(models, metrics, topk)
