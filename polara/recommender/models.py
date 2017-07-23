@@ -31,7 +31,26 @@ class Timer():
         print(self.message.format(self.model_name, elapsed_time))
 
 
+class MetaModel(type):
+    # this metaclass ensures that every time the build function is called,
+    # all cached recommendations are cleared
+    # key idea is borrowed from here:
+    # https://stackoverflow.com/questions/18858759/python-decorating-a-class-method-that-is-intended-to-be-overwritten-when-inheri
+    def __init__(cls, name, bases, clsdict):
+        super(MetaModel, cls).__init__(name, bases, clsdict)
+        if 'build' in clsdict:
+            def clean_build(self, *args, **kwargs):
+                self._is_ready = False
+                self._recommendations = None
+                clsdict['build'](self, *args, **kwargs)
+                self._is_ready = True
+            setattr(cls, 'build', clean_build)
+
+
 class RecommenderModel(object):
+
+    __metaclass__ = MetaModel
+
     _config = ('topk', 'filter_seen', 'switch_positive', 'verify_integrity')
     _pad_const = -1 # used for sparse data
 
@@ -51,16 +70,18 @@ class RecommenderModel(object):
         self.verify_integrity =  get_default('verify_integrity')
         self.not_rated_penalty = 0
 
+        self._is_ready = False
+        self.data._attach_model('on_change', self, '_on_change')
+        self.data._attach_model('on_update', self, '_on_update')
+
 
     @property
     def recommendations(self):
-        if (self._recommendations is None):
-            try:
-                self._recommendations = self.get_recommendations()
-            except AttributeError:
+        if self._recommendations is None:
+            if not self._is_ready:
                 print '{} model is not ready. Rebuilding.'.format(self.method)
                 self.build()
-                self._recommendations = self.get_recommendations()
+            self._recommendations = self.get_recommendations()
         return self._recommendations
 
 
@@ -78,6 +99,14 @@ class RecommenderModel(object):
 
     def build(self):
         raise NotImplementedError('This must be implemented in subclasses')
+
+
+    def _on_change(self):
+        self._recommendations = None
+        self._is_ready = False
+
+    def _on_update(self):
+        self._recommendations = None
 
 
     def _get_slices_idx(self, shape, result_width=None, scores_multiplier=None, dtypes=None):
@@ -433,7 +462,7 @@ class NonPersonalized(RecommenderModel):
 
 
     def build(self):
-        self._recommendations = None
+        pass
 
 
     def get_recommendations(self):
@@ -474,8 +503,6 @@ class CooccurrenceModel(RecommenderModel):
 
 
     def build(self):
-        self._recommendations = None
-
         user_item_matrix = self.get_training_matrix()
         if self.implicit:
             # np.sign allows for negative values as well
@@ -531,7 +558,6 @@ class SVDModel(RecommenderModel):
 
 
     def build(self, operator=None):
-        self._recommendations = None
         svd_matrix = operator or self.get_training_matrix(dtype=np.float64)
 
         with Timer(self.method):
@@ -599,9 +625,8 @@ class CoffeeModel(RecommenderModel):
 
 
     def build(self):
-        self._recommendations = None
         idx, val, shp = self.data.to_coo(tensor_mode=True)
-        
+
         with Timer(self.method):
             users_factors, items_factors, feedback_factors, core = \
                                 tucker_als(idx, val, shp, self.mlrank,
