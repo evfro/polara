@@ -172,19 +172,12 @@ class RecommenderData(object):
 
     @property
     def test(self):
-        update_data, update_test = self._pending_change()
-        if update_data or not hasattr(self, '_test'):
-            self.prepare()
-            test_change_required = False #changes are already effective
-        if update_test:
-            self._split_eval_data()
+        self.update()
         return self._test
 
     @property
     def training(self):
-        update_data, _ = self._pending_change()
-        if update_data or not hasattr(self, '_training'):
-            self.prepare()
+        self.update() # both _test and _training attributes appear simultaneously
         return self._training
 
 
