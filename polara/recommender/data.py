@@ -26,8 +26,11 @@ def filter_by_length(data, userid='userid', min_session_length=3):
 
 class RecommenderData(object):
     _std_fields = ('userid', 'itemid', 'feedback')
+    # changing one of these params requires running prepare() method:
     _datawise_properties = {'_shuffle_data', '_test_ratio', '_test_fold'}
-    _testwise_properties = {'_holdout_size', '_test_sample', '_permute_tops', '_random_holdout', '_negative_prediction'}
+    # changing one of these params only requires to renew testset and holdout:
+    _testwise_properties = {'_holdout_size', '_test_sample', '_permute_tops',
+                            '_random_holdout', '_negative_prediction'}
     _config = _datawise_properties.union(_testwise_properties)
     # ('test_ratio', 'holdout_size', 'test_fold', 'shuffle_data',
     #             'test_sample', 'permute_tops', 'random_holdout', 'negative_prediction')
@@ -218,6 +221,7 @@ class RecommenderData(object):
         elif '_shuffle_data' in self._change_properties:
             print 'Recovering original data state due to change in shuffle_data.'
             self._data = self._data.sort_index()
+
         self._change_properties.clear()
 
         self._split_test_data()
