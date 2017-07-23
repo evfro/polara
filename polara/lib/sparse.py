@@ -56,3 +56,23 @@ def csc_matvec(mat_csc, vec, dense_output=True, dtype=None):
         res = sp.sparse.csr_matrix((data, indices, indptr), shape=(1, mat_csc.shape[0]), dtype=res_dtype)
         res.sum_duplicates() # expensive operation
     return res
+
+jit(nopython=True)
+def _blockify(ind, ptr, major_dim):
+    # convenient function to compute only diagonal
+    # elements of the product of 2 matrices;
+    # indices must be intp in order to avoid overflow
+    # major_dim is shape[0] for csc format and shape[1] for csr format
+    n = len(ptr) - 1
+    for i in xrange(1, n): #first row/col is unchanged
+        lind = ptr[i]
+        rind = ptr[i+1]
+        for j in xrange(lind, rind):
+            shift_ind = i * major_dim
+            ind[j] += shift_ind
+
+
+def inverse_permutation(p):
+    s = np.empty(p.size, p.dtype)
+    s[p] = np.arange(p.size)
+    return s
