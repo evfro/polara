@@ -82,6 +82,47 @@ i2i.build()
 i2i.evaluate()
 ```
 
+## Bulk experiments
+Here's an example of how to perform **top-*k* recommendations** experiments with *5-fold cross-validation* for several models at once:
+
+```python
+from polara.evaluation import evaluation_engine as ee
+from polara.recommender.models import NonPersonalized
+
+# define models
+i2i = CooccurrenceModel(data_model)
+svd = SVDModel(data_model)
+popular =  NonPersonalized('mostpopular', data_model)
+random = NonPersonalized('random', data_model)
+models = [i2i, svd, popular, random]
+
+metrics = ['ranking', 'relevance'] # metrics for evaluation: NDGC, Precision, Recall, etc.
+folds = [1, 2, 3, 4, 5] # use all 5 folds for cross-validation
+topk_values = [1, 5, 10, 20, 50] # values of k to experiment with
+
+# run experiment
+topk_result = {}
+for fold in folds:
+    data_model.test_fold = fold
+    topk_result[fold] = ee.topk_test(models, topk_list=topk_values, metrics=metrics)
+
+# rearrange results into a more friendly representation
+# this is just a dictionary of Pandas Dataframes
+result = ee.consolidate_folds(topk_result, folds, metrics)
+result.keys() # outputs ['ranking', 'relevance']
+
+# calculate average values across all folds for e.g. relevance metrics
+result['relevance'].mean(axis=0).unstack() # use .std instead of .mean for standard deviation
+```
+which results in something like:
+
+| metric/model |item-to-item | SVD | mostpopular | random |
+| ---: |:---:|:---:|:---:|:---:|
+| *precision* | 0.348212 | 0.600066 | 0.411126 | 0.016159 |
+| *recall*    | 0.147969 | 0.304338 | 0.182472 | 0.005486 |
+| *miss_rate* | 0.852031 | 0.695662 | 0.817528 | 0.994514 |
+| ... | ... | ... | ... | ... |
+
 ## Custom pipelines
 Polara by default takes care of raw data and helps to organize full evaluation pipeline, that includes splitting data into training, test and evaluation datasets, performing cross-validation and gathering results. However, if you need more control on that workflow, you can easily implement your custom  usage scenario for you own needs.
 
