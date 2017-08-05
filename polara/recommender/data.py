@@ -5,7 +5,12 @@ from collections import namedtuple
 
 
 def random_choice(df, num, random_state):
-    return df.iloc[random_state.choice(df.shape[0], num, replace=False)]
+    n = df.shape[0]
+    k = min(num, n)
+    return df.iloc[random_state.choice(n, k, replace=False)]
+
+def random_sample(df, frac, random_state):
+    return df.sample(frac=frac, random_state=random_state)
 
 
 def filter_by_length(data, userid='userid', min_session_length=3):
