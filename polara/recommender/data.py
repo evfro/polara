@@ -158,9 +158,10 @@ class RecommenderData(object):
 
     @test_fold.setter
     def test_fold(self, new_value):
-        max_fold = 1.0 / self._test_ratio
-        if new_value > max_fold:
-            raise ValueError('Test fold value cannot be greater than {}'.format(max_fold))
+        if self._test_ratio:
+            max_fold = 1.0 / self._test_ratio
+            if new_value > max_fold:
+                raise ValueError('Test fold value cannot be greater than {}'.format(max_fold))
         self._update_data_property('_test_fold', new_value)
 
     @property
