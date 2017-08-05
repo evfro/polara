@@ -53,6 +53,7 @@ class RecommenderData(object):
         self._set_defaults()
         self._change_properties = set() #container for changed properties
         self.random_state = None #use with shuffle_data, permute_tops, random_choice
+        self.verify_sessions_length_distribution = True
 
         self._attached_models = {'on_change': {}, 'on_update': {}}
         # on_change indicates whether full data has been changed
@@ -207,26 +208,17 @@ class RecommenderData(object):
         self._split_eval_data()
 
         self._notify('on_change')
+    def _split_test_index(self):
+        # check that folds' sizes will be balanced (in terms of a number of items)
+        user_sessions_size, user_idx = self._get_sessions_info()
+        n_users = len(user_sessions_size)
+        test_split = self._split_test_users(user_idx, n_users, self._test_fold, self._test_ratio)
+        return test_split
 
 
-
-
-    @staticmethod
-    def is_not_uniform(idx, nbins=10, allowed_gap=0.75):
-        idx_bins = pd.cut(idx, bins=nbins, labels=False)
-        idx_bin_size = np.bincount(idx_bins)
-
-        diff = idx_bin_size[:-1] - idx_bin_size[1:]
-        monotonic = (diff < 0).all() or (diff > 0).all()
-        huge_gap = (idx_bin_size.min()*1.0 / idx_bin_size.max()) < allowed_gap
-        return monotonic or huge_gap
-
-
-    def _split_test_data(self):
-        userid, itemid = self.fields.userid, self.fields.itemid
-        test_fold = self._test_fold
-
-        user_sessions = self._data.groupby(userid, sort=True) #KEEP TRUE HERE!!!!
+    def _get_sessions_info(self):
+        userid = self.fields.userid
+        user_sessions = self._data.groupby(userid, sort=True) #KEEP TRUE HERE!
         # if False than long sessions idx are prevalent in the beginning => non-equal size folds
         # this effect is taken into account with help of is_not_uniform function
         # example (run several times to see a pattern):
@@ -243,39 +235,50 @@ class RecommenderData(object):
         # idx_orig = df.groupby('N', sort=True).grouper.group_info[0]
         # print_frames((sampled[idx_sample_false>1],
         #               sampled[idx_sample_true>1], df[idx_orig>1]))
-
         user_idx = user_sessions.grouper.group_info[0]
-        is_skewed = self.is_not_uniform(user_idx)
-        if is_skewed:
-            print 'Users are not uniformly ordered! Unable to split test set reliably.'
-            #raise NotImplementedError('Users are not uniformly ordered! Unable to split test set reliably.')
-
+        if self.verify_sessions_length_distribution:
+            if self.is_not_uniform(user_idx):
+                print 'Users are not uniformly ordered! Unable to split test set reliably.'
+            self.verify_sessions_length_distribution = False
         user_sessions_len = user_sessions.size()
-        user_num = user_sessions_len.size #number of unique users
-        test_user_num = user_num * self._test_ratio
-
-        left_condition = user_idx < round((test_fold-1) * test_user_num)
-        right_condition = user_idx >= round(test_fold * test_user_num)
-        training_selection = left_condition | right_condition
-        test_selection = ~training_selection
-
-        self._training = self._data.loc[training_selection, list(self.fields)].copy()
-        self._test = self._data[test_selection].copy()
-
-        short_sessions = user_sessions_len.index[user_sessions_len <= self._holdout_size]
-        if self._test[userid].isin(short_sessions).any():
-            #TODO: maybe simply ignore those users? What to do if becomes empty?
-            raise NotImplementedError('Some test users have not enough items for evaluation')
+        return user_sessions_len, user_idx
 
 
-    def _reindex_data(self):
-        userid, itemid, feedback = self.fields
-        reindex = self.reindex
-        # remove any gaps in user idx, start from 0 (both for training and test)
-        user_index = [reindex(data, userid, sort=False) for data in [self._training, self._test]]
-        user_index = namedtuple('UserIndex', 'training test')._make(user_index)
+    @staticmethod
+    def is_not_uniform(idx, nbins=10, allowed_gap=0.75):
+        idx_bins = pd.cut(idx, bins=nbins, labels=False)
+        idx_bin_size = np.bincount(idx_bins)
+
+        diff = idx_bin_size[:-1] - idx_bin_size[1:]
+        monotonic = (diff < 0).all() or (diff > 0).all()
+        huge_gap = (idx_bin_size.min()*1.0 / idx_bin_size.max()) < allowed_gap
+        return monotonic or huge_gap
+
+
+    @staticmethod
+    def _split_test_users(idx, n_users, fold, ratio):
+        num = n_users * ratio
+        selection = (idx >= round((fold-1) * num)) & (idx < round(fold * num))
+        return selection
+
+
+    def _try_reindex_training_data(self):
+        if self.build_index:
+            self._reindex_train_users()
+            self._reindex_train_items()
+            self._reindex_feedback()
+    def _reindex_train_users(self):
+        userid = self.fields.userid
+        user_index = self.reindex(self._training, userid, sort=False)
+        user_index = namedtuple('UserIndex', 'training test')._make([user_index, None])
         self.index = self.index._replace(userid=user_index)
-        self.index = self.index._replace(itemid=reindex(self._training, itemid))
+
+    def _reindex_train_items(self):
+        itemid = self.fields.itemid
+        items_index = self.reindex(self._training, itemid)
+        self.index = self.index._replace(itemid=items_index)
+
+    def _reindex_feedback(self):
         self.index = self.index._replace(feedback=None)
 
 
