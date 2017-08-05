@@ -54,6 +54,10 @@ class RecommenderData(object):
         self._change_properties = set() #container for changed properties
         self.random_state = None #use with shuffle_data, permute_tops, random_choice
         self.verify_sessions_length_distribution = True
+        self.ensure_consistency = True # drop test entities if not present in training
+        self.build_index = True # reindex data, avoid gaps in user and item index
+        self._test_selector = None
+        self._state = None # None or 1 of {'_': 1, 'H': 11, '|': 2, 'd': 3, 'T': 4}
 
         self._attached_models = {'on_change': {}, 'on_update': {}}
         # on_change indicates whether full data has been changed
@@ -158,6 +162,14 @@ class RecommenderData(object):
         if new_value > max_fold:
             raise ValueError('Test fold value cannot be greater than {}'.format(max_fold))
         self._update_data_property('_test_fold', new_value)
+
+    @property
+    def test_unseen_users(self):
+        return self._verified_data_property('_test_unseen_users')
+
+    @test_unseen_users.setter
+    def test_unseen_users(self, new_value):
+        self._update_data_property('_test_unseen_users', new_value)
 
     @property
     def test(self):
