@@ -26,14 +26,10 @@ def filter_by_length(data, userid='userid', min_session_length=3):
 
 class RecommenderData(object):
     _std_fields = ('userid', 'itemid', 'feedback')
-    # changing one of these params requires running prepare() method:
-    _datawise_properties = {'_shuffle_data', '_test_ratio', '_test_fold'}
-    # changing one of these params only requires to renew testset and holdout:
-    _testwise_properties = {'_holdout_size', '_test_sample', '_permute_tops',
-                            '_random_holdout', '_negative_prediction'}
-    _config = _datawise_properties.union(_testwise_properties)
-    # ('test_ratio', 'holdout_size', 'test_fold', 'shuffle_data',
-    #             'test_sample', 'permute_tops', 'random_holdout', 'negative_prediction')
+
+    _config = {'_shuffle_data', '_test_ratio', '_test_fold',
+               '_test_unseen_users', '_holdout_size', '_test_sample',
+               '_permute_tops', '_random_holdout', '_negative_prediction'}
 
     def __init__(self, data, userid, itemid, feedback, custom_order=None):
         self.name = None
@@ -190,16 +186,9 @@ class RecommenderData(object):
         return getattr(self, data_property)
 
 
-    def _pending_change(self, data_properties=None):
-        update_data = self._change_properties - self._testwise_properties
-        update_test = self._change_properties - self._datawise_properties
-
-        if data_properties:
-            data_properties = set(data_properties)
-            update_data = update_data.intersection_update(data_properties)
-            update_test = update_test.intersection_update(data_properties)
-
-        return update_data, update_test
+    def update(self):
+        if self._change_properties:
+            self.prepare()
 
 
     def prepare(self):
@@ -220,13 +209,6 @@ class RecommenderData(object):
         self._notify('on_change')
 
 
-    def update(self):
-        data_update_pending, test_update_pending = self._pending_change()
-        if data_update_pending or not hasattr(self, '_test'):
-            self.prepare()
-            test_update_pending = False
-        if test_update_pending:
-            self._split_eval_data()
 
 
     @staticmethod
