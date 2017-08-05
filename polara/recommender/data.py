@@ -96,7 +96,6 @@ class RecommenderData(object):
     #properties that change evaluation set but do not require rebuilding test data
     @property
     def holdout_size(self):
-        # return self._holdout_size
         return self._verified_data_property('_holdout_size')
 
     @holdout_size.setter
@@ -105,7 +104,6 @@ class RecommenderData(object):
 
     @property
     def random_holdout(self):
-        # return self._random_holdout
         return self._verified_data_property('_random_holdout')
 
     @random_holdout.setter
@@ -114,7 +112,6 @@ class RecommenderData(object):
 
     @property
     def permute_tops(self):
-        # return self._permute_tops
         return self._verified_data_property('_permute_tops')
 
     @permute_tops.setter
@@ -123,7 +120,6 @@ class RecommenderData(object):
 
     @property
     def negative_prediction(self):
-        # return self._negative_prediction
         return self._verified_data_property('_negative_prediction')
 
     @negative_prediction.setter
@@ -132,7 +128,6 @@ class RecommenderData(object):
 
     @property
     def test_sample(self):
-        # return self._test_sample
         return self._verified_data_property('_test_sample')
 
     @test_sample.setter
@@ -142,7 +137,6 @@ class RecommenderData(object):
     #properties that require rebuilding training and test datasets
     @property
     def shuffle_data(self):
-        # return self._shuffle_data
         return self._verified_data_property('_shuffle_data')
 
     @shuffle_data.setter
@@ -151,7 +145,6 @@ class RecommenderData(object):
 
     @property
     def test_ratio(self):
-        # return self._test_ratio
         return self._verified_data_property('_test_ratio')
 
     @test_ratio.setter
@@ -160,7 +153,6 @@ class RecommenderData(object):
 
     @property
     def test_fold(self):
-        # return self._test_fold
         return self._verified_data_property('_test_fold')
 
     @test_fold.setter
@@ -193,7 +185,6 @@ class RecommenderData(object):
 
 
     def _verified_data_property(self, data_property):
-        #update_data, update_test = self._pending_change(data_property)
         if data_property in self._change_properties:
             print 'The value of {} might be not effective yet.'.format(data_property[1:])
         return getattr(self, data_property)
