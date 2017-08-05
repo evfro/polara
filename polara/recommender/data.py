@@ -30,6 +30,26 @@ def filter_by_length(data, userid='userid', min_session_length=3):
     return new_data
 
 
+def property_setter(cls):
+    # set properties in the loop, see
+    # https://stackoverflow.com/questions/25371906/python-scope-issue-with-anonymous-lambda-in-metaclass
+    # https://stackoverflow.com/questions/27629944/python-metaclass-adding-properties
+    def getter(x):
+        def wrapped(self):
+            return self._verified_data_property(x)
+        return wrapped
+
+    def setter(x):
+        def wrapped(self, v):
+            self._update_data_property(x, v)
+        return wrapped
+
+    for p in cls._config:
+        setattr(cls, p[1:], property(getter(p), setter(p)))
+    return cls
+
+
+@property_setter
 class RecommenderData(object):
     _std_fields = ('userid', 'itemid', 'feedback')
 
@@ -100,84 +120,6 @@ class RecommenderData(object):
         return config
 
 
-    #properties that change evaluation set but do not require rebuilding test data
-    @property
-    def holdout_size(self):
-        return self._verified_data_property('_holdout_size')
-
-    @holdout_size.setter
-    def holdout_size(self, new_value):
-        self._update_data_property('_holdout_size', new_value)
-
-    @property
-    def random_holdout(self):
-        return self._verified_data_property('_random_holdout')
-
-    @random_holdout.setter
-    def random_holdout(self, new_value):
-        self._update_data_property('_random_holdout', new_value)
-
-    @property
-    def permute_tops(self):
-        return self._verified_data_property('_permute_tops')
-
-    @permute_tops.setter
-    def permute_tops(self, new_value):
-        self._update_data_property('_permute_tops', new_value)
-
-    @property
-    def negative_prediction(self):
-        return self._verified_data_property('_negative_prediction')
-
-    @negative_prediction.setter
-    def negative_prediction(self, new_value):
-        self._update_data_property('_negative_prediction', new_value)
-
-    @property
-    def test_sample(self):
-        return self._verified_data_property('_test_sample')
-
-    @test_sample.setter
-    def test_sample(self, new_value):
-        self._update_data_property('_test_sample', new_value)
-
-    #properties that require rebuilding training and test datasets
-    @property
-    def shuffle_data(self):
-        return self._verified_data_property('_shuffle_data')
-
-    @shuffle_data.setter
-    def shuffle_data(self, new_value):
-        self._update_data_property('_shuffle_data', new_value)
-
-    @property
-    def test_ratio(self):
-        return self._verified_data_property('_test_ratio')
-
-    @test_ratio.setter
-    def test_ratio(self, new_value):
-        self._update_data_property('_test_ratio', new_value)
-
-    @property
-    def test_fold(self):
-        return self._verified_data_property('_test_fold')
-
-    @test_fold.setter
-    def test_fold(self, new_value):
-        if self._test_ratio:
-            max_fold = 1.0 / self._test_ratio
-            if new_value > max_fold:
-                raise ValueError('Test fold value cannot be greater than {}'.format(max_fold))
-        self._update_data_property('_test_fold', new_value)
-
-    @property
-    def test_unseen_users(self):
-        return self._verified_data_property('_test_unseen_users')
-
-    @test_unseen_users.setter
-    def test_unseen_users(self, new_value):
-        self._update_data_property('_test_unseen_users', new_value)
-
     @property
     def test(self):
         self.update()
@@ -232,6 +174,11 @@ class RecommenderData(object):
             raise ValueError('Both holdout_size and test_ratio must be positive when test_unseen_users is set to True')
 
         assert self._test_ratio < 1, 'Value of test_ratio can\'t be greater than or equal to 1'
+
+        if self._test_ratio:
+            max_fold = 1.0 / self._test_ratio
+            if self._test_fold  > max_fold:
+                raise ValueError('Test fold value cannot be greater than {}'.format(max_fold))
 
 
     def _check_state_transition(self):
