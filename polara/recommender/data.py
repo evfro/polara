@@ -2,6 +2,7 @@ from polara.recommender import defaults
 import pandas as pd
 import numpy as np
 from collections import namedtuple
+from collections import defaultdict
 
 
 def random_choice(df, num, random_state):
@@ -211,21 +212,227 @@ class RecommenderData(object):
 
 
     def prepare(self):
-        print 'Preparing data'
-        if self._shuffle_data:
-            self._data = self._data.sample(frac=1, random_state=self.random_state)
-        elif '_shuffle_data' in self._change_properties:
-            print 'Recovering original data state due to change in shuffle_data.'
-            self._data = self._data.sort_index()
+        print 'Preparing data...'
+        update_rule = self._split_data()
+
+        if update_rule['use_same_holdout']:
+            self._try_revert_holdout_index()
+
+        if update_rule['full_update']:
+            self._try_reindex_training_data()
+
+        if update_rule['full_update'] or update_rule['test_update']:
+            self._try_drop_unseen_test_items() # unseen = not present in training data
+            self._try_drop_invalid_test_users() # with too few items and/or if inconsistent between testset and holdout
+            self._try_reindex_test_data() # either assign known index, or (if testing for unseen users) reindex
+
+
+    def _validate_config(self):
+        if self._test_unseen_users and not (self._holdout_size and self._test_ratio):
+            raise ValueError('Both holdout_size and test_ratio must be positive when test_unseen_users is set to True')
+
+        assert self._test_ratio < 1, 'Value of test_ratio can\'t be greater than or equal to 1'
+
+
+    def _check_state_transition(self):
+        test_ratio_change = '_test_ratio' in self._change_properties
+        test_fold_change = '_test_fold' in self._change_properties
+        test_sample_change = '_test_sample' in self._change_properties
+        test_data_change = test_fold_change or test_ratio_change
+        holdout_sz_change = '_holdout_size' in self._change_properties
+        unseen_usr_change = '_test_unseen_users' in self._change_properties
+        permute_change = '_permute_tops' in self._change_properties
+        negative_change = ('_negative_prediction' in self._change_properties) and not self._random_holdout
+        rnd_holdout_change = '_random_holdout' in self._change_properties
+        any_holdout_change = holdout_sz_change or rnd_holdout_change or negative_change or permute_change
+        empty_holdout = self._holdout_size == 0
+        empty_testset = self._test_ratio == 0
+        test_unseen = self._test_unseen_users
+        last_state = self._state
+        update_rule = defaultdict(bool)
+        new_state = last_state
+
+        if unseen_usr_change: # unseen_test_users is reserved for state 4 only!
+            if test_unseen:
+                new_state = 4
+                if (last_state == 11) and not test_data_change:
+                    update_rule['test_update'] = True
+                elif (last_state == 3) and not (test_data_change or any_holdout_change):
+                    update_rule['full_update'] = True
+                    update_rule['use_same_holdout'] = True
+                else:
+                    update_rule['full_update'] = True
+            else:
+                if empty_holdout:
+                    if empty_testset:
+                        new_state = 1
+                        update_rule['full_update'] = True
+                    else:
+                        new_state = 11
+                        update_key = 'full_update' if test_data_change else 'test_update'
+                        update_rule[update_key] = True
+                else:
+                    update_rule['full_update'] = True
+                    if empty_testset:
+                        new_state = 2
+                    else:
+                        new_state = 3
+                        if not (test_data_change or any_holdout_change):
+                            update_rule['full_update'] = True
+                            update_rule['use_same_holdout'] = True
+        else: # this assumes that test_unseen_users is consistent with current state!
+            if last_state == 1: # hsz = 0, trt = 0, usn = False
+                if holdout_sz_change: # hsz > 0
+                    new_state = 3 if test_ratio_change else 2
+                    update_rule['full_update'] = True
+                elif test_ratio_change: # hsz = 0,  trt > 0
+                    new_state = 11
+                    update_rule['full_update'] = True
+
+            elif last_state == 11: # hsz = 0, trt > 0, usn = False
+                if holdout_sz_change: # hsz > 0
+                    new_state = 2 if empty_testset else 3
+                    update_rule['full_update'] = True
+                elif test_data_change: # hsz = 0
+                    if empty_testset: # hsz = 0, trt = 0
+                        new_state = 1
+                    update_rule['full_update'] = True
+
+            elif last_state == 2: # hsz > 0, trt = 0, usn = False
+                if test_ratio_change: # trt > 0
+                    new_state = 11 if empty_holdout else 3
+                    update_rule['full_update'] = True
+
+                elif any_holdout_change: # trt = 0
+                    if empty_holdout: # hsz = 0
+                        new_state = 1
+                    update_rule['full_update'] = True
+
+            elif last_state == 3: # hsz > 0, trt > 0, usn = False
+                if test_data_change or any_holdout_change:
+                    if empty_holdout:
+                        new_state = 1 if empty_testset else 11
+                    elif empty_testset: # hsz > 0, trt = 0
+                        new_state = 2
+                    update_rule['full_update'] = True
+
+            elif last_state == 4: # hsz > 0, trt > 0, usn = True
+                if any_holdout_change:
+                    if empty_holdout:
+                        if test_data_change:
+                            new_state = 1 if empty_testset else 11
+                            update_rule['full_update'] = True
+                        else: # hsz = 0, trt > 0
+                            new_state = 11
+                            update_rule['test_update'] = True
+                    else: # hsz > 0
+                        if test_data_change:
+                            if empty_testset: # hsz > 0, trt = 0
+                                new_state = 2
+                            update_rule['full_update'] = True
+                        else: # including test_sample_change
+                            update_rule['test_update'] = True
+                else: # hsz > 0
+                    if test_data_change:
+                        if empty_testset: # hsz > 0, trt = 0
+                            new_state = 2
+                        update_rule['full_update'] = True
+                    elif test_sample_change:
+                        update_rule['test_update'] = True
+                        update_rule['use_same_holdout'] = True
+
+            else: # initial state
+                if empty_holdout:
+                    new_state = 1 if empty_testset else 11
+                else:
+                    if empty_testset: # hsz > 0, trt = 0
+                        new_state = 2
+                    else: # hsz > 0, trt > 0
+                        new_state = 4 if test_unseen else 3
+                update_rule['full_update'] = True
+
+        return new_state, update_rule
+
+
+    def _split_data(self):
+        order_field = self._custom_order or self.fields.feedback
+        test_selector = None
+        def try_permute(selector):
+            # data may have many items with the same top ratings
+            # randomizing the data helps to avoid biases in that case
+            if self._permute_tops and not self._random_holdout:
+                selector = selector.sample(frac=1, random_state=self.random_state)
+            return selector
+
+        self._validate_config()
+        new_state, update_rule = self._check_state_transition()
+
+        full_update = update_rule['full_update']
+        test_update = update_rule['test_update']
+        fix_holdout = update_rule['use_same_holdout']
+
+        if not (full_update or test_update): return
+
+        if self._test_ratio:
+            if full_update:
+                test_split = self._split_test_index()
+                test_selector = self._data.loc[test_split, order_field]
+            else: #test_update
+                test_selector = self._test_selector
+                test_split = self._data.index.isin(test_selector.index.unique())
+
+            if self._holdout_size == 0:  # state 11
+                testset = holdout = None
+                train_split = ~test_split
+            else: # state 3 or state 4
+                if fix_holdout:
+                    holdout = self._test.evalset
+                    holdout_index = holdout.index
+                else: # sample holdout data per each user, whole data sampling is inconsistent
+                    holdout_index = self._sample_holdout_index(try_permute(test_selector))
+                    holdout = self._data.loc[holdout_index]
+
+                if self._test_unseen_users: # state 4
+                    testset = self._data.loc[test_split].drop(holdout_index)
+                    testset = self._sample_testset(testset)
+                    train_split = ~test_split
+                else: # state 3
+                    testset = None
+                    train_split = ~self._data.index.isin(holdout_index)
+        else: # test_ratio == 0
+            testset = None
+
+            if self._holdout_size >= 1: # state 2, sample holdout data per each user
+                test_selector = self._data[order_field]
+                # TODO order_field may also change - need to check it as well
+                holdout_index = self._sample_holdout_index(try_permute(test_selector))
+                holdout = self._data.loc[holdout_index]
+
+            elif self._holdout_size > 0: # state 2, special case - sample whole data at once
+                test_selector = None
+                holdout = self._data.sample(frac=self._holdout_size, random_state=self.random_state)
+                holdout_index = holdout.index
+
+            else: # state 1
+                test_selector = None
+                holdout = holdout_index = None
+
+            train_split = slice(None) if holdout_index is None else ~self._data.index.isin(holdout_index)
+
+        self._state = new_state
+        self._test_selector = test_selector
+        self._test = namedtuple('TestData', 'testset evalset')._make([testset, holdout])
+
+        if full_update:
+            self._training = self._data.loc[train_split, list(self.fields)].copy()
+            self._notify('on_change')
+        elif test_update:
+            self._notify('on_update')
 
         self._change_properties.clear()
+        return update_rule
 
-        self._split_test_data()
-        self._reindex_data()
-        self._align_test_items()
-        self._split_eval_data()
 
-        self._notify('on_change')
     def _split_test_index(self):
         # check that folds' sizes will be balanced (in terms of a number of items)
         user_sessions_size, user_idx = self._get_sessions_info()
@@ -285,6 +492,84 @@ class RecommenderData(object):
             self._reindex_train_users()
             self._reindex_train_items()
             self._reindex_feedback()
+
+    def _try_drop_unseen_test_items(self):
+        if self.ensure_consistency:
+            itemid = self.fields.itemid
+            self._filter_unseen_entity(itemid, self._test.testset, 'testset')
+            self._filter_unseen_entity(itemid, self._test.evalset, 'holdout')
+
+    def _try_drop_invalid_test_users(self):
+        if self.holdout_size >= 1:
+            self._filter_short_sessions() # ensure holdout conforms the holdout_size attribute
+        self._align_test_users() # ensure the same users are in both testset and holdout
+
+    def _try_reindex_test_data(self):
+        self._assign_test_items_index()
+        if not self._test_unseen_users:
+            self._assign_test_users_index()
+        else:
+            self._reindex_test_users()
+
+    def _assign_test_items_index(self):
+        itemid = self.fields.itemid
+        self._map_entity(itemid, self._test.testset)
+        self._map_entity(itemid, self._test.evalset)
+
+    def _assign_test_users_index(self):
+        userid = self.fields.userid
+        self._map_entity(userid, self._test.testset)
+        self._map_entity(userid, self._test.evalset)
+
+    def _reindex_test_users(self):
+        self._reindex_testset_users()
+        self._assign_holdout_users_index()
+
+    def _filter_short_sessions(self):
+        userid = self.fields.userid
+        holdout = self._test.evalset
+
+        holdout_sessions = holdout.groupby(userid, sort=False)
+        holdout_sessions_len = holdout_sessions.size()
+
+        invalid_sessions = (holdout_sessions_len!=self.holdout_size)
+        if invalid_sessions.any():
+            n_invalid_sessions = invalid_sessions.sum()
+            invalid_session_index = invalid_sessions.index[invalid_sessions]
+            holdout.query('{} not in @invalid_session_index'.format(userid), inplace=True)
+            print '{} of {} {}\'s were filtered out from holdout. Reason: not enough items.'.format(n_invalid_sessions,
+                                                                                                    len(invalid_sessions),
+                                                                                                    userid)
+
+    def _align_test_users(self):
+        if self._test.testset is None:
+            return
+
+        userid = self.fields.userid
+        testset = self._test.testset
+        holdout = self._test.evalset
+
+        holdout_in_testset = holdout[userid].isin(testset[userid])
+        testset_in_holdout = testset[userid].isin(holdout[userid])
+
+        if not holdout_in_testset.all():
+            invalid_holdout_users = holdout.loc[~holdout_in_testset, userid]
+            n_unique_users = invalid_holdout_users.nunique()
+            holdout.drop(invalid_holdout_users.index, inplace=True)
+            REASON = 'Reason: inconsistent with testset'
+            print '{} {}\'s were filtered out from holdout. {}.'.format(n_unique_users,
+                                                                        userid,
+                                                                        REASON)
+
+        if not testset_in_holdout.all():
+            invalid_testset_users = testset.loc[~testset_in_holdout, userid]
+            n_unique_users = invalid_testset_users.nunique()
+            testset.drop(invalid_testset_users.index, inplace=True)
+            REASON = 'Reason: inconsistent with holdout'
+            print '{} {}\'s were filtered out from testset. {}.'.format(n_unique_users,
+                                                                        userid,
+                                                                        REASON)
+
     def _reindex_train_users(self):
         userid = self.fields.userid
         user_index = self.reindex(self._training, userid, sort=False)
@@ -298,6 +583,79 @@ class RecommenderData(object):
 
     def _reindex_feedback(self):
         self.index = self.index._replace(feedback=None)
+
+    def _map_entity(self, entity, dataset):
+        if dataset is None:
+            return
+
+        entity_type = self.fields._fields[self.fields.index(entity)]
+        index_data = getattr(self.index, entity_type)
+
+        if index_data is None:
+            return
+
+        try:
+            seen_entities_index = index_data.training
+        except AttributeError:
+            seen_entities_index = index_data
+
+        entity_index_map = seen_entities_index.set_index('old').new
+        dataset.loc[:, entity] = dataset.loc[:, entity].map(entity_index_map)
+
+    def _filter_unseen_entity(self, entity, dataset, label):
+        if dataset is None:
+            return
+
+        entity_type = self.fields._fields[self.fields.index(entity)]
+        index_data = getattr(self.index, entity_type)
+
+        if index_data is None:
+            # TODO factorize training or get unique values
+            raise NotImplementedError
+
+        try:
+            seen_entities = index_data.training.old.values
+        except AttributeError:
+            seen_entities = index_data.old.values
+
+        seen_data = dataset[entity].isin(seen_entities)
+        if not seen_data.all():
+            n_unseen_entities = dataset.loc[~seen_data, entity].nunique()
+            dataset.query('{} in @seen_entities'.format(entity), inplace=True)
+            #unseen_index = dataset.index[unseen_entities]
+            #dataset.drop(unseen_index, inplace=True)
+            UNSEEN = 'not in the training data'
+            print '{} unique {}\'s within {} {} interactions were filtered. Reason: {}.'.format(n_unseen_entities,
+                                                                                                entity,
+                                                                                                (~seen_data).sum(),
+                                                                                                label,
+                                                                                                UNSEEN)
+
+    def _reindex_testset_users(self):
+        userid = self.fields.userid
+        user_index = self.reindex(self._test.testset, userid, sort=False)
+        self.index = self.index._replace(userid=self.index.userid._replace(test=user_index))
+
+    def _assign_holdout_users_index(self):
+        userid = self.fields.userid
+        test_user_index = self.index.userid.test.set_index('old').new
+        self._test.evalset.loc[:, userid] = self._test.evalset.loc[:, userid].map(test_user_index)
+
+    def _try_revert_holdout_index(self):
+        user_index = self.index.userid.test
+        item_index = self.index.itemid
+
+        try:
+            reverted_user_index = user_index.set_index('new').old
+            reverted_item_index = item_index.set_index('new').old
+        except AttributeError:
+            return
+
+        userid = self.fields.userid
+        itemid = self.fields.itemid
+
+        self._test.evalset.loc[:, userid] = self._test.evalset.loc[:, userid].map(reverted_user_index)
+        self._test.evalset.loc[:, itemid] = self._test.evalset.loc[:, itemid].map(reverted_item_index)
 
 
     @staticmethod
@@ -316,88 +674,27 @@ class RecommenderData(object):
         return result
 
 
-    def _align_test_items(self):
-        items_index = self.index.itemid.set_index('old')
-        itemid = self.fields.itemid
-        #this changes int to float dtype if NaN values exist:
-        self._test.loc[:, itemid] = items_index.loc[self._test[itemid].values, 'new'].values
-        # need to filter those items which were not in the training set
-        unseen_items = self._test[itemid].isnull()
-        if unseen_items.any():
-            userid = self.fields.userid
-            test_data = self._test[~unseen_items]
-            # there could be insufficient data now - check again
-            valid_users_sel = test_data.groupby(userid, sort=False).size() > self._holdout_size
-            if not valid_users_sel.all():
-                nfiltered = (~valid_users_sel).sum()
-                valid_users_sel = valid_users_sel[valid_users_sel]
-                print '{} test users filtered due to insufficient number of seen items.'.format(nfiltered)
+    def _sample_holdout_index(self, data):
+        userid = self.fields.userid
+        grouper = data.groupby(self._data[userid], sort=False)
+
+        if self._random_holdout: #randomly sample data for evaluation
+            if self._holdout_size >= 1:
+                holdout = grouper.apply(random_choice, self._holdout_size, self.random_state or np.random)
             else:
-                print '{} unseen items filtered from testset.'.format(unseen_items.sum())
-            valid_users_idx = valid_users_sel.index[valid_users_sel]
-
-            self._test = test_data.loc[test_data[userid].isin(valid_users_idx)].copy()
-            #force int dtype after filtering NaNs
-            self._test[itemid] = self._test[itemid].astype(np.int64)
-            #reindex the test userids as they were filtered
-            new_test_idx = self.reindex(self._test, userid, sort=False, inplace=True)
-            #update index info accordingly
-            old_test_idx = self.index.userid.test
-            self.index = self.index._replace(userid=self.index.userid._replace(test=old_test_idx[old_test_idx['new'].isin(valid_users_idx)]))
-            self.index.userid.test.loc[new_test_idx['old'].values, 'new'] = new_test_idx['new'].values
-
-
-    def _split_eval_data(self):
-        userid, feedback = self.fields.userid, self.fields.feedback
-
-        if self._change_properties: #
-            print 'Updating test data.'
-            self._test = self._test_old
-
-            self._notify('on_update')
-            self._change_properties.clear()
-
-        # data may have many items with top ratings and result depends on how
-        # they are sorted. randomizing the data helps to avoid biases
-        if self.permute_tops:
-            test_data = self._test.sample(frac=1, random_state=self.random_state)
-        else:
-            test_data = self._test
-
-        # split holdout items from the rest of the test data
-        holdout = self._sample_holdout(test_data)
-        evalidx = holdout.index.get_level_values(1)
-        evalset = test_data.loc[evalidx]
-
-        # get test users whos items were hidden
-        testset = test_data[~test_data.index.isin(evalidx)]
-        # leave at most self.test_sample items for every test user
-        testset = self._sample_testset(testset)
-
-        # ensure identical ordering of users in testset and holdout
-        testset = testset.sort_values(userid)
-        evalset = evalset.sort_values(userid)
-
-        self._test_old = self._test
-        #TODO make it computed from index data and _data
-        #self._test_idx = namedtuple('TestDataIndex', 'testset evalset')
-        #           ._make([self._test.testset.index, self._test.evalset.index])
-        self._test = namedtuple('TestData', 'testset evalset')._make([testset, evalset])
-
-
-    def _sample_holdout(self, data):
-        userid, feedback = self.fields.userid, self.fields.feedback
-        order_field = self._custom_order or feedback
-        grouper = data.groupby(userid, sort=False)[order_field]
-
-        if self.random_holdout: #randomly sample data for evaluation
-            holdout = grouper.apply(random_choice, self._holdout_size, self.random_state or np.random)
-        elif self.negative_prediction: #try to holdout negative only examples
-            holdout = grouper.nsmallest(self._holdout_size)
+                holdout = grouper.apply(random_sample, self._holdout_size, self.random_state)
+        elif self._negative_prediction: #try to holdout negative only examples
+            if self._holdout_size >= 1:
+                holdout = grouper.nsmallest(self._holdout_size, keep='last')
+            else:
+                raise NotImplementedError
         else: #standard top-score prediction mode
-            holdout = grouper.nlargest(self._holdout_size)
+            if self._holdout_size >= 1:
+                holdout = grouper.nlargest(self._holdout_size, keep='last')
+            else:
+                raise NotImplementedError
 
-        return holdout
+        return holdout.index.get_level_values(1)
 
 
     def _sample_testset(self, data):
