@@ -109,6 +109,33 @@ class RecommenderModel(object):
         self._recommendations = None
 
 
+    def get_training_matrix(self, dtype=None):
+        idx, val, shp = self.data.to_coo(tensor_mode=False)
+        dtype = dtype or val.dtype
+        matrix = csr_matrix((val, (idx[:, 0], idx[:, 1])),
+                            shape=shp, dtype=dtype)
+        return matrix
+
+
+    def get_test_matrix(self, test_data, shape, user_slice=None):
+        num_users_all = shape[0]
+        if user_slice:
+            start, stop = user_slice
+            stop = min(stop, num_users_all)
+            num_users = stop - start
+            coo_data = self._slice_test_data(test_data, start, stop)
+        else:
+            num_users = num_users_all
+            coo_data = test_data
+
+        user_coo, item_coo, fdbk_coo = coo_data
+        num_items = shape[1]
+        test_matrix = csr_matrix((fdbk_coo, (user_coo, item_coo)),
+                                  shape=(num_users, num_items),
+                                  dtype=fdbk_coo.dtype)
+        return test_matrix, coo_data
+
+
     def _get_slices_idx(self, shape, result_width=None, scores_multiplier=None, dtypes=None):
         result_width = result_width or self.topk
         if scores_multiplier is None:
@@ -143,33 +170,6 @@ class RecommenderModel(object):
         fdbk_slice_coo = fdbk_coo[slicer]
 
         return (user_slice_coo, item_slice_coo, fdbk_slice_coo)
-
-
-    def get_training_matrix(self, dtype=None):
-        idx, val, shp = self.data.to_coo(tensor_mode=False)
-        dtype = dtype or val.dtype
-        matrix = csr_matrix((val, (idx[:, 0], idx[:, 1])),
-                            shape=shp, dtype=dtype)
-        return matrix
-
-
-    def get_test_matrix(self, test_data, shape, user_slice=None):
-        num_users_all = shape[0]
-        if user_slice:
-            start, stop = user_slice
-            stop = min(stop, num_users_all)
-            num_users = stop - start
-            coo_data = self._slice_test_data(test_data, start, stop)
-        else:
-            num_users = num_users_all
-            coo_data = test_data
-
-        user_coo, item_coo, fdbk_coo = coo_data
-        num_items = shape[1]
-        test_matrix = csr_matrix((fdbk_coo, (user_coo, item_coo)),
-                                  shape=(num_users, num_items),
-                                  dtype=fdbk_coo.dtype)
-        return test_matrix, coo_data
 
 
     def slice_recommendations(self, test_data, shape, start, end):
