@@ -18,17 +18,20 @@ def get_default(name):
 
 
 class Timer():
-    def __init__(self, model_name='Model'):
+    def __init__(self, model_name='Model', verbose=True):
         self.model_name = model_name
         self.message = '{} training time: {}s'
+        self.elapsed_time = None
+        self.verbose = verbose
 
     def __enter__(self):
         self.start = timer()
-        return None  # could return anything, to be used like this: with Timer("Message") as value:
+        return self.elapsed_time
 
     def __exit__(self, type, value, traceback):
-        elapsed_time = timer() - self.start
-        print(self.message.format(self.model_name, elapsed_time))
+        self.elapsed_time = timer() - self.start
+        if self.verbose:
+            print(self.message.format(self.model_name, self.elapsed_time))
 
 
 class MetaModel(type):
@@ -73,6 +76,8 @@ class RecommenderModel(object):
         self._is_ready = False
         self.data._attach_model('on_change', self, '_on_change')
         self.data._attach_model('on_update', self, '_on_update')
+
+        self.verbose = True
 
 
     @property
@@ -508,7 +513,7 @@ class CooccurrenceModel(RecommenderModel):
             # np.sign allows for negative values as well
             user_item_matrix.data = np.sign(user_item_matrix.data)
 
-        with Timer(self.method):
+        with Timer(self.method, verbose=self.verbose):
             i2i_matrix = user_item_matrix.T.dot(user_item_matrix) # gives CSC format
             i2i_matrix.setdiag(0) #exclude "self-links"
             i2i_matrix.eliminate_zeros()
@@ -561,7 +566,7 @@ class SVDModel(RecommenderModel):
     def build(self, operator=None):
         svd_matrix = self.operator or operator or self.get_training_matrix(dtype=np.float64)
 
-        with Timer(self.method):
+        with Timer(self.method, verbose=self.verbose):
             _, _, items_factors = svds(svd_matrix, k=self.rank, return_singular_vectors='vh')
 
         self._items_factors = np.ascontiguousarray(items_factors[::-1, :]).T
@@ -628,7 +633,7 @@ class CoffeeModel(RecommenderModel):
     def build(self):
         idx, val, shp = self.data.to_coo(tensor_mode=True)
 
-        with Timer(self.method):
+        with Timer(self.method, verbose=self.verbose):
             users_factors, items_factors, feedback_factors, core = \
                                 tucker_als(idx, val, shp, self.mlrank,
                                 growth_tol=self.growth_tol,
