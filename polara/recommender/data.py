@@ -30,8 +30,8 @@ def filter_by_length(data, userid='userid', min_session_length=3):
     return new_data
 
 
-def property_setter(cls):
-    # set properties in the loop, see
+def property_factory(cls):
+    # set class properties in the loop, see
     # https://stackoverflow.com/questions/25371906/python-scope-issue-with-anonymous-lambda-in-metaclass
     # https://stackoverflow.com/questions/27629944/python-metaclass-adding-properties
     def getter(x):
@@ -49,7 +49,7 @@ def property_setter(cls):
     return cls
 
 
-@property_setter
+@property_factory
 class RecommenderData(object):
     _std_fields = ('userid', 'itemid', 'feedback')
 
