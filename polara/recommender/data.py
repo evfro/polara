@@ -170,6 +170,7 @@ class RecommenderData(object):
 
         if update_rule['full_update'] or update_rule['test_update']:
             self._try_drop_unseen_test_items() # unseen = not present in training data
+            self._try_drop_unseen_test_users() # unseen = not present in training data
             self._try_drop_invalid_test_users() # with too few items and/or if inconsistent between testset and holdout
             self._try_reindex_test_data() # either assign known index, or (if testing for unseen users) reindex
             self._try_sort_test_data()
@@ -453,6 +454,11 @@ class RecommenderData(object):
             itemid = self.fields.itemid
             self._filter_unseen_entity(itemid, self._test.testset, 'testset')
             self._filter_unseen_entity(itemid, self._test.evalset, 'holdout')
+
+    def _try_drop_unseen_test_users(self):
+        if self.ensure_consistency and not self._test_unseen_users:
+            userid = self.fields.userid
+            self._filter_unseen_entity(userid, self._test.evalset, 'holdout')
 
     def _try_drop_invalid_test_users(self):
         if self.holdout_size >= 1:
