@@ -386,7 +386,7 @@ class RecommenderData(object):
         # check that folds' sizes will be balanced (in terms of a number of items)
         user_sessions_size, user_idx = self._get_sessions_info()
         n_users = len(user_sessions_size)
-        test_split = self._split_test_users(user_idx, n_users, self._test_fold, self._test_ratio)
+        test_split = self._split_fold_index(user_idx, n_users, self._test_fold, self._test_ratio)
         return test_split
 
 
@@ -430,8 +430,10 @@ class RecommenderData(object):
 
 
     @staticmethod
-    def _split_test_users(idx, n_users, fold, ratio):
-        num = n_users * ratio
+    def _split_fold_index(idx, n_unique, fold, ratio):
+        # supports both [0, 1, 2, 3] and [0, 0, 1, 1, 1, 2, 3, 3] types of idx
+        # if idx contains only unique elements (1 case) then n_unique = len(idx)
+        num = n_unique * ratio
         selection = (idx >= round((fold-1) * num)) & (idx < round(fold * num))
         return selection
 
