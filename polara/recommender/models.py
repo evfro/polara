@@ -457,11 +457,14 @@ class RecommenderModel(object):
         userid, itemid, feedback = data.fields
 
         nunique_items = data.training[itemid].nunique()
-        nunique_test_users = data.test.testset[userid].nunique()
-
         assert nunique_items == len(data.index.itemid)
         assert nunique_items == data.training[itemid].max() + 1
-        assert nunique_test_users == data.test.testset[userid].max() + 1
+
+        testset = data.test.testset
+        if testset is not None:
+            nunique_test_users = testset[userid].nunique()
+            if data._state == 4:
+                assert nunique_test_users == testset[userid].max() + 1
 
         try:
             assert self._items_factors.shape[0] == len(data.index.itemid)
