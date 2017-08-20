@@ -710,8 +710,13 @@ class RecommenderData(object):
                 raise ValueError('Unable to read test data')
             userid = self.fields.userid
             test_users = holdout[userid].drop_duplicates()
-            testset = (self.training.query('{} in @test_users'.format(userid))
-                             .sort_values(userid))
+
+            if test_users.isin(self.index.userid.training.new).all():
+                testset = self.training
+            else:
+                testset = (self.training.query('{} in @test_users'.format(userid))
+                                 .sort_values(userid))
+
             self._test = self._test._replace(testset=testset)
             self._align_test_users()
 
