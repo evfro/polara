@@ -732,7 +732,7 @@ class RecommenderData(object):
     def get_test_shape(self, tensor_mode=False):
         #TODO make it a property maybe
         userid = self.fields.userid
-        num_users = self.test.testset[userid].max() + 1
+        num_users = self.test.evalset[userid].nunique()
         num_items = len(self.index.itemid)
         shape = (num_users, num_items)
 
