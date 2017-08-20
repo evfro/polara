@@ -573,12 +573,11 @@ class SVDModel(RecommenderModel):
     def __init__(self, *args, **kwargs):
         super(SVDModel, self).__init__(*args, **kwargs)
         self.rank = defaults.svd_rank
-        self.operator = None
         self.method = 'PureSVD'
 
 
     def build(self, operator=None):
-        svd_matrix = self.operator or operator or self.get_training_matrix(dtype=np.float64)
+        svd_matrix = operator if operator is not None else self.get_training_matrix(dtype=np.float64)
 
         with Timer(self.method, verbose=self.verbose):
             _, _, items_factors = svds(svd_matrix, k=self.rank, return_singular_vectors='vh')
