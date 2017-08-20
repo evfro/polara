@@ -59,18 +59,20 @@ class RecommenderData(object):
 
     def __init__(self, data, userid, itemid, feedback, custom_order=None):
         self.name = None
-        fields_selection = [userid, itemid, feedback]
+        fields = [userid, itemid, feedback]
 
-        if data.duplicated(fields_selection).any():
+        if data is None:
+            cols = fields + [custom_order] if custom_order else fields
+            self._data = pd.DataFrame(columns=cols)
+        else:
+            self._data = data
+
+        if data.duplicated(subset=fields).any():
             #unstable in pandas v. 17.0, only works in <> v.17.0
             #rely on deduplicated data in many places - makes data processing more efficient
             raise NotImplementedError('Data has duplicate values')
 
         self._custom_order = custom_order
-        if self._custom_order:
-            fields_selection.append(self._custom_order)
-
-        self._data = data[fields_selection].copy()
         self.fields = namedtuple('Fields', self._std_fields)
         self.fields = self.fields._make(map(eval, self._std_fields))
         self.index = namedtuple('DataIndex', self._std_fields)
