@@ -390,10 +390,9 @@ class RecommenderData(object):
 
 
     def _split_test_index(self):
-        # check that folds' sizes will be balanced (in terms of a number of items)
-        user_sessions_size, user_idx = self._get_sessions_info()
-        n_users = len(user_sessions_size)
-        test_split = self._split_fold_index(user_idx, n_users, self._test_fold, self._test_ratio)
+        sessions_size, sess_idx = self._get_sessions_info()
+        n_sessions = len(sessions_size)
+        test_split = self._split_fold_index(sess_idx, n_sessions, self._test_fold, self._test_ratio)
         return test_split
 
 
