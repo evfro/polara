@@ -380,7 +380,7 @@ class RecommenderData(object):
         self._test = namedtuple('TestData', 'testset evalset')._make([testset, holdout])
 
         if full_update:
-            self._training = self._data.loc[train_split, list(self.fields)].copy()
+            self._training = self._data.loc[train_split, list(self.fields)]
             self._notify('on_change')
         elif test_update:
             self._notify('on_update')
