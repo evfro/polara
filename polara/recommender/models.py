@@ -573,8 +573,8 @@ class SVDModel(RecommenderModel):
     def __init__(self, *args, **kwargs):
         super(SVDModel, self).__init__(*args, **kwargs)
         self.rank = defaults.svd_rank
-        self.method = 'SVD'
         self.operator = None
+        self.method = 'PureSVD'
 
 
     def build(self, operator=None):
