@@ -188,14 +188,14 @@ class RecommenderModel(object):
         return (user_slice_coo, item_slice_coo, fdbk_slice_coo)
 
 
-    def slice_recommendations(self, test_data, shape, start, end):
+    def slice_recommendations(self, test_data, shape, start, stop, test_users=None):
         raise NotImplementedError('This must be implemented in subclasses')
 
 
     def _user_scores(self, i):
         # should not be exposed, designed for use within framework
         # operates on internal itemid's
-        test_data, test_shape = self._get_test_data()
+        test_data, test_shape, _ = self._get_test_data()
         scores, seen_idx = self.slice_recommendations(test_data, test_shape, i, i+1)
 
         if self.filter_seen:
@@ -261,7 +261,7 @@ class RecommenderModel(object):
         if self.verify_integrity:
             self.verify_data_integrity()
 
-        test_data, test_shape = self._get_test_data()
+        test_data, test_shape, test_users = self._get_test_data()
 
         topk = self.topk
         top_recs = np.empty((test_shape[0], topk), dtype=np.int64)
@@ -270,7 +270,7 @@ class RecommenderModel(object):
         start = user_slices[0]
         for i in user_slices[1:]:
             stop = i
-            scores, slice_data = self.slice_recommendations(test_data, test_shape, start, stop)
+            scores, slice_data = self.slice_recommendations(test_data, test_shape, start, stop, test_users)
 
             if self.filter_seen:
                 # prevent seen items from appearing in recommendations
@@ -556,7 +556,7 @@ class CooccurrenceModel(RecommenderModel):
         return scores
 
 
-    def slice_recommendations(self, test_data, shape, start, stop):
+    def slice_recommendations(self, test_data, shape, start, stop, test_user=None):
         test_matrix, slice_data = self.get_test_matrix(test_data, shape, (start, stop))
         # NOTE CSR format is mandatory for proper handling of signle user
         # recommendations, as vector of shape (1, N) in CSC format is inefficient
@@ -586,7 +586,7 @@ class SVDModel(RecommenderModel):
         self._items_factors = np.ascontiguousarray(items_factors[::-1, :]).T
 
 
-    def slice_recommendations(self, test_data, shape, start, stop):
+    def slice_recommendations(self, test_data, shape, start, stop, test_users=None):
         test_matrix, slice_data = self.get_test_matrix(test_data, shape, (start, stop))
         v = self._items_factors
         scores = (test_matrix.dot(v)).dot(v.T)
@@ -677,9 +677,9 @@ class CoffeeModel(RecommenderModel):
         return test_tensor_unfolded, slice_idx
 
 
-    def slice_recommendations(self, test_data, shape, start, end):
-        test_tensor_unfolded, slice_idx = self.get_test_tensor(test_data, shape, start, end)
-        num_users = end - start
+    def slice_recommendations(self, test_data, shape, start, stop, test_users=None):
+        test_tensor_unfolded, slice_idx = self.get_test_tensor(test_data, shape, start, stop)
+        num_users = stop - start
         num_items = shape[1]
         num_fdbks = shape[2]
         v = self._items_factors
