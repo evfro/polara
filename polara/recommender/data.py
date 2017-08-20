@@ -172,6 +172,7 @@ class RecommenderData(object):
             self._try_drop_unseen_test_items() # unseen = not present in training data
             self._try_drop_invalid_test_users() # with too few items and/or if inconsistent between testset and holdout
             self._try_reindex_test_data() # either assign known index, or (if testing for unseen users) reindex
+            self._try_sort_test_data()
 
 
     def _validate_config(self):
@@ -592,6 +593,15 @@ class RecommenderData(object):
         userid = self.fields.userid
         test_user_index = self.index.userid.test.set_index('old').new
         self._test.evalset.loc[:, userid] = self._test.evalset.loc[:, userid].map(test_user_index)
+
+    def _try_sort_test_data(self):
+        userid = self.fields.userid
+        testset = self._test.testset
+        holdout = self._test.evalset
+        if testset is not None:
+            testset.sort_values(userid, inplace=True)
+        if holdout is not None:
+            holdout.sort_values(userid, inplace=True)
 
     def _try_revert_holdout_index(self):
         user_index = self.index.userid.test
