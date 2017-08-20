@@ -80,6 +80,9 @@ class RecommenderData(object):
 
         self._set_defaults()
         self._change_properties = set() #container for changed properties
+        # TODO random_state may also lead to either full_update or test_update
+        # depending on config. For ex., shuffle_data - full_update,
+        # random_holdout - test_update. Need to implement checks
         self.random_state = None #use with shuffle_data, permute_tops, random_choice
         self.verify_sessions_length_distribution = True
         self.ensure_consistency = True # drop test entities if not present in training
@@ -88,8 +91,8 @@ class RecommenderData(object):
         self._state = None # None or 1 of {'_': 1, 'H': 11, '|': 2, 'd': 3, 'T': 4}
 
         self._attached_models = {'on_change': {}, 'on_update': {}}
-        # on_change indicates whether full data has been changed
-        # on_update indicates whether only test data has been changed
+        # on_change indicates whether full data has been changed -> rebuild model
+        # on_update indicates whether only test data has been changed -> renew recommendations
         self.verbose = True
 
 
@@ -394,6 +397,7 @@ class RecommenderData(object):
         # print_frames((sampled[idx_sample_false>1],
         #               sampled[idx_sample_true>1], df[idx_orig>1]))
         user_idx = user_sessions.grouper.group_info[0]
+        # check that folds' sizes will be balanced (in terms of a number of items)
         if self.verify_sessions_length_distribution:
             if self.is_not_uniform(user_idx):
                 print 'Users are not uniformly ordered! Unable to split test set reliably.'
