@@ -309,15 +309,6 @@ class RecommenderData(object):
 
 
     def _split_data(self):
-        order_field = self._custom_order or self.fields.feedback
-        test_selector = None
-        def try_permute(selector):
-            # data may have many items with the same top ratings
-            # randomizing the data helps to avoid biases in that case
-            if self._permute_tops and not self._random_holdout:
-                selector = selector.sample(frac=1, random_state=self.random_state)
-            return selector
-
         self._validate_config()
         new_state, update_rule = self._check_state_transition()
 
@@ -332,51 +323,38 @@ class RecommenderData(object):
         if self._test_ratio:
             if full_update:
                 test_split = self._split_test_index()
-                test_selector = self._data.loc[test_split, order_field]
             else: #test_update
-                test_selector = self._test_selector
-                test_split = self._data.index.isin(test_selector.index.unique())
-
+                test_split = self._test_split
             if self._holdout_size == 0:  # state 11
                 testset = holdout = None
                 train_split = ~test_split
             else: # state 3 or state 4
                 if fix_holdout:
                     holdout = self._test.evalset
-                    holdout_index = holdout.index
                 else: # sample holdout data per each user, whole data sampling is inconsistent
-                    holdout_index = self._sample_holdout_index(try_permute(test_selector))
-                    holdout = self._data.loc[holdout_index]
+                    holdout = self._sample_holdout(test_split)
 
                 if self._test_unseen_users: # state 4
-                    testset = self._data.loc[test_split].drop(holdout_index)
-                    testset = self._sample_testset(testset)
+                    testset = self._sample_testset(test_split, holdout.index)
                     train_split = ~test_split
                 else: # state 3
-                    testset = None
-                    train_split = ~self._data.index.isin(holdout_index)
+                    testset = None # will be computed if test data is requested
+                    train_split = ~self._data.index.isin(holdout.index)
         else: # test_ratio == 0
-            testset = None
+            testset = None # will be computed if test data is requested
+            test_split = slice(None)
 
             if self._holdout_size >= 1: # state 2, sample holdout data per each user
-                test_selector = self._data[order_field]
-                # TODO order_field may also change - need to check it as well
-                holdout_index = self._sample_holdout_index(try_permute(test_selector))
-                holdout = self._data.loc[holdout_index]
-
+                holdout = self._sample_holdout(test_split)
             elif self._holdout_size > 0: # state 2, special case - sample whole data at once
-                test_selector = None
                 holdout = self._data.sample(frac=self._holdout_size, random_state=self.random_state)
-                holdout_index = holdout.index
-
             else: # state 1
-                test_selector = None
-                holdout = holdout_index = None
+                holdout = None
 
-            train_split = slice(None) if holdout_index is None else ~self._data.index.isin(holdout_index)
+            train_split = slice(None) if holdout is None else ~self._data.index.isin(holdout.index)
 
         self._state = new_state
-        self._test_selector = test_selector
+        self._test_split = test_split
         self._test = namedtuple('TestData', 'testset evalset')._make([testset, holdout])
 
         if full_update:
@@ -643,9 +621,18 @@ class RecommenderData(object):
         return result
 
 
-    def _sample_holdout_index(self, data):
+    def _sample_holdout(self, test_split):
         userid = self.fields.userid
-        grouper = data.groupby(self._data[userid], sort=False)
+        # TODO order_field may also change - need to check it as well
+        order_field = self._custom_order or self.fields.feedback
+
+        selector = self._data.loc[test_split, order_field]
+        # data may have many items with the same top ratings
+        # randomizing the data helps to avoid biases in that case
+        if self._permute_tops and not self._random_holdout:
+            selector = selector.sample(frac=1, random_state=self.random_state)
+
+        grouper = selector.groupby(self._data[userid], sort=False)
 
         if self._random_holdout: #randomly sample data for evaluation
             if self._holdout_size >= 1:
@@ -663,25 +650,26 @@ class RecommenderData(object):
             else:
                 raise NotImplementedError
 
-        return holdout.index.get_level_values(1)
+        holdout_index = holdout.index.get_level_values(1)
+        return self._data.loc[holdout_index]
 
 
-    def _sample_testset(self, data):
-        test_sample = self.test_sample
-        if not isinstance(test_sample, int):
+    def _sample_testset(self, test_split, holdout_index):
+        data = self._data[test_split].drop(holdout_index)
+
+        test_sample = self._test_sample
+        if not test_sample:
             return data
 
-        userid, feedback = self.fields.userid, self.fields.feedback
+        userid = self.fields.userid
         if test_sample > 0:
             sampled = (data.groupby(userid, sort=False, group_keys=False)
                             .apply(random_choice, test_sample, self.random_state or np.random))
-        elif test_sample < 0: #leave only the most negative feedback from user
+        else: #test_sample < 0, leave only the most negative feedback from user
+            feedback = self.fields.feedback
             idx = (data.groupby(userid, sort=False)[feedback]
                         .nsmallest(-test_sample).index.get_level_values(1))
             sampled = data.loc[idx]
-        else:
-            sampled = data
-
         return sampled
 
 
