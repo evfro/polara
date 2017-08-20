@@ -90,6 +90,7 @@ class RecommenderData(object):
         self._attached_models = {'on_change': {}, 'on_update': {}}
         # on_change indicates whether full data has been changed
         # on_update indicates whether only test data has been changed
+        self.verbose = True
 
 
     def _get_attached_models(self, event):
@@ -156,7 +157,9 @@ class RecommenderData(object):
 
 
     def prepare(self):
-        print 'Preparing data...'
+        if self.verbose:
+            print 'Preparing data...'
+
         update_rule = self._split_data()
 
         if update_rule['use_same_holdout']:
@@ -488,9 +491,9 @@ class RecommenderData(object):
             n_invalid_sessions = invalid_sessions.sum()
             invalid_session_index = invalid_sessions.index[invalid_sessions]
             holdout.query('{} not in @invalid_session_index'.format(userid), inplace=True)
-            print '{} of {} {}\'s were filtered out from holdout. Reason: not enough items.'.format(n_invalid_sessions,
-                                                                                                    len(invalid_sessions),
-                                                                                                    userid)
+            if self.verbose:
+                msg = '{} of {} {}\'s were filtered out from holdout. Reason: not enough items.'
+                print msg.format(n_invalid_sessions, len(invalid_sessions), userid)
 
     def _align_test_users(self):
         if self._test.testset is None:
@@ -507,19 +510,19 @@ class RecommenderData(object):
             invalid_holdout_users = holdout.loc[~holdout_in_testset, userid]
             n_unique_users = invalid_holdout_users.nunique()
             holdout.drop(invalid_holdout_users.index, inplace=True)
-            REASON = 'Reason: inconsistent with testset'
-            print '{} {}\'s were filtered out from holdout. {}.'.format(n_unique_users,
-                                                                        userid,
-                                                                        REASON)
+            if self.verbose:
+                REASON = 'Reason: inconsistent with testset'
+                msg = '{} {}\'s were filtered out from holdout. {}.'
+                print msg.format(n_unique_users, userid, REASON)
 
         if not testset_in_holdout.all():
             invalid_testset_users = testset.loc[~testset_in_holdout, userid]
             n_unique_users = invalid_testset_users.nunique()
             testset.drop(invalid_testset_users.index, inplace=True)
-            REASON = 'Reason: inconsistent with holdout'
-            print '{} {}\'s were filtered out from testset. {}.'.format(n_unique_users,
-                                                                        userid,
-                                                                        REASON)
+            if self.verbose:
+                REASON = 'Reason: inconsistent with holdout'
+                msg = '{} {}\'s were filtered out from testset. {}.'
+                print msg.format(n_unique_users, userid, REASON)
 
     def _reindex_train_users(self):
         userid = self.fields.userid
@@ -575,12 +578,10 @@ class RecommenderData(object):
             dataset.query('{} in @seen_entities'.format(entity), inplace=True)
             #unseen_index = dataset.index[unseen_entities]
             #dataset.drop(unseen_index, inplace=True)
-            UNSEEN = 'not in the training data'
-            print '{} unique {}\'s within {} {} interactions were filtered. Reason: {}.'.format(n_unseen_entities,
-                                                                                                entity,
-                                                                                                (~seen_data).sum(),
-                                                                                                label,
-                                                                                                UNSEEN)
+            if self.verbose:
+                UNSEEN = 'not in the training data'
+                msg = '{} unique {}\'s within {} {} interactions were filtered. Reason: {}.'
+                print msg.format(n_unseen_entities, entity, (~seen_data).sum(), label, UNSEEN)
 
     def _reindex_testset_users(self):
         userid = self.fields.userid
