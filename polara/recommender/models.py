@@ -160,9 +160,20 @@ class RecommenderModel(object):
         except AttributeError:
             tensor_mode = False
 
-        test_data = self.data.test_to_coo(tensor_mode=tensor_mode)
+        user_idx, item_idx, feedback = self.data.test_to_coo(tensor_mode=tensor_mode)
         test_shape = self.data.get_test_shape(tensor_mode=tensor_mode)
-        return test_data, test_shape
+        
+        idx_diff = np.diff(user_idx) # this assumes testset is sorted by users!
+        # TODO only required when testset consists of known users
+        if (idx_diff>1).any() or (user_idx.min() != 0): # check index monotonicity
+            test_users = user_idx[np.r_[0, np.where(idx_diff)[0]+1]]
+            user_idx = np.r_[0, np.cumsum(idx_diff>0)].astype(user_idx.dtype)
+        else:
+            test_users = np.arange(test_shape[0])
+
+        test_data = (user_idx, item_idx, feedback)
+
+        return test_data, test_shape, test_users
 
 
     def _slice_test_data(self, test_data, start, stop):
