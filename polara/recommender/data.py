@@ -325,7 +325,9 @@ class RecommenderData(object):
         test_update = update_rule['test_update']
         fix_holdout = update_rule['use_same_holdout']
 
-        if not (full_update or test_update): return
+        if not (full_update or test_update):
+            print 'Data is ready. No action was taken.'
+            return update_rule
 
         if self._test_ratio:
             if full_update:
