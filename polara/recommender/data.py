@@ -710,11 +710,22 @@ class RecommenderData(object):
 
     def test_to_coo(self, tensor_mode=False):
         userid, itemid, feedback = self.fields
-        test_data = self.test.testset
+        testset = self.test.testset
+        holdout = self.test.evalset
 
-        user_idx = test_data[userid].values.astype(np.intp)
-        item_idx = test_data[itemid].values.astype(np.intp)
-        fdbk_val = test_data[feedback].values
+        if testset is None:
+            if self._test_unseen_users or (holdout is None):
+                raise ValueError('Unable to read test data')
+            userid = self.fields.userid
+            test_users = holdout[userid].drop_duplicates()
+            testset = (self.training.query('{} in @test_users'.format(userid))
+                             .sort_values(userid))
+            self._test = self._test._replace(testset=testset)
+            self._align_test_users()
+
+        user_idx = testset[userid].values.astype(np.intp)
+        item_idx = testset[itemid].values.astype(np.intp)
+        fdbk_val = testset[feedback].values
 
         if tensor_mode:
             fdbk_idx = self.index.feedback.set_index('old').loc[fdbk_val, 'new'].values
