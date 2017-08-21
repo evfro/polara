@@ -493,8 +493,8 @@ class RecommenderData(object):
         testset = self._test.testset
         holdout = self._test.evalset
 
-        holdout_in_testset = holdout[userid].isin(testset[userid])
-        testset_in_holdout = testset[userid].isin(holdout[userid])
+        holdout_in_testset = holdout[userid].isin(testset[userid].unique())
+        testset_in_holdout = testset[userid].isin(holdout[userid].unique())
 
         if not holdout_in_testset.all():
             invalid_holdout_users = holdout.loc[~holdout_in_testset, userid]
