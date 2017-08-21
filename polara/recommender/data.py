@@ -579,6 +579,7 @@ class RecommenderData(object):
         self.index = self.index._replace(userid=self.index.userid._replace(test=user_index))
 
     def _assign_holdout_users_index(self):
+        # this is only for state 4
         userid = self.fields.userid
         test_user_index = self.index.userid.test.set_index('old').new
         self._test.evalset.loc[:, userid] = self._test.evalset.loc[:, userid].map(test_user_index)
@@ -679,10 +680,10 @@ class RecommenderData(object):
             return data
 
         userid = self.fields.userid
-        if test_sample > 0:
+        if test_sample > 0: # sample at most test_sample items
             sampled = (data.groupby(userid, sort=False, group_keys=False)
                             .apply(random_choice, test_sample, self.random_state or np.random))
-        else: #test_sample < 0, leave only the most negative feedback from user
+        else: # sample at most test_sample items with the worst feedback from user
             feedback = self.fields.feedback
             idx = (data.groupby(userid, sort=False)[feedback]
                         .nsmallest(-test_sample).index.get_level_values(1))
