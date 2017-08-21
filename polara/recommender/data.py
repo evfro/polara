@@ -593,20 +593,33 @@ class RecommenderData(object):
             holdout.sort_values(userid, inplace=True)
 
     def _try_revert_holdout_index(self):
-        user_index = self.index.userid.test
-        item_index = self.index.itemid
+        self._revert_holdout_users_index()
+        self._revert_holdout_items_index()
 
+    def _revert_holdout_users_index(self):
+        userid = self.fields.userid
+        user_index = self.index.userid.test # in state 4
+        if user_index is None: # in state 3
+            user_index = self.index.userid.training
+        msg = 'There\'s no {} index data. Assuming holdout index wasn\'t changed.'
         try:
             reverted_user_index = user_index.set_index('new').old
+        except AttributeError:
+
+            print msg.format(userid)
+        else:
+            self._test.evalset.loc[:, userid] = self._test.evalset.loc[:, userid].map(reverted_user_index)
+
+    def _revert_holdout_items_index(self):
+        itemid = self.fields.itemid
+        item_index = self.index.itemid
+        msg = 'There\'s no {} index data. Assuming holdout index wasn\'t changed.'
+        try:
             reverted_item_index = item_index.set_index('new').old
         except AttributeError:
-            return
-
-        userid = self.fields.userid
-        itemid = self.fields.itemid
-
-        self._test.evalset.loc[:, userid] = self._test.evalset.loc[:, userid].map(reverted_user_index)
-        self._test.evalset.loc[:, itemid] = self._test.evalset.loc[:, itemid].map(reverted_item_index)
+            print msg.format(itemid)
+        else:
+            self._test.evalset.loc[:, itemid] = self._test.evalset.loc[:, itemid].map(reverted_item_index)
 
 
     @staticmethod
