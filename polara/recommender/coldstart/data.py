@@ -99,6 +99,10 @@ class ItemColdStartData(RecommenderData):
     def _reindex_cold_items(self):
         itemid_cold = '{}_cold'.format(self.fields.itemid)
         cold_item_index = self.reindex(self.test.testset, itemid_cold, inplace=True, sort=False)
+        try: # check if already modified item index to avoid nested assignemnt
+            item_index = self.index.itemid.training
+        except AttributeError:
+            item_index = self.index.itemid
         new_item_index = (namedtuple('ItemIndex', 'training cold_start')
-                                ._make([self.index.itemid, cold_item_index]))
+                                ._make([item_index, cold_item_index]))
         self.index = self.index._replace(itemid=new_item_index)
