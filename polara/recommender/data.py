@@ -63,7 +63,7 @@ class RecommenderData(object):
 
         if data is None:
             cols = fields + [custom_order] if custom_order else fields
-            self._data = pd.DataFrame(columns=cols)
+            self._data = data = pd.DataFrame(columns=cols)
         else:
             self._data = data
 
