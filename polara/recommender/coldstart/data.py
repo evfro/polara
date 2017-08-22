@@ -81,19 +81,18 @@ class ItemColdStartData(RecommenderData):
         pass
 
     def _assign_test_items_index(self):
-        # skip holdout as it contains cold-start items only
         itemid = self.fields.itemid
         self._map_entity(itemid, self._test.testset)
+        self._reindex_cold_items() # instead of trying to assign known items index
 
     def _assign_test_users_index(self):
         # skip testset as it doesn't contain users
         userid = self.fields.userid
         self._map_entity(userid, self._test.evalset)
 
-    def _revert_holdout_items_index(self):
-        # cold-start items are never reindexed
-        pass
-
-    def _try_sort_test_data(self):
-        # no need to sort by users
-        pass
+    def _reindex_cold_items(self):
+        itemid_cold = '{}_cold'.format(itemid)
+        cold_item_index = self.reindex(self.test.testset, itemid_cold, inplace=True, sort=False)
+        new_item_index = (namedtuple('ItemIndex', 'training cold_start')
+                                ._make([self.index.itemid, cold_item_index]))
+        self.index = self.index._replace(itemid=new_item_index)
