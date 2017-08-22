@@ -165,9 +165,6 @@ class RecommenderData(object):
 
         update_rule = self._split_data()
 
-        if update_rule['use_same_holdout']:
-            self._try_revert_holdout_index()
-
         if update_rule['full_update']:
             self._try_reindex_training_data()
 
@@ -214,9 +211,6 @@ class RecommenderData(object):
                 new_state = 4
                 if (last_state == 11) and not test_data_change:
                     update_rule['test_update'] = True
-                elif (last_state == 3) and not (test_data_change or any_holdout_change):
-                    update_rule['full_update'] = True
-                    update_rule['use_same_holdout'] = True
                 else:
                     update_rule['full_update'] = True
             else:
@@ -234,9 +228,6 @@ class RecommenderData(object):
                         new_state = 2
                     else:
                         new_state = 3
-                        if not (test_data_change or any_holdout_change):
-                            update_rule['full_update'] = True
-                            update_rule['use_same_holdout'] = True
         else: # this assumes that test_unseen_users is consistent with current state!
             if last_state == 1: # hsz = 0, trt = 0, usn = False
                 if holdout_sz_change: # hsz > 0
@@ -296,7 +287,6 @@ class RecommenderData(object):
                         update_rule['full_update'] = True
                     elif test_sample_change:
                         update_rule['test_update'] = True
-                        update_rule['use_same_holdout'] = True
 
             else: # initial state
                 if empty_holdout:
@@ -317,7 +307,6 @@ class RecommenderData(object):
 
         full_update = update_rule['full_update']
         test_update = update_rule['test_update']
-        fix_holdout = update_rule['use_same_holdout']
 
         if not (full_update or test_update):
             print 'Data is ready. No action was taken.'
@@ -332,10 +321,7 @@ class RecommenderData(object):
                 testset = holdout = None
                 train_split = ~test_split
             else: # state 3 or state 4
-                if fix_holdout:
-                    holdout = self._test.evalset
-                else: # sample holdout data per each user, whole data sampling is inconsistent
-                    holdout = self._sample_holdout(test_split)
+                holdout = self._sample_holdout(test_split)
 
                 if self._test_unseen_users: # state 4
                     testset = self._sample_testset(test_split, holdout.index)
@@ -592,35 +578,6 @@ class RecommenderData(object):
             testset.sort_values(userid, inplace=True)
         if holdout is not None:
             holdout.sort_values(userid, inplace=True)
-
-    def _try_revert_holdout_index(self):
-        self._revert_holdout_users_index()
-        self._revert_holdout_items_index()
-
-    def _revert_holdout_users_index(self):
-        userid = self.fields.userid
-        user_index = self.index.userid.test # in state 4
-        if user_index is None: # in state 3
-            user_index = self.index.userid.training
-        msg = 'There\'s no {} index data. Assuming holdout index wasn\'t changed.'
-        try:
-            reverted_user_index = user_index.set_index('new').old
-        except AttributeError:
-
-            print msg.format(userid)
-        else:
-            self._test.evalset.loc[:, userid] = self._test.evalset.loc[:, userid].map(reverted_user_index)
-
-    def _revert_holdout_items_index(self):
-        itemid = self.fields.itemid
-        item_index = self.index.itemid
-        msg = 'There\'s no {} index data. Assuming holdout index wasn\'t changed.'
-        try:
-            reverted_item_index = item_index.set_index('new').old
-        except AttributeError:
-            print msg.format(itemid)
-        else:
-            self._test.evalset.loc[:, itemid] = self._test.evalset.loc[:, itemid].map(reverted_item_index)
 
 
     @staticmethod
