@@ -90,7 +90,7 @@ class ItemColdStartData(RecommenderData):
         self._map_entity(userid, self._test.evalset)
 
     def _reindex_cold_items(self):
-        itemid_cold = '{}_cold'.format(itemid)
+        itemid_cold = '{}_cold'.format(self.fields.itemid)
         cold_item_index = self.reindex(self.test.testset, itemid_cold, inplace=True, sort=False)
         new_item_index = (namedtuple('ItemIndex', 'training cold_start')
                                 ._make([self.index.itemid, cold_item_index]))
