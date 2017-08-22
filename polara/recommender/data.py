@@ -711,11 +711,15 @@ class RecommenderData(object):
         #TODO make it a property maybe
         userid = self.fields.userid
         num_users = self.test.evalset[userid].nunique()
-        num_items = len(self.index.itemid)
+        try:
+            item_index = self.index.itemid.training
+        except AttributeError:
+            item_index = self.index.itemid
+        num_items = item_index.shape[0]
         shape = (num_users, num_items)
 
         if tensor_mode:
-            num_fdbks = len(self.index.feedback)
+            num_fdbks = self.index.feedback.shape[0]
             shape = shape + (num_fdbks,)
 
         return shape
