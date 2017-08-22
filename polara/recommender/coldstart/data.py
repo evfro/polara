@@ -23,6 +23,13 @@ class ItemColdStartData(RecommenderData):
         self._unique_items = permute(self._data[itemid].unique())
 
 
+    def _check_state_transition(self):
+        new_state, update_rule = super(ItemColdStartData, self)._check_state_transition()
+        if '_test_sample' in self._change_properties:
+            update_rule['test_update'] = True
+        return new_state, update_rule
+
+
     def _split_test_index(self):
         userid = self.fields.userid
         itemid = self.fields.itemid
