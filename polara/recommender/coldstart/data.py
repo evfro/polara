@@ -76,6 +76,10 @@ class ItemColdStartData(RecommenderData):
         # testset contains items only
         pass
 
+    def _try_sort_test_data(self):
+        # no need to sort by users
+        pass
+
     def _assign_test_items_index(self):
         itemid = self.fields.itemid
         self._map_entity(itemid, self._test.testset)
