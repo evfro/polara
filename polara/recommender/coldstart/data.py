@@ -72,10 +72,6 @@ class ItemColdStartData(RecommenderData):
         # there will be no such items except cold-start items
         pass
 
-    def _try_drop_unseen_test_users(self):
-        # we care only about cold-start items in holdout
-        pass
-
     def _try_drop_invalid_test_users(self):
         # testset contains items only
         pass
