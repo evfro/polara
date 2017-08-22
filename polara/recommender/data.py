@@ -544,9 +544,9 @@ class RecommenderData(object):
             raise NotImplementedError
 
         try:
-            seen_entities = index_data.training.old.values
+            seen_entities = index_data.training['old']
         except AttributeError:
-            seen_entities = index_data.old.values
+            seen_entities = index_data['old']
 
         seen_data = dataset[entity].isin(seen_entities)
         if not seen_data.all():
