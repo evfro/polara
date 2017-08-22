@@ -37,7 +37,6 @@ class ItemColdStartData(RecommenderData):
 
     def _split_data(self):
         assert self._test_ratio > 0
-        assert self._test_sample > 1
         assert not self._test_unseen_users
         update_rule = super(ItemColdStartData, self)._split_data()
 
