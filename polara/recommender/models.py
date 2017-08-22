@@ -217,9 +217,14 @@ class RecommenderModel(object):
             feedback_val = self.data.training[feedback].max()
             feedback_data = [feedback_val]*len(items_data)
 
+        try:
+            item_index = self.data.index.itemid.training
+        except AttributeError:
+            item_index = self.data.index.itemid
+
         # need to convert itemid's to internal representation
         # conversion is not required for feedback (it's made in *to_coo functions, if needed)
-        items_data = self.data.index.itemid.set_index('old').loc[items_data, 'new'].values
+        items_data = item_index.set_index('old').loc[items_data, 'new'].values
         user_data = pd.DataFrame({userid:[0]*len(items_data),
                                 itemid:items_data,
                                 feedback:feedback_data})
@@ -249,9 +254,14 @@ class RecommenderModel(object):
         top_recs = self.get_topk_items(scores).squeeze() #remove singleton
         self.topk = _topk
 
+        try:
+            item_index = self.data.index.itemid.training
+        except AttributeError:
+            item_index = self.data.index.itemid
+
         seen_idx = seen_idx[1] # only items idx
         # covert back to external representation
-        item_idx_map = self.data.index.itemid.set_index('new')
+        item_idx_map = item_index.set_index('new')
         top_recs = item_idx_map.loc[top_recs, 'old'].values
         seen_items = item_idx_map.loc[seen_idx, 'old'].values
         return top_recs, seen_items
