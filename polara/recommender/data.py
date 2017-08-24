@@ -80,10 +80,10 @@ class RecommenderData(object):
 
         self._set_defaults()
         self._change_properties = set() #container for changed properties
-        # TODO random_state may also lead to either full_update or test_update
         # depending on config. For ex., shuffle_data - full_update,
+        # TODO seed may also lead to either full_update or test_update
         # random_holdout - test_update. Need to implement checks
-        self.random_state = None #use with shuffle_data, permute_tops, random_choice
+        self.seed = None #use with shuffle_data, permute_tops, random_choice
         self.verify_sessions_length_distribution = True
         self.ensure_consistency = True # drop test entities if not present in training
         self.build_index = True # reindex data, avoid gaps in user and item index
@@ -336,7 +336,8 @@ class RecommenderData(object):
             if self._holdout_size >= 1: # state 2, sample holdout data per each user
                 holdout = self._sample_holdout(test_split)
             elif self._holdout_size > 0: # state 2, special case - sample whole data at once
-                holdout = self._data.sample(frac=self._holdout_size, random_state=self.random_state)
+                random_state = np.random.RandomState(self.seed)
+                holdout = self._data.sample(frac=self._holdout_size, random_state=random_state)
             else: # state 1
                 holdout = None
 
@@ -605,15 +606,17 @@ class RecommenderData(object):
         # data may have many items with the same top ratings
         # randomizing the data helps to avoid biases in that case
         if self._permute_tops and not self._random_holdout:
-            selector = selector.sample(frac=1, random_state=self.random_state)
+            random_state = np.random.RandomState(self.seed)
+            selector = selector.sample(frac=1, random_state=random_state)
 
         grouper = selector.groupby(self._data[userid], sort=False)
 
         if self._random_holdout: #randomly sample data for evaluation
+            random_state = np.random.RandomState(self.seed)
             if self._holdout_size >= 1:
-                holdout = grouper.apply(random_choice, self._holdout_size, self.random_state or np.random)
+                holdout = grouper.apply(random_choice, self._holdout_size, random_state)
             else:
-                holdout = grouper.apply(random_sample, self._holdout_size, self.random_state)
+                holdout = grouper.apply(random_sample, self._holdout_size, random_state)
         elif self._negative_prediction: #try to holdout negative only examples
             if self._holdout_size >= 1:
                 holdout = grouper.nsmallest(self._holdout_size, keep='last')
@@ -638,8 +641,9 @@ class RecommenderData(object):
 
         userid = self.fields.userid
         if test_sample > 0: # sample at most test_sample items
+            random_state = np.random.RandomState(self.seed)
             sampled = (data.groupby(userid, sort=False, group_keys=False)
-                            .apply(random_choice, test_sample, self.random_state or np.random))
+                            .apply(random_choice, test_sample, random_state))
         else: # sample at most test_sample items with the worst feedback from user
             feedback = self.fields.feedback
             idx = (data.groupby(userid, sort=False)[feedback]

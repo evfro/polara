@@ -6,17 +6,14 @@ from polara.recommender.data import RecommenderData
 
 class ItemColdStartData(RecommenderData):
     def __init__(self, *args, **kwargs):
-        random_state = kwargs.pop('random_state', None)
+        seed = kwargs.pop('seed', None)
         super(ItemColdStartData, self).__init__(*args, **kwargs)
 
         self._test_sample = 1
         self._test_unseen_users = False
 
-        self.random_state = random_state
-        try:
-            permute = self.random_state.permutation
-        except AttributeError:
-            permute = np.random.permutation
+        self.seed = seed
+        permute = np.random.RandomState(seed).permutation
 
         # build unique items list to split them by folds
         itemid = self.fields.itemid
