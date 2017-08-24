@@ -162,7 +162,7 @@ class RecommenderModel(object):
 
         user_idx, item_idx, feedback = self.data.test_to_coo(tensor_mode=tensor_mode)
         test_shape = self.data.get_test_shape(tensor_mode=tensor_mode)
-        
+
         idx_diff = np.diff(user_idx) # this assumes testset is sorted by users!
         # TODO only required when testset consists of known users
         if (idx_diff>1).any() or (user_idx.min() != 0): # check index monotonicity
@@ -520,6 +520,43 @@ class NonPersonalized(RecommenderModel):
 
         top_recs =  self.get_topk_items(scores)
         return top_recs
+
+
+class PopularityModel(RecommenderModel):
+    def __init__(self, *args, **kwargs):
+        super(PopularityModel, self).__init__(*args, **kwargs)
+        self.method = 'MP'
+
+    def build(self):
+        itemid = self.data.fields.itemid
+        self.item_scores = self.data.training.groupby(itemid, sort=True).size().values
+
+    def slice_recommendations(self, test_data, shape, start, stop, test_users=None):
+        slice_data = self._slice_test_data(test_data, start, stop)
+        n_users = stop - start
+        scores = np.repeat(self.item_scores[None, :], n_users, axis=0)
+        return scores, slice_data
+
+
+class RandomModel(RecommenderModel):
+    def __init__(self, *args, **kwargs):
+        self.seed = kwargs.pop('seed', None)
+        super(RandomModel, self).__init__(*args, **kwargs)
+        self.method = 'RND'
+
+    def build(self):
+        try:
+            index_data = self.data.index.itemid.training
+        except AttributeError:
+            index_data = self.data.index.itemid
+        self.n_items = index_data.shape[0]
+        self._random_state = np.random.RandomState(self.seed) if self.seed else np.random
+
+    def slice_recommendations(self, test_data, shape, start, stop, test_users=None):
+        slice_data = self._slice_test_data(test_data, start, stop)
+        n_users = stop - start
+        scores = self._random_state.rand(n_users, self.n_items)
+        return scores, slice_data
 
 
 class CooccurrenceModel(RecommenderModel):
