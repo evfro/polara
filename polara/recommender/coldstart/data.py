@@ -56,22 +56,25 @@ class ItemColdStartData(RecommenderData):
     def _sample_test_items(self):
         userid = self.fields.userid
         itemid = self.fields.itemid
+        itemid_cold = '{}_cold'.format(itemid)
         test_split = self._test_split
         holdout = self.test.evalset
         user_has_cold_item = self._data[userid].isin(holdout[userid].unique())
         sampled = super(ItemColdStartData, self)._sample_testset(user_has_cold_item, holdout.index)
-        testset = (pd.merge(holdout[[userid, itemid]],
+        testset = (pd.merge(holdout[[userid, itemid_cold]],
                             sampled[[userid, itemid]],
-                            on=userid, how='inner',
-                            suffixes=('_cold', ''))
+                            on=userid, how='inner')
                             .drop(userid, axis=1)
-                            .drop_duplicates()
+                            .drop_duplicates(subset=[itemid, itemid_cold])
                             .sort_values('{}_cold'.format(itemid)))
         return testset
 
 
     def _sample_holdout(self, test_split):
-        return self._data.loc[test_split, list(self.fields)]
+        itemid = self.fields.itemid
+        itemid_cold = '{}_cold'.format(itemid)
+        return (self._data.loc[test_split, list(self.fields)]
+                    .rename(columns={itemid: itemid_cold}, copy=False))
 
 
     def _try_drop_unseen_test_items(self):
