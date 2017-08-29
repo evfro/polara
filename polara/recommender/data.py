@@ -91,6 +91,8 @@ class RecommenderData(object):
         self._state = None # None or 1 of {'_': 1, 'H': 11, '|': 2, 'd': 3, 'T': 4}
 
         self._attached_models = {'on_change': {}, 'on_update': {}}
+        self.on_change_event = 'on_change'
+        self.on_update_event = 'on_update'
         # on_change indicates whether full data has been changed -> rebuild model
         # on_update indicates whether only test data has been changed -> renew recommendations
         self.verbose = True
@@ -349,9 +351,9 @@ class RecommenderData(object):
 
         if full_update:
             self._training = self._data.loc[train_split, list(self.fields)]
-            self._notify('on_change')
+            self._notify(self.on_change_event)
         elif test_update:
-            self._notify('on_update')
+            self._notify(self.on_update_event)
 
         self._change_properties.clear()
         return update_rule
