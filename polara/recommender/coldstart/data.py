@@ -97,11 +97,17 @@ class ItemColdStartData(RecommenderData):
         self.index = self.index._replace(itemid=new_item_index)
 
 
+    def _try_sort_test_data(self):
+        # no need to sort by users
+        pass
+
+
     def _post_process_cold_items(self):
         self._clean_representative_users()
         self._verify_cold_items_representatives()
         self._verify_cold_items_features()
         self._try_cleanup_cold_items()
+        self._sort_by_cold_items()
 
 
     def _clean_representative_users(self):
@@ -164,3 +170,10 @@ class ItemColdStartData(RecommenderData):
             itemid_cold = '{}_cold'.format(self.fields.itemid)
             holdout = self._test.evalset
             holdout.query('{} in @cold_index.new'.format(itemid_cold), inplace=True)
+
+    def _sort_by_cold_items(self):
+        itemid_cold = '{}_cold'.format(self.fields.itemid)
+        cold_index = self.index.itemid.cold_start
+        cold_index.sort_values('new', inplace=True)
+        holdout = self._test.evalset
+        holdout.sort_values(itemid_cold, inplace=True)
