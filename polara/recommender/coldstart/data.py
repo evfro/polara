@@ -137,6 +137,8 @@ class ItemColdStartData(RecommenderData):
             except AttributeError: # fall back to much slower but more general option
                 features_melted = (self.meta_data.apply(lambda x: [x.sum()], axis=1)
                                                  .apply(lambda x: x[0]))
+        else:
+            features_melted = self.meta_data.iloc[:, 0]
 
         feature_labels = defaultdict(lambda: len(feature_labels))
         labels = features_melted.apply(lambda x: [feature_labels[i] for i in x])
