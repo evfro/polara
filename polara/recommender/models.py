@@ -74,8 +74,8 @@ class RecommenderModel(object):
         self.not_rated_penalty = 0
 
         self._is_ready = False
-        self.data._attach_model('on_change', self, '_on_change')
-        self.data._attach_model('on_update', self, '_on_update')
+        self.data._attach_model(self.data.on_change_event, self, '_on_change')
+        self.data._attach_model(self.data.on_update_event, self, '_on_update')
 
         self.verbose = True
 
