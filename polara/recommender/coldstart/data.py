@@ -30,7 +30,7 @@ class ItemColdStartData(RecommenderData):
                 sample_params = {'frac' if sample < 1 else 'n': sample,
                                  'random_state': np.random.RandomState(self.seed)}
                 all_users = self.index.userid.training
-                self._repr_users = all_users.sample(**sample_params)
+                self._repr_users = all_users.sample(**sample_params).sort_values('new')
         return self._repr_users
 
 
