@@ -90,9 +90,10 @@ class RecommenderData(object):
         self._test_selector = None
         self._state = None # None or 1 of {'_': 1, 'H': 11, '|': 2, 'd': 3, 'T': 4}
 
-        self._attached_models = {'on_change': {}, 'on_update': {}}
         self.on_change_event = 'on_change'
         self.on_update_event = 'on_update'
+        self._attached_models = {self.on_change_event: defaultdict(set),
+                                 self.on_update_event: defaultdict(set)}
         # on_change indicates whether full data has been changed -> rebuild model
         # on_update indicates whether only test data has been changed -> renew recommendations
         self.verbose = True
@@ -102,14 +103,15 @@ class RecommenderData(object):
         return self._attached_models[event]
 
     def _attach_model(self, event, model, callback):
-        self._get_attached_models(event)[model] = callback
+        self._get_attached_models(event)[model].add(callback)
 
     def _detach_model(self, event, model):
         del self._get_attached_models(event)[model]
 
     def _notify(self, event):
-        for model, callback in self._get_attached_models(event).iteritems():
-            getattr(model, callback)()
+        for model, callback_set in self._get_attached_models(event).iteritems():
+            for callback in list(callback_set):
+                getattr(model, callback)()
 
 
     def _set_defaults(self, params=None):
