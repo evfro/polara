@@ -89,6 +89,7 @@ class RecommenderData(object):
         self.build_index = True # reindex data, avoid gaps in user and item index
         self._test_selector = None
         self._state = None # None or 1 of {'_': 1, 'H': 11, '|': 2, 'd': 3, 'T': 4}
+        self._last_update_rule = None
 
         self.on_change_event = 'on_change'
         self.on_update_event = 'on_update'
@@ -360,6 +361,7 @@ class RecommenderData(object):
         elif test_update:
             self._notify(self.on_update_event)
 
+        self._last_update_rule = update_rule
         self._change_properties.clear()
         return update_rule
 
