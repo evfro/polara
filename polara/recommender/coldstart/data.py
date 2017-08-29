@@ -1,26 +1,46 @@
-from collections import namedtuple
+from collections import namedtuple, defaultdict
 import numpy as np
 import pandas as pd
 from polara.recommender.data import RecommenderData
+from polara.lib.similarity import build_indicator_matrix
 
 
 class ItemColdStartData(RecommenderData):
     def __init__(self, *args, **kwargs):
+        self.meta_data = kwargs.pop('meta_data', None)
         super(ItemColdStartData, self).__init__(*args, **kwargs)
 
-        self._test_sample = 1
+        self._test_ratio = 0.2
         self._test_unseen_users = False
+        self._holdout_size = None  # needed for correct processing of test data
+        self._test_sample = 0.25 # fraction of representative users
+        #TODO need to implement hook to test_sample change
 
         # build unique items list to split them by folds
         itemid = self.fields.itemid
+        permute = np.random.RandomState(self.seed).permutation
         self._unique_items = permute(self._data[itemid].unique())
 
+        self._repr_users = None
 
-    def _check_state_transition(self):
-        new_state, update_rule = super(ItemColdStartData, self)._check_state_transition()
-        if '_test_sample' in self._change_properties:
-            update_rule['test_update'] = True
-        return new_state, update_rule
+
+    @property
+    def representative_users(self):
+        if self._repr_users is None:
+            sample = self.test_sample
+            if sample:
+                sample_params = {'frac' if sample < 1 else 'n': sample,
+                                 'random_state': np.random.RandomState(self.seed)}
+                all_users = self.index.userid.training
+                self._repr_users = all_users.sample(**sample_params)
+        return self._repr_users
+
+
+    def prepare(self):
+        super(ItemColdStartData, self).prepare()
+
+        if any(self._last_update_rule.values()):
+            self._post_process_cold_items()
 
 
     def _split_test_index(self):
@@ -35,32 +55,17 @@ class ItemColdStartData(RecommenderData):
         return cold_items_mask
 
 
-    def _split_data(self):
-        assert self._test_ratio > 0
+    def _check_state_transition(self):
+        new_state, update_rule = super(ItemColdStartData, self)._check_state_transition()
+
         assert not self._test_unseen_users
-        update_rule = super(ItemColdStartData, self)._split_data()
-
-        if any(update_rule.values()):
-            testset = self._sample_test_items()
-            self._test = self._test._replace(testset=testset)
-        return update_rule
-
-
-    def _sample_test_items(self):
-        userid = self.fields.userid
-        itemid = self.fields.itemid
-        itemid_cold = '{}_cold'.format(itemid)
-        test_split = self._test_split
-        holdout = self.test.evalset
-        user_has_cold_item = self._data[userid].isin(holdout[userid].unique())
-        sampled = super(ItemColdStartData, self)._sample_testset(user_has_cold_item, holdout.index)
-        testset = (pd.merge(holdout[[userid, itemid_cold]],
-                            sampled[[userid, itemid]],
-                            on=userid, how='inner')
-                            .drop(userid, axis=1)
-                            .drop_duplicates(subset=[itemid, itemid_cold])
-                            .sort_values('{}_cold'.format(itemid)))
-        return testset
+        assert self._holdout_size is None # needed for correct processing of test data
+        assert self._test_ratio > 0
+        # handle chnage of test_sample value
+        # which is not handled in standard state 3 scenario as there's no testset
+        test_update = '_test_sample' in self._change_properties
+        update_rule['test_update'] = test_update
+        return new_state, update_rule
 
 
     def _sample_holdout(self, test_split):
@@ -74,31 +79,87 @@ class ItemColdStartData(RecommenderData):
         # there will be no such items except cold-start items
         pass
 
-    def _try_drop_invalid_test_users(self):
-        # testset contains items only
-        pass
-
-    def _try_sort_test_data(self):
-        # no need to sort by users
-        pass
 
     def _assign_test_items_index(self):
-        itemid = self.fields.itemid
-        self._map_entity(itemid, self._test.testset)
-        self._reindex_cold_items() # instead of trying to assign known items index
+        if self.build_index:
+            self._reindex_cold_items()
 
-    def _assign_test_users_index(self):
-        # skip testset as it doesn't contain users
-        userid = self.fields.userid
-        self._map_entity(userid, self._test.evalset)
 
     def _reindex_cold_items(self):
         itemid_cold = '{}_cold'.format(self.fields.itemid)
-        cold_item_index = self.reindex(self.test.testset, itemid_cold, inplace=True, sort=False)
+        cold_item_index = self.reindex(self._test.evalset, itemid_cold, inplace=True, sort=False)
+
         try: # check if already modified item index to avoid nested assignemnt
             item_index = self.index.itemid.training
         except AttributeError:
             item_index = self.index.itemid
+
         new_item_index = (namedtuple('ItemIndex', 'training cold_start')
                                 ._make([item_index, cold_item_index]))
         self.index = self.index._replace(itemid=new_item_index)
+
+
+    def _post_process_cold_items(self):
+        self._clean_representative_users()
+        self._verify_cold_items_representatives()
+        self._verify_cold_items_features()
+        self._try_cleanup_cold_items()
+
+
+    def _clean_representative_users(self):
+        self._repr_users = None
+
+
+    def _verify_cold_items_representatives(self):
+        repr_users = self.representative_users
+        if repr_users is None:
+            return
+
+        # post-processing to leave only representative users
+        # potentially filters out some cold items as well
+        userid = self.fields.userid
+        holdout = self._test.evalset # use _ to avoid recusrion
+        is_repr_user = holdout[userid].isin(repr_users.new)
+
+        itemid_cold = '{}_cold'.format(self.fields.itemid)
+        repr_items = holdout.loc[is_repr_user, itemid_cold].unique()
+        item_index = self.index.itemid
+        is_repr_item = item_index.cold_start.new.isin(repr_items)
+        item_index.cold_start['is_repr'] = is_repr_item
+
+
+    def _verify_cold_items_features(self):
+        if self.meta_data is None:
+            return
+
+        if self.meta_data.shape[1] > 1:
+            try: # agg is supported only starting from pandas v.0.20.0
+                features_melted = self.meta_data.agg('sum', axis=1)
+            except AttributeError: # fall back to much slower but more general option
+                features_melted = (self.meta_data.apply(lambda x: [x.sum()], axis=1)
+                                                 .apply(lambda x: x[0]))
+
+        feature_labels = defaultdict(lambda: len(feature_labels))
+        labels = features_melted.apply(lambda x: [feature_labels[i] for i in x])
+
+        item_index = self.index.itemid
+        cold_idx = item_index.cold_start.old
+        seen_idx = item_index.training.old
+
+        max_items = len(feature_labels)
+        cold_items_matrix = build_indicator_matrix(labels.loc[cold_idx], max_items)
+        seen_items_matrix = build_indicator_matrix(labels.loc[seen_idx], max_items)
+        # valid -> has at least 1 feature intersecting with any of seen items
+        is_valid_item = cold_items_matrix.dot(seen_items_matrix.T).getnnz(axis=1) > 0
+        item_index.cold_start['is_valid'] = is_valid_item
+
+
+    def _try_cleanup_cold_items(self):
+        indicators = ['is_repr', 'is_valid']
+        cold_index = self.index.itemid.cold_start
+        valid_items_query = ' and '.join([i for i in indicators if i in cold_index])
+        if valid_items_query:
+            cold_index.query(valid_items_query, inplace=True)
+            itemid_cold = '{}_cold'.format(self.fields.itemid)
+            holdout = self._test.evalset
+            holdout.query('{} in @cold_index.new'.format(itemid_cold), inplace=True)
