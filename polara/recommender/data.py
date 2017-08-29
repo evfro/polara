@@ -113,6 +113,9 @@ class RecommenderData(object):
             for callback in list(callback_set):
                 getattr(model, callback)()
 
+    def _register_event(self, event):
+        self._attached_models[event] = defaultdict(set)
+
 
     def _set_defaults(self, params=None):
         #[1:] omits undersacores in properties names
