@@ -251,7 +251,7 @@ class RecommenderModel(object):
         _topk = self.topk
         self.topk = topk or _topk
         # takes care of both sparse and dense recommendation lists
-        top_recs = self.get_topk_items(scores).squeeze() #remove singleton
+        top_recs = self.get_topk_elements(scores).squeeze() #remove singleton
         self.topk = _topk
 
         try:
@@ -291,7 +291,7 @@ class RecommenderModel(object):
                 # of the naive cooccurrence method itself, not to the algorithm
                 self.downvote_seen_items(scores, slice_data)
 
-            top_recs[start:stop, :] = self.get_topk_items(scores)
+            top_recs[start:stop, :] = self.get_topk_elements(scores)
             start = stop
 
         return top_recs
@@ -405,7 +405,7 @@ class RecommenderModel(object):
             recs.flat[idx_seen_flat] = lowered
 
 
-    def get_topk_items(self, scores):
+    def get_topk_elements(self, scores):
         topk = self.topk
         if sp.sparse.issparse(scores):
             assert scores.format == 'csr'
@@ -433,7 +433,7 @@ class RecommenderModel(object):
             nnz_users = row_data.grouper.levels[0]
             num_users = scores.shape[0]
             if len(nnz_users) < num_users:
-                # scores may have zero-valued rows, this breaks get_topk_items
+                # scores may have zero-valued rows, this breaks get_topk_elements
                 # as scores.nonzero() will filter out indices of those rows.
                 # Need to restore full data with zeros in that case.
                 recs = np.empty((num_users, topk))
@@ -518,7 +518,7 @@ class NonPersonalized(RecommenderModel):
             #prevent seen items from appearing in recommendations
             self.downvote_seen_items(scores, test_idx)
 
-        top_recs =  self.get_topk_items(scores)
+        top_recs =  self.get_topk_elements(scores)
         return top_recs
 
 
