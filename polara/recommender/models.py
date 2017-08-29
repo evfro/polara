@@ -621,20 +621,33 @@ class SVDModel(RecommenderModel):
         super(SVDModel, self).__init__(*args, **kwargs)
         self.rank = defaults.svd_rank
         self.method = 'PureSVD'
+        self.factors = {}
 
 
-    def build(self, operator=None):
-        svd_matrix = operator if operator is not None else self.get_training_matrix(dtype=np.float64)
+    def build(self, operator=None, return_factors='vh'):
+        if operator is not None:
+            svd_matrix = operator
+        else:
+            svd_matrix = self.get_training_matrix(dtype=np.float64)
+
+        svd_params = dict(k=self.rank, return_singular_vectors=return_factors)
 
         with Timer(self.method, verbose=self.verbose):
-            _, _, items_factors = svds(svd_matrix, k=self.rank, return_singular_vectors='vh')
+            user_factors, sigma, item_factors = svds(svd_matrix, **svd_params)
 
-        self._items_factors = np.ascontiguousarray(items_factors[::-1, :]).T
+        if user_factors is not None:
+            userid = self.data.fields.userid
+            self.factors[userid] = np.ascontiguousarray(user_factors[:, ::-1])
+        if item_factors is not None:
+            itemid = self.data.fields.itemid
+            self.factors[itemid] = np.ascontiguousarray(item_factors[::-1, :]).T
+        if sigma is not None:
+            self.factors['singular_values'] = np.ascontiguousarray(sigma[::-1])
 
 
     def slice_recommendations(self, test_data, shape, start, stop, test_users=None):
         test_matrix, slice_data = self.get_test_matrix(test_data, shape, (start, stop))
-        v = self._items_factors
+        v = self.factors[self.data.fields.itemid]
         scores = (test_matrix.dot(v)).dot(v.T)
         return scores, slice_data
 
