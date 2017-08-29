@@ -233,6 +233,14 @@ def uniquify_ordered(seq):
     return [x for x in seq if not (x in seen or seen_add(x))]
 
 
+def build_indicator_matrix(labels, max_items=None):
+    indices = [i for x in labels for i in x]
+    indprt = np.r_[0, labels.apply(len).cumsum().values]
+    data = np.ones_like(indices, dtype=np.bool)
+    shape = [len(labels), max_items or indices.max()+1]
+    return csr_matrix((data, indices, indprt), shape=shape)
+
+
 def feature2sparse(feature_data, ranking=None, deduplicate=True):
     if deduplicate:
         feature_data = feature_data.apply(uniquify_ordered if ranking else set)
