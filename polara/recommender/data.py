@@ -57,7 +57,7 @@ class RecommenderData(object):
                '_test_unseen_users', '_holdout_size', '_test_sample',
                '_permute_tops', '_random_holdout', '_negative_prediction'}
 
-    def __init__(self, data, userid, itemid, feedback, custom_order=None):
+    def __init__(self, data, userid, itemid, feedback, custom_order=None, seed=None):
         self.name = None
         fields = [userid, itemid, feedback]
 
@@ -83,7 +83,7 @@ class RecommenderData(object):
         # depending on config. For ex., shuffle_data - full_update,
         # TODO seed may also lead to either full_update or test_update
         # random_holdout - test_update. Need to implement checks
-        self.seed = None #use with shuffle_data, permute_tops, random_choice
+        self.seed = seed #use with permute_tops, random_choice
         self.verify_sessions_length_distribution = True
         self.ensure_consistency = True # drop test entities if not present in training
         self.build_index = True # reindex data, avoid gaps in user and item index
