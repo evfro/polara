@@ -13,16 +13,14 @@ class ItemColdStartData(RecommenderData):
         self._test_ratio = 0.2
         self._test_unseen_users = False
         self._holdout_size = None  # needed for correct processing of test data
-        self._test_sample = 0.25 # fraction of representative users
-        #TODO need to implement hook to test_sample change
 
         # build unique items list to split them by folds
         itemid = self.fields.itemid
         permute = np.random.RandomState(self.seed).permutation
         self._unique_items = permute(self._data[itemid].unique())
 
+        self._test_sample = 0.25 # fraction of representative users from train
         self._repr_users = None
-
 
     @property
     def representative_users(self):
@@ -56,15 +54,15 @@ class ItemColdStartData(RecommenderData):
 
 
     def _check_state_transition(self):
-        new_state, update_rule = super(ItemColdStartData, self)._check_state_transition()
-
         assert not self._test_unseen_users
         assert self._holdout_size is None # needed for correct processing of test data
         assert self._test_ratio > 0
-        # handle chnage of test_sample value
-        # which is not handled in standard state 3 scenario as there's no testset
-        test_update = '_test_sample' in self._change_properties
-        update_rule['test_update'] = test_update
+        new_state, update_rule = super(ItemColdStartData, self)._check_state_transition()
+
+        # handle chnage of test_sample value which is not handled
+        # in standard state 3 scenario (as there's no testset)
+        test_sample_change = '_test_sample' in self._change_properties
+        update_rule['test_update'] = update_rule['test_update'] or test_sample_change
         return new_state, update_rule
 
 
@@ -107,6 +105,7 @@ class ItemColdStartData(RecommenderData):
 
 
     def _clean_representative_users(self):
+        # TODO don't clean if training data and test_sample value are not changed
         self._repr_users = None
 
 
