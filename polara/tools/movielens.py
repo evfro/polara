@@ -1,7 +1,10 @@
 import pandas as pd
 from requests import get
 from StringIO import StringIO
-from pandas.io.common import ZipFile
+try:
+    from pandas.io.common import ZipFile
+except ImportError:
+    from zipfile import ZipFile
 
 
 def get_movielens_data(local_file=None, get_ratings=True, get_genres=False,
