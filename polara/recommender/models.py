@@ -39,8 +39,8 @@ class MetaModel(type):
     # all cached recommendations are cleared
     # key idea is borrowed from here:
     # https://stackoverflow.com/questions/18858759/python-decorating-a-class-method-that-is-intended-to-be-overwritten-when-inheri
-    def __init__(cls, name, bases, clsdict):
-        super(MetaModel, cls).__init__(name, bases, clsdict)
+    def __new__(meta, name, bases, clsdict):
+        cls = super(MetaModel, meta).__new__(meta, name, bases, clsdict)
         if 'build' in clsdict:
             def clean_build(self, *args, **kwargs):
                 self._is_ready = False
@@ -48,6 +48,7 @@ class MetaModel(type):
                 clsdict['build'](self, *args, **kwargs)
                 self._is_ready = True
             setattr(cls, 'build', clean_build)
+        return cls
 
 
 class RecommenderModel(object):
