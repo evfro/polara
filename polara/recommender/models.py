@@ -45,8 +45,9 @@ class MetaModel(type):
             def clean_build(self, *args, **kwargs):
                 self._is_ready = False
                 self._recommendations = None
-                clsdict['build'](self, *args, **kwargs)
+                build_res = clsdict['build'](self, *args, **kwargs)
                 self._is_ready = True
+                return build_res
             setattr(cls, 'build', clean_build)
         return cls
 
