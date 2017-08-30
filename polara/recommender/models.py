@@ -636,14 +636,15 @@ class SVDModel(RecommenderModel):
             user_factors, sigma, item_factors = svds(svd_matrix, **svd_params)
 
         if user_factors is not None:
-            userid = self.data.fields.userid
-            self.factors[userid] = np.ascontiguousarray(user_factors[:, ::-1])
+            user_factors = np.ascontiguousarray(user_factors[:, ::-1])
         if item_factors is not None:
-            itemid = self.data.fields.itemid
-            self.factors[itemid] = np.ascontiguousarray(item_factors[::-1, :]).T
+            item_factors = np.ascontiguousarray(item_factors[::-1, :]).T
         if sigma is not None:
-            self.factors['singular_values'] = np.ascontiguousarray(sigma[::-1])
+            sigma = np.ascontiguousarray(sigma[::-1])
 
+        self.factors[self.data.fields.userid] = user_factors
+        self.factors[self.data.fields.itemid] = item_factors
+        self.factors['singular_values'] = sigma
 
     def slice_recommendations(self, test_data, shape, start, stop, test_users=None):
         test_matrix, slice_data = self.get_test_matrix(test_data, shape, (start, stop))
