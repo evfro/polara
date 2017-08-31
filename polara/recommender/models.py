@@ -1,3 +1,4 @@
+from functools import wraps
 from collections import namedtuple
 from timeit import default_timer as timer
 import pandas as pd
@@ -34,21 +35,26 @@ class Timer():
             print(self.message.format(self.model_name, self.elapsed_time[-1]))
 
 
-class MetaModel(type):
-    # this metaclass ensures that every time the build function is called,
+def clean_build_decorator(build_func):
+    # this ensures that every time the build function is called,
     # all cached recommendations are cleared
-    # key idea is borrowed from here:
+    @wraps(build_func)
+    def wrapper(self, *args, **kwargs):
+        self._is_ready = False
+        self._recommendations = None
+        build_res = build_func(self, *args, **kwargs)
+        self._is_ready = True
+        return build_res
+    return wrapper
+
+class MetaModel(type):
+    # performs cleaning of the instance when build method is called
+    # propagates the action to any subclasses, key idea is borrowed from here:
     # https://stackoverflow.com/questions/18858759/python-decorating-a-class-method-that-is-intended-to-be-overwritten-when-inheri
     def __new__(meta, name, bases, clsdict):
         cls = super(MetaModel, meta).__new__(meta, name, bases, clsdict)
         if 'build' in clsdict:
-            def clean_build(self, *args, **kwargs):
-                self._is_ready = False
-                self._recommendations = None
-                build_res = clsdict['build'](self, *args, **kwargs)
-                self._is_ready = True
-                return build_res
-            setattr(cls, 'build', clean_build)
+            setattr(cls, 'build', clean_build_decorator(clsdict['build']))
         return cls
 
 
