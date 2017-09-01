@@ -67,8 +67,8 @@ class RecommenderModel(object):
         self.not_rated_penalty = 0
 
         self._is_ready = False
-        self.data._attach_model(self.data.on_change_event, self, '_on_change')
-        self.data._attach_model(self.data.on_update_event, self, '_on_update')
+        self.data._attach_model(self.data.on_change_event, self, '_renew_model')
+        self.data._attach_model(self.data.on_update_event, self, '_refresh_model')
 
         self.verbose = True
 
@@ -82,6 +82,14 @@ class RecommenderModel(object):
                 self.build()
             self._recommendations = self.get_recommendations()
         return self._recommendations
+
+
+    def _renew_model(self):
+        self._recommendations = None
+        self._is_ready = False
+
+    def _refresh_model(self):
+        self._recommendations = None
 
 
     @property
@@ -98,14 +106,6 @@ class RecommenderModel(object):
 
     def build(self):
         raise NotImplementedError('This must be implemented in subclasses')
-
-
-    def _on_change(self):
-        self._recommendations = None
-        self._is_ready = False
-
-    def _on_update(self):
-        self._recommendations = None
 
 
     def get_training_matrix(self, dtype=None):
