@@ -1,38 +1,23 @@
 from functools import wraps
 from collections import namedtuple
-from timeit import default_timer as timer
+
 import pandas as pd
 import numpy as np
 import scipy as sp
 import scipy.sparse
 from scipy.sparse import csr_matrix
 from scipy.sparse.linalg import svds
+
 from polara.recommender import data, defaults
 from polara.recommender.evaluation import get_hits, get_relevance_scores, get_ranking_scores
 from polara.recommender.utils import array_split, NNZ_MAX
 from polara.lib.hosvd import tucker_als
 from polara.lib.sparse import csc_matvec
+from polara.tools.timing import Timer
 
 
 def get_default(name):
     return defaults.get_config([name])[name]
-
-
-class Timer():
-    def __init__(self, model_name='Model', verbose=True):
-        self.model_name = model_name
-        self.message = '{} training time: {}s'
-        self.elapsed_time = []
-        self.verbose = verbose
-
-    def __enter__(self):
-        self.start = timer()
-        return self.elapsed_time
-
-    def __exit__(self, type, value, traceback):
-        self.elapsed_time.append(timer() - self.start)
-        if self.verbose:
-            print(self.message.format(self.model_name, self.elapsed_time[-1]))
 
 
 def clean_build_decorator(build_func):
