@@ -14,22 +14,6 @@ def random_sample(df, frac, random_state):
     return df.sample(frac=frac, random_state=random_state)
 
 
-def filter_by_length(data, userid='userid', min_session_length=3):
-    """Filters users with insufficient number of items"""
-    if data.duplicated().any():
-        raise NotImplementedError
-
-    sz = data[userid].value_counts(sort=False)
-    has_valid_session_length = sz >= min_session_length
-    if not has_valid_session_length.all():
-        valid_users = sz.index[has_valid_session_length]
-        new_data =  data[data[userid].isin(valid_users)].copy()
-        print 'Sessions are filtered by length'
-    else:
-        new_data = data
-    return new_data
-
-
 def property_factory(cls):
     # set class properties in the loop, see
     # https://stackoverflow.com/questions/25371906/python-scope-issue-with-anonymous-lambda-in-metaclass
