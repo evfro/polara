@@ -419,7 +419,8 @@ class RecommenderData(object):
             self._filter_unseen_entity(itemid, self._test.evalset, 'holdout')
 
     def _try_drop_unseen_test_users(self):
-        if self.ensure_consistency: # even in state 3 there could be unseen users
+        if self.ensure_consistency and not self._test_unseen_users:
+            # even in state 3 there could be unseen users
             userid = self.fields.userid
             self._filter_unseen_entity(userid, self._test.evalset, 'holdout')
 
