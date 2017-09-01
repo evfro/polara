@@ -77,7 +77,8 @@ class RecommenderModel(object):
     def recommendations(self):
         if self._recommendations is None:
             if not self._is_ready:
-                print '{} model is not ready. Rebuilding.'.format(self.method)
+                if self.verbose:
+                    print '{} model is not ready. Rebuilding.'.format(self.method)
                 self.build()
             self._recommendations = self.get_recommendations()
         return self._recommendations
