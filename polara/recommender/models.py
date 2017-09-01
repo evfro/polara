@@ -613,9 +613,32 @@ class SVDModel(RecommenderModel):
 
     def __init__(self, *args, **kwargs):
         super(SVDModel, self).__init__(*args, **kwargs)
-        self.rank = defaults.svd_rank
+        self._rank = defaults.svd_rank
         self.method = 'PureSVD'
         self.factors = {}
+
+    @property
+    def rank(self):
+        return self._rank
+
+    @rank.setter
+    def rank(self, new_value):
+        if new_value != self._rank:
+            self._rank = new_value
+            self._check_reduced_rank(new_value)
+            self._recommendations = None
+
+    def _check_reduced_rank(self, rank):
+        for entity, factor in self.factors.iteritems():
+            if factor is None:
+                continue
+
+            if factor.shape[-1] < rank:
+                self._is_ready = False
+                self.factors = dict.fromkeys(self.factors.keys())
+                break
+            else:
+                self.factors[entity] = factor[..., :rank]
 
 
     def build(self, operator=None, return_factors='vh'):

@@ -7,7 +7,7 @@ class GraphlabFactorization(RecommenderModel):
         self.item_side_info = kwargs.pop('item_side_info', None)
         self.user_side_info = kwargs.pop('user_side_info', None)
         super(GraphlabFactorization, self).__init__(*args, **kwargs)
-        self.rank = 10
+        self._rank = 10
         self.method = 'GLF'
         # side data
         self._item_data = None
@@ -33,6 +33,19 @@ class GraphlabFactorization(RecommenderModel):
         super(GraphlabFactorization, self)._on_change()
         self._item_data = None
         self._user_data = None
+
+    @property
+    def rank(self):
+        return self._rank
+
+    @rank.setter
+    def rank(self, new_value):
+        if new_value != self._rank:
+            self._rank = new_value
+            self._is_ready = False
+            self._recommendations = None
+
+    num_factors = rank # convenience
 
     @property
     def item_data(self):
