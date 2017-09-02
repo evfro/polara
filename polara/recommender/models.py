@@ -139,7 +139,7 @@ class RecommenderModel(object):
         result_width = result_width or self.topk
         if scores_multiplier is None:
             try:
-                fdbk_dim = self._feedback_factors.shape
+                fdbk_dim = self.factors.get(self.data.fields.feedback, None).shape
                 scores_multiplier = fdbk_dim[0] + 2*fdbk_dim[1]
             except AttributeError:
                 scores_multiplier = 1
@@ -150,7 +150,7 @@ class RecommenderModel(object):
 
     def _get_test_data(self):
         try:
-            tensor_mode = self._feedback_factors is not None
+            tensor_mode = self.factors.get(self.data.fields.feedback, None) is not None
         except AttributeError:
             tensor_mode = False
 
@@ -675,6 +675,7 @@ class CoffeeModel(RecommenderModel):
     def __init__(self, *args, **kwargs):
         super(CoffeeModel, self).__init__(*args, **kwargs)
         self.mlrank = defaults.mlrank
+        self.factors = {}
         self.chunk = defaults.test_chunk_size
         self.method = 'CoFFee'
         self._flattener = defaults.flattener
@@ -731,10 +732,10 @@ class CoffeeModel(RecommenderModel):
                                 iters = self.num_iters,
                                 batch_run=not self.show_output)
 
-        self._users_factors = users_factors
-        self._items_factors = items_factors
-        self._feedback_factors = feedback_factors
-        self._core = core
+        self.factors[self.data.fields.userid] = users_factors
+        self.factors[self.data.fields.itemid] = items_factors
+        self.factors[self.data.fields.feedback] = feedback_factors
+        self.factors['core'] = core
 
 
     def get_test_tensor(self, test_data, shape, start, end):
@@ -759,8 +760,8 @@ class CoffeeModel(RecommenderModel):
         num_users = stop - start
         num_items = shape[1]
         num_fdbks = shape[2]
-        v = self._items_factors
-        w = self._feedback_factors
+        v = self.factors[self.data.fields.itemid]
+        w = self.factors[self.data.fields.feedback]
 
         # assume that w.shape[1] < v.shape[1] (allows for more efficient calculations)
         scores = test_tensor_unfolded.dot(w).reshape(num_users, num_items, w.shape[1])
