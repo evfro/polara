@@ -5,7 +5,7 @@ import pandas as pd
 import numpy as np
 import scipy as sp
 import scipy.sparse
-from scipy.sparse import csr_matrix
+from scipy.sparse import coo_matrix, csr_matrix
 from scipy.sparse.linalg import svds
 
 from polara.recommender import data, defaults
