@@ -67,10 +67,10 @@ class RecommenderModel(object):
         self.not_rated_penalty = 0
 
         self._is_ready = False
-        self.data._attach_model(self.data.on_change_event, self, '_renew_model')
-        self.data._attach_model(self.data.on_update_event, self, '_refresh_model')
-
         self.verbose = True
+
+        self.data.subscribe(self.data.on_change_event, self._renew_model)
+        self.data.subscribe(self.data.on_update_event, self._refresh_model)
 
 
     @property

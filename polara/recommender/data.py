@@ -1,9 +1,9 @@
-from polara.recommender import defaults
-import pandas as pd
-import numpy as np
+from weakref import WeakKeyDictionary
 from collections import namedtuple
 from collections import defaultdict
-
+import pandas as pd
+import numpy as np
+from polara.recommender import defaults
 
 def random_choice(df, num, random_state):
     n = df.shape[0]
@@ -12,6 +12,50 @@ def random_choice(df, num, random_state):
 
 def random_sample(df, frac, random_state):
     return df.sample(frac=frac, random_state=random_state)
+
+
+class EventNotifier(object):
+    def __init__(self, events=[]):
+        self._subscribers = {}
+        assert isinstance(events, list)
+        for event in events:
+            self.register_event(event)
+
+    def register_event(self, event):
+        self._subscribers[event] = WeakKeyDictionary({})
+
+    def unregister_event(self, event):
+        del self._subscribers[event]
+
+    def _get_subscribers(self, event):
+        return self._subscribers[event]
+
+    def subscribe(self, event, callback):
+        subscriber = callback.__self__
+        func =  callback.__func__
+        self._get_subscribers(event).setdefault(subscriber, set()).add(func)
+
+    def unsubscribe(self, event, subscriber):
+        del self._get_subscribers(event)[subscriber]
+
+    def unsubscribe_any(self, subscriber):
+        for event in self._subscribers.iterkeys():
+            subscribers = self._get_subscribers(event)
+            if subscriber in subscribers:
+                del subscribers[subscriber]
+
+    def __call__(self, event):
+        self._notify(event)
+
+    def _notify(self, event):
+        subscribers = self._get_subscribers(event)
+        for subscriber_ref in subscribers.keyrefs():
+            subscriber = subscriber_ref()
+            if subscriber is not None:
+                callbacks = subscribers.get(subscriber)
+                for callback in list(callbacks):
+                    callback(subscriber)
+
 
 
 def property_factory(cls):
@@ -77,29 +121,17 @@ class RecommenderData(object):
 
         self.on_change_event = 'on_change'
         self.on_update_event = 'on_update'
-        self._attached_models = {self.on_change_event: defaultdict(set),
-                                 self.on_update_event: defaultdict(set)}
+        self._notify = EventNotifier([self.on_change_event, self.on_update_event])
         # on_change indicates whether full data has been changed -> rebuild model
         # on_update indicates whether only test data has been changed -> renew recommendations
         self.verbose = True
 
 
-    def _get_attached_models(self, event):
-        return self._attached_models[event]
+    def subscribe(self, event, model_callback):
+        self._notify.subscribe(event, model_callback)
 
-    def _attach_model(self, event, model, callback):
-        self._get_attached_models(event)[model].add(callback)
-
-    def _detach_model(self, event, model):
-        del self._get_attached_models(event)[model]
-
-    def _notify(self, event):
-        for model, callback_set in self._get_attached_models(event).iteritems():
-            for callback in list(callback_set):
-                getattr(model, callback)()
-
-    def _register_event(self, event):
-        self._attached_models[event] = defaultdict(set)
+    def unsubscribe(self, event, model):
+        self._notify.unsubscribe(event, model)
 
 
     def _set_defaults(self, params=None):
