@@ -55,11 +55,11 @@ class ItemColdStartData(RecommenderData):
 
     def _check_state_transition(self):
         assert not self._test_unseen_users
-        assert self._holdout_size is None # needed for correct processing of test data
+        assert self._holdout_size != 0 # needed for correct processing of test data
         assert self._test_ratio > 0
         new_state, update_rule = super(ItemColdStartData, self)._check_state_transition()
 
-        # handle chnage of test_sample value which is not handled
+        # handle change of test_sample value which is not handled
         # in standard state 3 scenario (as there's no testset)
         test_sample_change = '_test_sample' in self._change_properties
         update_rule['test_update'] = update_rule['test_update'] or test_sample_change
@@ -68,9 +68,14 @@ class ItemColdStartData(RecommenderData):
 
     def _sample_holdout(self, test_split):
         itemid = self.fields.itemid
+
+        if self._holdout_size:
+            holdout = super(ItemColdStartData, self)._sample_holdout(test_split, group_id=itemid)
+        else:
+            holdout = self._data.loc[test_split, list(self.fields)]
+
         itemid_cold = '{}_cold'.format(itemid)
-        return (self._data.loc[test_split, list(self.fields)]
-                    .rename(columns={itemid: itemid_cold}, copy=False))
+        return holdout.rename(columns={itemid: itemid_cold}, copy=False)
 
 
     def _try_drop_unseen_test_items(self):
