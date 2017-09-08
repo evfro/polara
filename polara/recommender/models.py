@@ -457,8 +457,13 @@ class RecommenderModel(object):
         data = self.data
         userid, itemid, feedback = data.fields
 
+        try:
+            item_index = data.index.itemid.training
+        except AttributeError:
+            item_index = data.index.itemid
+
         nunique_items = data.training[itemid].nunique()
-        assert nunique_items == len(data.index.itemid)
+        assert nunique_items == item_index.shape[0]
         assert nunique_items == data.training[itemid].max() + 1
 
         testset = data.test.testset
@@ -468,8 +473,8 @@ class RecommenderModel(object):
                 assert nunique_test_users == testset[userid].max() + 1
 
         try:
-            assert self._items_factors.shape[0] == len(data.index.itemid)
-            assert self._feedback_factors.shape[0] == len(data.index.feedback)
+            assert self.factors.get(itemid, None).shape[0] == item_index.shape[0]
+            assert self.factors.get(feedback, None).shape[0] == data.index.feedback.shape[0]
         except AttributeError:
             pass
 
