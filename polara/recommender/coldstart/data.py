@@ -61,8 +61,9 @@ class ItemColdStartData(RecommenderData):
 
         # handle change of test_sample value which is not handled
         # in standard state 3 scenario (as there's no testset)
-        test_sample_change = '_test_sample' in self._change_properties
-        update_rule['test_update'] = update_rule['test_update'] or test_sample_change
+        if '_test_sample' in self._change_properties:
+            update_rule['test_update'] = True
+            self._repr_users = None
         return new_state, update_rule
 
 
