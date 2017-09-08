@@ -169,14 +169,29 @@ class ItemColdStartData(RecommenderData):
 
 
     def _try_cleanup_cold_items(self):
-        indicators = ['is_repr', 'is_valid']
+        holdout = self._test.evalset
         cold_index = self.index.itemid.cold_start
-        valid_items_query = ' and '.join([i for i in indicators if i in cold_index])
-        if valid_items_query:
-            cold_index.query(valid_items_query, inplace=True)
+        item_index_query = []
+        holdout_query = []
+
+        if 'is_valid' in cold_index:
+            item_index_query.append('is_valid')
             itemid_cold = '{}_cold'.format(self.fields.itemid)
-            holdout = self._test.evalset
-            holdout.query('{} in @cold_index.new'.format(itemid_cold), inplace=True)
+            holdout_query.append('{} in @cold_index.new'.format(itemid_cold))
+
+        if 'is_repr' in cold_index:
+            item_index_query.append('is_repr')
+            repr_users = self.representative_users.new
+            holdout_query.append('{} in @repr_users'.format(self.fields.userid))
+
+        item_index_query = ' and '.join([q for q in item_index_query if q])
+        if item_index_query:
+            cold_index.query(item_index_query, inplace=True)
+
+        holdout_query = ' and '.join([q for q in holdout_query if q])
+        if holdout_query:
+            holdout.query(holdout_query, inplace=True)
+
 
     def _sort_by_cold_items(self):
         itemid_cold = '{}_cold'.format(self.fields.itemid)
