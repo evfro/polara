@@ -116,7 +116,12 @@ class RecommenderModel(object):
         return matrix
 
 
-    def get_test_matrix(self, test_data, shape, user_slice=None):
+    def get_test_matrix(self, test_data=None, shape=None, user_slice=None):
+        if test_data is None:
+            test_data, shape = self._get_test_data()
+        elif shape is None:
+            raise ValueError('Shape of test data must be provided')
+
         num_users_all = shape[0]
         if user_slice:
             start, stop = user_slice
