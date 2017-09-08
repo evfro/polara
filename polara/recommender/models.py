@@ -425,11 +425,11 @@ class RecommenderModel(object):
                 recs = np.empty((num_users, topk), dtype=idx[1].dtype)
                 zero_rows = np.in1d(np.arange(num_users), nnz_users, assume_unique=True, invert=True)
                 recs[zero_rows, :] = self._pad_const
-                recs[~zero_rows, :] = np.asarray(row_data.apply(topscore, topk).tolist())
+                recs[~zero_rows, :] = np.stack(row_data.apply(topscore, topk).tolist())
             else:
-                recs = np.asarray(row_data.apply(topscore, topk).tolist())
+                recs = np.stack(row_data.apply(topscore, topk).tolist())
         else:
-        # apply_along_axis is more memory efficient then argsort on full array
+            # apply_along_axis is more memory efficient then argsort on full array
             recs = np.apply_along_axis(self.topsort, 1, scores, topk)
         return recs
 
