@@ -422,7 +422,7 @@ class RecommenderModel(object):
                 # scores may have zero-valued rows, this breaks get_topk_elements
                 # as scores.nonzero() will filter out indices of those rows.
                 # Need to restore full data with zeros in that case.
-                recs = np.empty((num_users, topk))
+                recs = np.empty((num_users, topk), dtype=idx[1].dtype)
                 zero_rows = np.in1d(np.arange(num_users), nnz_users, assume_unique=True, invert=True)
                 recs[zero_rows, :] = self._pad_const
                 recs[~zero_rows, :] = np.asarray(row_data.apply(topscore, topk).tolist())
