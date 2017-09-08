@@ -623,8 +623,7 @@ class RecommenderData(object):
         return result
 
 
-    def _sample_holdout(self, test_split):
-        userid = self.fields.userid
+    def _sample_holdout(self, test_split, group_id=None):
         # TODO order_field may also change - need to check it as well
         order_field = self._custom_order or self.fields.feedback
 
@@ -635,7 +634,8 @@ class RecommenderData(object):
             random_state = np.random.RandomState(self.seed)
             selector = selector.sample(frac=1, random_state=random_state)
 
-        grouper = selector.groupby(self._data[userid], sort=False)
+        group_id = group_id or self.fields.userid
+        grouper = selector.groupby(self._data[group_id], sort=False)
 
         if self._random_holdout: #randomly sample data for evaluation
             random_state = np.random.RandomState(self.seed)
