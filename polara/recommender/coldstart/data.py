@@ -135,7 +135,8 @@ class ItemColdStartData(RecommenderData):
         repr_items = holdout.loc[is_repr_user, itemid_cold].unique()
         item_index = self.index.itemid
         is_repr_item = item_index.cold_start.new.isin(repr_items)
-        item_index.cold_start['is_repr'] = is_repr_item
+        if not is_repr_item.all():
+            item_index.cold_start['is_repr'] = is_repr_item
 
 
     def _verify_cold_items_features(self):
@@ -163,7 +164,8 @@ class ItemColdStartData(RecommenderData):
         seen_items_matrix = build_indicator_matrix(labels.loc[seen_idx], max_items)
         # valid -> has at least 1 feature intersecting with any of seen items
         is_valid_item = cold_items_matrix.dot(seen_items_matrix.T).getnnz(axis=1) > 0
-        item_index.cold_start['is_valid'] = is_valid_item
+        if not is_valid_item.all():
+            item_index.cold_start['is_valid'] = is_valid_item
 
 
     def _try_cleanup_cold_items(self):
