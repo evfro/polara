@@ -333,7 +333,9 @@ class RecommenderData(object):
         test_update = update_rule['test_update']
 
         if not (full_update or test_update):
-            print 'Data is ready. No action was taken.'
+            # TODO place assert new_state == self._state into tests
+            if self.verbose:
+                print 'Data is ready. No action was taken.'
             return update_rule
 
         if self._test_ratio:
