@@ -19,7 +19,7 @@ class ItemColdStartData(RecommenderData):
         permute = np.random.RandomState(self.seed).permutation
         self._unique_items = permute(self._data[itemid].unique())
 
-        self._test_sample = 0.25 # fraction of representative users from train
+        self._test_sample = None # fraction of representative users from train
         self._repr_users = None
 
     @property
