@@ -28,6 +28,8 @@ class GraphlabFactorization(RecommenderModel):
         self.ranking_regularization = 0.25
         self.unobserved_rating_value = None
         self.num_sampled_negative_examples = None
+        # other parameters
+        self.other_gl_params = {}
 
     def _on_change(self):
         super(GraphlabFactorization, self)._on_change()
@@ -113,7 +115,9 @@ class GraphlabFactorization(RecommenderModel):
                       sgd_step_size=self.sgd_step_size,
                       # regularization
                       regularization=self.regularization,
-                      linear_regularization=self.linear_regularization)
+                      linear_regularization=self.linear_regularization,
+                      # other parameters
+                      **self.other_gl_params)
 
         if self.ranking_optimization:
             build_model = gl.ranking_factorization_recommender.create
