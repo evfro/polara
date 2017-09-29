@@ -162,7 +162,9 @@ class RecommenderModel(object):
         user_idx, item_idx, feedback = self.data.test_to_coo(tensor_mode=tensor_mode)
         test_shape = self.data.get_test_shape(tensor_mode=tensor_mode)
 
-        idx_diff = np.diff(user_idx) # this assumes testset is sorted by users!
+        idx_diff = np.diff(user_idx)
+        assert (idx_diff >= 0).all() # calculations assume testset is sorted by users!
+
         # TODO only required when testset consists of known users
         if (idx_diff>1).any() or (user_idx.min() != 0): # check index monotonicity
             test_users = user_idx[np.r_[0, np.where(idx_diff)[0]+1]]
