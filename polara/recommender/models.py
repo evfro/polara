@@ -118,7 +118,7 @@ class RecommenderModel(object):
 
     def get_test_matrix(self, test_data=None, shape=None, user_slice=None):
         if test_data is None:
-            test_data, shape = self._get_test_data()
+            test_data, shape, _ = self._get_test_data()
         elif shape is None:
             raise ValueError('Shape of test data must be provided')
 
@@ -791,7 +791,7 @@ class CoffeeModel(RecommenderModel):
         self.flattener = 'argmax' #this will be applied along feedback axis
         feedback_idx = self.data.index.feedback.set_index('new')
 
-        test_data, test_shape = self._get_test_data()
+        test_data, test_shape, _ = self._get_test_data()
         holdout_size = self.data.holdout_size
         dtype = feedback_idx.old.dtype
         predicted_feedback = np.empty((test_shape[0], holdout_size), dtype=dtype)
