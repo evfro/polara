@@ -72,9 +72,9 @@ def get_ranking_scores(matched_predictions, feedback_data, switch_positive, alte
     if alternative:
         discount = np.log2(np.arange(2, discount_num+2))
         relevance_scores_pos = 2**relevance_scores_pos - 1
-        relevance_scores_neg = 2**relevance_scores_neg - 1
+        relevance_scores_neg = 2.0**relevance_scores_neg - 1
         ideal_scores_pos = 2**ideal_scores_pos - 1
-        ideal_scores_neg = 2**ideal_scores_neg - 1
+        ideal_scores_neg = 2.0**ideal_scores_neg - 1
     else:
         discount = np.hstack([1, np.log(np.arange(2, discount_num+1))])
 
