@@ -108,7 +108,7 @@ class RecommenderData(object):
 
         self._set_defaults()
         self._change_properties = set() #container for changed properties
-        # depending on config. For ex., shuffle_data - full_update,
+        # depending on config. For ex., test_fold - full_update,
         # TODO seed may also lead to either full_update or test_update
         # random_holdout - test_update. Need to implement checks
         self.seed = seed #use with permute_tops, random_choice
@@ -347,6 +347,9 @@ class RecommenderData(object):
                 testset = holdout = None
                 train_split = ~test_split
             else: # state 3 or state 4
+                # NOTE holdout_size = None is also here; this can used in
+                # subclasses like ItemColdStartData to preprocess data properly
+                # in that case _sample_holdout must be modified accordingly
                 holdout = self._sample_holdout(test_split)
 
                 if self._test_unseen_users: # state 4
@@ -460,6 +463,7 @@ class RecommenderData(object):
 
     def _try_drop_invalid_test_users(self):
         if self.holdout_size >= 1:
+            # TODO remove that, when new evaluation arrives
             self._filter_short_sessions() # ensure holdout conforms the holdout_size attribute
         self._align_test_users() # ensure the same users are in both testset and holdout
 
@@ -641,17 +645,17 @@ class RecommenderData(object):
 
         if self._random_holdout: #randomly sample data for evaluation
             random_state = np.random.RandomState(self.seed)
-            if self._holdout_size >= 1:
+            if self._holdout_size >= 1: # pick at most _holdout_size elements
                 holdout = grouper.apply(random_choice, self._holdout_size, random_state)
             else:
                 holdout = grouper.apply(random_sample, self._holdout_size, random_state)
         elif self._negative_prediction: #try to holdout negative only examples
-            if self._holdout_size >= 1:
+            if self._holdout_size >= 1: # pick at most _holdout_size elements
                 holdout = grouper.nsmallest(self._holdout_size, keep='last')
             else:
                 raise NotImplementedError
         else: #standard top-score prediction mode
-            if self._holdout_size >= 1:
+            if self._holdout_size >= 1: # pick at most _holdout_size elements
                 holdout = grouper.nlargest(self._holdout_size, keep='last')
             else:
                 raise NotImplementedError
