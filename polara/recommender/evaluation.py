@@ -68,20 +68,17 @@ def get_ranking_scores(matched_predictions, feedback_data, switch_positive, alte
     ideal_scores_pos = positive_feedback.ravel()[ideal_scores_idx]
     ideal_scores_neg = negative_feedback.ravel()[ideal_scores_idx]
 
-    discount_num = max(holdout, topk)
+    discount = np.log2(np.arange(2, topk+2))
     if alternative:
-        discount = np.log2(np.arange(2, discount_num+2))
         relevance_scores_pos = 2**relevance_scores_pos - 1
-        relevance_scores_neg = 2**relevance_scores_neg - 1
+        relevance_scores_neg = 2.0**relevance_scores_neg - 1
         ideal_scores_pos = 2**ideal_scores_pos - 1
-        ideal_scores_neg = 2**ideal_scores_neg - 1
-    else:
-        discount = np.hstack([1, np.log(np.arange(2, discount_num+1))])
+        ideal_scores_neg = 2.0**ideal_scores_neg - 1
 
-    dcg = (relevance_scores_pos / discount[:topk]).sum(axis=1)
-    dcl = (relevance_scores_neg / -discount[:topk]).sum(axis=1)
-    idcg = (ideal_scores_pos / discount[:holdout]).sum(axis=1)
-    idcl = (ideal_scores_neg / -discount[:holdout]).sum(axis=1)
+    dcg = (relevance_scores_pos / discount).sum(axis=1)
+    dcl = (relevance_scores_neg / -discount).sum(axis=1)
+    idcg = (ideal_scores_pos[:, :topk] / discount).sum(axis=1)
+    idcl = (ideal_scores_neg[:, :topk] / -discount).sum(axis=1)
 
     with np.errstate(invalid='ignore'):
         ndcg = unmask(np.nansum(dcg / idcg) / users_num)
