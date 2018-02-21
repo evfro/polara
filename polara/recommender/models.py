@@ -301,8 +301,8 @@ class RecommenderModel(object):
     def get_matched_predictions(self):
         userid, itemid = self.data.fields.userid, self.data.fields.itemid
         holdout_data = self.data.test.evalset[itemid]
-        holdout = self.data.holdout_size
-        holdout_matrix = holdout_data.values.reshape(-1, holdout).astype(np.int64)
+        holdout_size = self.data.holdout_size
+        holdout_matrix = holdout_data.values.reshape(-1, holdout_size).astype(np.int64)
 
         recommendations = self.recommendations #will recalculate if empty
 
@@ -345,7 +345,7 @@ class RecommenderModel(object):
     def evaluate(self, method='hits', topk=None, on_feedback_level=None):
         #support rolling back scenario for @k calculations
         if topk > self.topk:
-            self.topk = topk #will also empty flush old recommendations
+            self.topk = topk #will also flush old recommendations
 
         matched_predictions = self.get_matched_predictions()
         matched_predictions = matched_predictions[:, :topk, :]
