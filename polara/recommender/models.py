@@ -306,12 +306,8 @@ class RecommenderModel(object):
 
         recommendations = self.recommendations #will recalculate if empty
 
-        if recommendations.shape[0] > holdout_matrix.shape[0]:
-            print 'Evaluation set is truncated.'
-            recommendations = recommendations[:holdout_matrix.shape[0], :]
-        elif recommendations.shape[0] < holdout_matrix.shape[0]:
-            print 'Recommendations are truncated.'
-            holdout_matrix = holdout_matrix[:recommendations.shape[0], :]
+        if recommendations.shape[0] != holdout_matrix.shape[0]:
+            raise ValueError('Incompatible test and holdout size.')
 
         matched_predictions = (recommendations[:, :, None] == holdout_matrix[:, None, :])
         return matched_predictions
