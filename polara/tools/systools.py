@@ -30,6 +30,13 @@ def platform_free_memory():
         memory_status = MemoryStatus()
         ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(memory_status))
         mem = memory_status.ullAvailPhys / (1024**3) # return in gigabytes
+    elif sys.platform == 'darwin':
+        try:
+            import psutil
+        except ImportError:
+            print 'Please, install psutil.'
+        memory_status = psutil.virtual_memory()
+	    mem = memory_status.free / (1024**3) # return in gigabytes
     else:
         memory_status = os.popen("free -m").readlines()
         if memory_status[0].split()[2].lower() == 'free':
