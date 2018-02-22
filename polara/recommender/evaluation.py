@@ -77,8 +77,11 @@ def get_ranking_scores(matched_predictions, feedback_data, switch_positive, alte
 
     dcg = (relevance_scores_pos / discount).sum(axis=1)
     dcl = (relevance_scores_neg / -discount).sum(axis=1)
-    idcg = (ideal_scores_pos[:, :topk] / discount).sum(axis=1)
-    idcl = (ideal_scores_neg[:, :topk] / -discount).sum(axis=1)
+
+    ideal_num = min(topk, holdout) # ideal scores are computed for topk as well
+    ideal_discount = discount[:ideal_num] # handle cases holdout <> topk
+    idcg = (ideal_scores_pos[:, :ideal_num] / ideal_discount).sum(axis=1)
+    idcl = (ideal_scores_neg[:, :ideal_num] / -ideal_discount).sum(axis=1)
 
     with np.errstate(invalid='ignore'):
         ndcg = unmask(np.nansum(dcg / idcg) / users_num)
