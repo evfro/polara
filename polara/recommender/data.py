@@ -763,6 +763,7 @@ class RecommenderData(object):
 
 class BinaryDataMixin(object):
     def __init__(self, *args, **kwargs):
+        raise NotImplementedError
         self.binary_threshold = kwargs.pop('binary_threshold', None)
         super(BinaryDataMixin, self).__init__(*args, **kwargs)
 
@@ -801,6 +802,7 @@ class BinaryDataMixin(object):
 
 class LongTailMixin(object):
     def __init__(self, *args, **kwargs):
+        raise NotImplementedError
         self.long_tail_holdout = kwargs.pop('long_tail_holdout', False)
         # use predefined list if defined
         self.short_head_items = kwargs.pop('short_head_items', None)
