@@ -271,7 +271,7 @@ def get_ranking_scores(matched_predictions, feedback_data, switch_positive, alte
     where = np.ma.where if np.ma.is_masked(feedback_data) else np.where
     is_positive = feedback_data >= switch_positive
     positive_feedback = where(is_positive, feedback_data, 0)
-    negative_feedback = where(~is_positive, -feedback_data, 0)
+    negative_feedback = where(~is_positive, feedback_data-switch_positive, 0)
 
     relevance_scores_pos = (matched_predictions * positive_feedback[:, None, :]).sum(axis=2)
     relevance_scores_neg = (matched_predictions * negative_feedback[:, None, :]).sum(axis=2)
