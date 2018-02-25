@@ -100,13 +100,15 @@ def get_ndcr_discounts(rank_matrix, eval_matrix, topn):
     discounts_matrix = rank_matrix._with_data(discounts, copy=False)
     # circumventing problem in ideal_discounts = eval_matrix.tolil()
     # related to incompatible indices dtype
-    relevance_per_user = np.array_split(eval_matrix.data, eval_matrix.indptr[1:-1])
-    item_inds_per_user = np.array_split(eval_matrix.indices, eval_matrix.indptr[1:-1])
+    relevance_per_key = np.array_split(eval_matrix.data, eval_matrix.indptr[1:-1])
+    target_id_per_key = np.array_split(eval_matrix.indices, eval_matrix.indptr[1:-1])
 
-    ideal_indices = [np.argsort(rel)[:-(topn+1):-1] for rel in relevance_per_user]
-    idx = np.arange(2, topn+2)
+    #ideal_indices = [np.argsort(rel)[:-(topn+1):-1] for rel in relevance_per_key]
+    #idx = np.arange(2, topn+2)
+    ideal_indices = [np.argsort(rel)[::-1] for rel in relevance_per_key]
+    idx = np.arange(2, eval_matrix.getnnz(axis=1).max()+2)
     data = np.concatenate([np.reciprocal(np.log2(idx[:len(i)], dtype='f8')) for i in ideal_indices])
-    inds = np.concatenate([np.take(r, i) for r, i in zip(item_inds_per_user, ideal_indices)])
+    inds = np.concatenate([np.take(r, i) for r, i in zip(target_id_per_key, ideal_indices)])
     ptrs = np.r_[0, np.cumsum([len(i) for i in ideal_indices])]
     ideal_discounts = no_copy_csr_matrix(data, inds, ptrs, eval_matrix.shape, data.dtype)
     return discounts_matrix, ideal_discounts
@@ -278,20 +280,18 @@ def get_ranking_scores(matched_predictions, feedback_data, switch_positive, alte
     ideal_scores_pos = positive_feedback.ravel()[ideal_scores_idx]
     ideal_scores_neg = negative_feedback.ravel()[ideal_scores_idx]
 
-    discount = np.log2(np.arange(2, topk+2))
     if alternative:
         relevance_scores_pos = 2**relevance_scores_pos - 1
         relevance_scores_neg = 2.0**relevance_scores_neg - 1
         ideal_scores_pos = 2**ideal_scores_pos - 1
         ideal_scores_neg = 2.0**ideal_scores_neg - 1
 
-    dcg = (relevance_scores_pos / discount).sum(axis=1)
-    dcl = (relevance_scores_neg / -discount).sum(axis=1)
-
-    ideal_num = min(topk, holdout) # ideal scores are computed for topk as well
-    ideal_discount = discount[:ideal_num] # handle cases holdout <> topk
-    idcg = (ideal_scores_pos[:, :ideal_num] / ideal_discount).sum(axis=1)
-    idcl = (ideal_scores_neg[:, :ideal_num] / -ideal_discount).sum(axis=1)
+    disc_num = max(topk, holdout)
+    discount = np.log2(np.arange(2, disc_num+2))
+    dcg = (relevance_scores_pos / discount[:topk]).sum(axis=1)
+    dcl = (relevance_scores_neg / -discount[:topk]).sum(axis=1)
+    idcg = (ideal_scores_pos / discount[:holdout]).sum(axis=1)
+    idcl = (ideal_scores_neg / -discount[:holdout]).sum(axis=1)
 
     with np.errstate(invalid='ignore'):
         ndcg = unmask(np.nansum(dcg / idcg) / users_num)
