@@ -201,14 +201,14 @@ def _get_relevance_scores(rank_matrix, hits_rank, miss_rank, eval_matrix, eval_m
         else:
             fallout = specifity = None
 
-    users_num = hits_rank.shape[0]
+    n_keys = hits_rank.shape[0]
     #average over all users
-    precision = np.nansum(precision) / users_num
-    recall = np.nansum(recall) / users_num
-    miss_rate = np.nansum(miss_rate) / users_num
+    precision = np.nansum(precision) / n_keys
+    recall = np.nansum(recall) / n_keys
+    miss_rate = np.nansum(miss_rate) / n_keys
     if true_negative is not None:
-        specifity = np.nansum(specifity) / users_num
-        fallout = np.nansum(fallout) / users_num
+        specifity = np.nansum(specifity) / n_keys
+        fallout = np.nansum(fallout) / n_keys
 
     scores = namedtuple('Relevance', ['precision', 'recall', 'fallout', 'specifity', 'miss_rate'])
     scores = scores._make([precision, recall, fallout, specifity, miss_rate])
