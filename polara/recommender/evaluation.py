@@ -128,18 +128,18 @@ def get_ndcg_score(eval_matrix, discounts_matrix, ideal_discounts, alternative=F
     return get_ndcr_score(eval_matrix, discounts_matrix, ideal_discounts, alternative=alternative)
 
 
-def get_ndcl_score(eval_matrix, discounts_matrix, ideal_discounts, alternative=False):
+def get_ndcl_score(eval_matrix, discounts_matrix, ideal_discounts, switch_positive, alternative=False):
     '''Normalized Discounted Cumulative Loss'''
-    return get_ndcr_score(-eval_matrix, -discounts_matrix, -ideal_discounts, alternative=alternative)
+    eval_matrix = eval_matrix._with_data(eval_matrix.data-switch_positive, copy=False)
+    return get_ndcr_score(eval_matrix, -discounts_matrix, -ideal_discounts, alternative=alternative)
 
 
-def _get_ranking_scores(rank_matrix, hits_rank, miss_rank, eval_matrix, eval_matrix_hits, eval_matrix_miss, topk=None, alternative=False):
+def _get_ranking_scores(rank_matrix, hits_rank, miss_rank, eval_matrix, eval_matrix_hits, eval_matrix_miss, switch_positive=None, topk=None, alternative=False):
     discounts_matrix, ideal_discounts = get_ndcr_discounts(rank_matrix, eval_matrix, topk)
-
     ndcg = get_ndcg_score(eval_matrix_hits, discounts_matrix, ideal_discounts, alternative=alternative)
     ndcl = None
     if miss_rank is not None:
-        ndcl = get_ndcl_score(eval_matrix_miss, discounts_matrix, ideal_discounts, alternative=alternative)
+        ndcl = get_ndcl_score(eval_matrix_miss, discounts_matrix, ideal_discounts, switch_positive, alternative=alternative)
 
     ranking_score = namedtuple('Ranking', ['nDCG', 'nDCL'])._make([ndcg, ndcl])
     return ranking_score

@@ -347,12 +347,11 @@ class RecommenderModel(object):
 
     def _evaluate(self, method='hits', topk=None, on_feedback_level=None):
         userid, itemid, feedback = self.data.fields
-        #support rolling back scenario for @k calculations
+        # support rolling back scenario for @k calculations
         if topk > self.topk:
-            self.topk = topk #will also flush old recommendations
+            self.topk = topk # will also flush old recommendations
 
-        topk = topk or self.topk # additionally handle the case topk < self.topk
-        recommendations = self.recommendations[:, :topk] #will recalculate if empty
+        recommendations = self.recommendations[:, :topk] # will recalculate if empty
 
         eval_data = self.data.test.evalset
         is_positive = None
@@ -380,7 +379,10 @@ class RecommenderModel(object):
             scores = _get_relevance_scores(*scoring_data, not_rated_penalty=not_rated_penalty)
         elif method == 'ranking':
             ndcg_alternative = get_default('ndcg_alternative')
-            scores = _get_ranking_scores(*scoring_data, topk=topk, alternative=ndcg_alternative)
+            topk = recommendations.shape[1] # handle topk=None case
+            # topk has to be passed explicitly, otherwise it's unclear how to
+            # estimate ideal ranking for NDCG and NDCL metrics in get_ndcr_discounts
+            scores = _get_ranking_scores(*scoring_data, switch_positive=self.switch_positive, topk=topk, alternative=ndcg_alternative)
         elif method == 'hits': # no need for feedback
             scores = _get_hits(*scoring_data, not_rated_penalty=not_rated_penalty)
         else:
