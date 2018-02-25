@@ -10,6 +10,8 @@ from scipy.sparse.linalg import svds
 
 from polara.recommender import data, defaults
 from polara.recommender.evaluation import get_hits, get_relevance_scores, get_ranking_scores
+from polara.recommender.evaluation import assemble_scoring_matrices
+from polara.recommender.evaluation import  _get_hits, _get_relevance_scores, _get_ranking_scores
 from polara.recommender.utils import array_split, NNZ_MAX
 from polara.lib.hosvd import tucker_als
 from polara.lib.sparse import csc_matvec
@@ -65,6 +67,11 @@ class RecommenderModel(object):
         self.switch_positive  = switch_positive or get_default('switch_positive')
         self.verify_integrity =  get_default('verify_integrity')
         self.not_rated_penalty = 0
+        # TODO make not_rated_penalty input argument in evaluate function
+        # as it is not a model attriute in fact
+
+        self._key = self.data.fields.userid
+        self._target = self.data.fields.itemid
 
         self._is_ready = False
         self.verbose = True
@@ -338,6 +345,49 @@ class RecommenderModel(object):
         return positive_feedback
 
 
+    def _evaluate(self, method='hits', topk=None, on_feedback_level=None):
+        userid, itemid, feedback = self.data.fields
+        #support rolling back scenario for @k calculations
+        if topk > self.topk:
+            self.topk = topk #will also flush old recommendations
+
+        topk = topk or self.topk # additionally handle the case topk < self.topk
+        recommendations = self.recommendations[:, :topk] #will recalculate if empty
+
+        eval_data = self.data.test.evalset
+        is_positive = None
+        if self.switch_positive is None:
+            # all recommendations are considered positive predictions
+            # this is a proper setting for binary data problems (implicit feedback)
+            # in this case all unrated items, recommended by an algorithm
+            # assumed to be "honest" false positives and therefore penalty equals 1
+            not_rated_penalty = 1 if self.not_rated_penalty is None else self.not_rated_penalty
+        else:
+            # if data is not binary (explicit feedback), the intuition is different
+            # it becomes unclear whether unrated items are "honest" false positives
+            # as among these items can be both top rated and down-rated
+            # the defualt setting in this case is to ignore such items at all
+            # by setting penalty to 0, however, it is adjustable
+            not_rated_penalty = self.not_rated_penalty or 0
+            positive_feedback_str = '{}>={}'.format(feedback, self.switch_positive)
+            is_positive = eval_data.eval(positive_feedback_str)
+
+        scoring_data = assemble_scoring_matrices(recommendations, eval_data,
+                                                 self._key, self._target,
+                                                 is_positive, feedback=feedback)
+
+        if method == 'relevance': # no need for feedback
+            scores = _get_relevance_scores(*scoring_data, not_rated_penalty=not_rated_penalty)
+        elif method == 'ranking':
+            ndcg_alternative = get_default('ndcg_alternative')
+            scores = _get_ranking_scores(*scoring_data, topk=topk, alternative=ndcg_alternative)
+        elif method == 'hits': # no need for feedback
+            scores = _get_hits(*scoring_data, not_rated_penalty=not_rated_penalty)
+        else:
+            raise NotImplementedError
+        return scores
+
+
     def evaluate(self, method='hits', topk=None, on_feedback_level=None):
         #support rolling back scenario for @k calculations
         if topk > self.topk:
@@ -351,7 +401,8 @@ class RecommenderModel(object):
             scores = get_relevance_scores(matched_predictions, positive_feedback, self.not_rated_penalty)
         elif method == 'ranking':
             feedback = self.get_feedback_data(on_feedback_level)
-            scores = get_ranking_scores(matched_predictions, feedback, self.switch_positive)
+            ndcg_alternative = get_default('ndcg_alternative')
+            scores = get_ranking_scores(matched_predictions, feedback, self.switch_positive, alternative=ndcg_alternative)
         elif method == 'hits':
             positive_feedback = self.get_positive_feedback(on_feedback_level)
             scores = get_hits(matched_predictions, positive_feedback, self.not_rated_penalty)
