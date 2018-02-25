@@ -153,3 +153,33 @@ class GraphlabFactorization(RecommenderModel):
         feedback = self.data.fields.feedback
         holdout = gl.SFrame(self.data.test.evalset)
         return self.gl_model.evaluate_rmse(holdout, feedback)['rmse_overall']
+
+
+
+class WarmStartRecommendationsMixin(object):
+    def get_recommendations(self):
+        pass
+
+
+class ColdStartRecommendationsMixin(object):
+    def get_recommendations(self):
+        userid = self.data.fields.userid
+        itemid = self.data.fields.itemid
+
+        cold_items_index = self.data.index.itemid.cold_start.old
+        lower_index = self.data.index.itemid.training.new.max() + 1
+        upper_index = lower_index + len(cold_items_index)
+        # prevent intersecting cold items index with known items
+        unseen_items_idx = np.arange(lower_index, upper_index)
+        new_item_data = gl.SFrame(self.item_side_info.loc[cold_items_index]
+                                  .reset_index()
+                                  .assign(**{itemid:unseen_items_idx}))
+
+        repr_users = self.data.representative_users.new.values
+        observation_idx = [a.flat for a in np.broadcast_arrays(repr_users, unseen_items_idx[:, None])]
+        new_observation = gl.SFrame(dict(zip([userid, itemid], observation_idx)))
+
+        scores = self.gl_model.predict(new_observation, new_item_data=new_item_data).to_numpy()
+        top_similar_idx = self.get_topk_items(scores.reshape(-1, len(repr_users)))
+        top_similar_users = repr_users[top_similar_idx.ravel()].reshape(top_similar_idx.shape)
+        return top_similar_users
