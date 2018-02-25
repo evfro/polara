@@ -368,8 +368,7 @@ class RecommenderModel(object):
             # the defualt setting in this case is to ignore such items at all
             # by setting penalty to 0, however, it is adjustable
             not_rated_penalty = self.not_rated_penalty or 0
-            positive_feedback_str = '{}>={}'.format(feedback, self.switch_positive)
-            is_positive = eval_data.eval(positive_feedback_str)
+            is_positive = (eval_data[feedback] >= self.switch_positive).values
 
         scoring_data = assemble_scoring_matrices(recommendations, eval_data,
                                                  self._key, self._target,
