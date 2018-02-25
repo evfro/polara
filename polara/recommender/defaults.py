@@ -15,7 +15,7 @@ negative_prediction = False #put negative feedback into evaluation set
 
 
 #MODELS
-switch_positive = 0 #feedback values below are treated as negative feedback
+switch_positive = None #feedback values below are treated as negative feedback
 verify_integrity = True
 #svd
 svd_rank = 10
@@ -33,8 +33,8 @@ filter_seen = True #prevent seen items from appearing in recommendations
 
 
 #EVALUATION
-not_rated_penalty = 0 #penalize predictions that were not rated by users
-ndcg_alternative = True  #use exponential instead of linear relevance contribution in nDCG
+not_rated_penalty = None #penalize predictions that were not rated by users
+ndcg_alternative = False  #use exponential instead of linear relevance contribution in nDCG
 
 
 #COMPUTATION
