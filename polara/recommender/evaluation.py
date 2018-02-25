@@ -149,8 +149,8 @@ def _get_ranking_scores(rank_matrix, hits_rank, miss_rank, eval_matrix, eval_mat
     return ranking_score
 
 
-def _get_relevance_data(rank_matrix, hits_rank, miss_rank, eval_matrix, eval_matrix_hits, eval_matrix_miss, not_rated_penalty=None, per_user=False):
-    axis = 1 if per_user else None
+def _get_relevance_data(rank_matrix, hits_rank, miss_rank, eval_matrix, eval_matrix_hits, eval_matrix_miss, not_rated_penalty=None, per_key=False):
+    axis = 1 if per_key else None
     true_positive = hits_rank.getnnz(axis=axis)
     if miss_rank is None:
         if not_rated_penalty > 0:
