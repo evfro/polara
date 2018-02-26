@@ -1,3 +1,4 @@
+import numpy as np
 from polara.recommender.models import RecommenderModel
 import graphlab as gl
 
