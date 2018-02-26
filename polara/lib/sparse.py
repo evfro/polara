@@ -71,6 +71,16 @@ def _blockify(ind, ptr, major_dim):
             shift_ind = i * major_dim
             ind[j] += shift_ind
 
+def row_unblockify(mat, block_size):
+    # only for CSR matrices
+    factor = (mat.indices // block_size) * block_size
+    mat.indices -= factor
+    mat._shape = (mat.shape[0], block_size)
+
+def row_blockify(mat, block_size):
+    # only for CSR matrices
+    _blockify(mat.indices, mat.indptr, block_size)
+    mat._shape = (mat.shape[0], block_size*mat.shape[0])
 
 def inverse_permutation(p):
     s = np.empty(p.size, p.dtype)

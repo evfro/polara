@@ -1,5 +1,4 @@
 import pandas as pd
-from requests import get
 from StringIO import StringIO
 
 try:
@@ -8,11 +7,12 @@ except ImportError:
     from zipfile import ZipFile
 
 def get_movielens_data(local_file=None, get_ratings=True, get_genres=False,
-                        split_genres=True, db_mapping=False):
+                        split_genres=True, mdb_mapping=False):
     '''Downloads movielens data and stores it in pandas dataframe.
     '''
     if not local_file:
         # downloading data
+        from requests import get
         zip_file_url = 'http://files.grouplens.org/datasets/movielens/ml-1m.zip'
         zip_response = get(zip_file_url)
         zip_contents = StringIO(zip_response.content)
@@ -43,7 +43,7 @@ def get_movielens_data(local_file=None, get_ratings=True, get_genres=False,
 
             ml_genres = get_split_genres(genres_data) if split_genres else genres_data
 
-        if is_latest and db_mapping:
+        if is_latest and mdb_mapping:
             # imdb and tmdb mapping - exists only in ml-latest datasets
             zip_file = zip_files[zip_files.str.contains('links')].iat[0]
             with zfile.open(zip_file) as zdata:
