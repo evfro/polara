@@ -347,7 +347,7 @@ class RecommenderData(object):
                 testset = holdout = None
                 train_split = ~test_split
             else: # state 3 or state 4
-                # NOTE holdout_size = None is also here; this can used in
+                # NOTE holdout_size = None is also here; this can be used in
                 # subclasses like ItemColdStartData to preprocess data properly
                 # in that case _sample_holdout must be modified accordingly
                 holdout = self._sample_holdout(test_split)
@@ -707,24 +707,29 @@ class RecommenderData(object):
         return idx, val, shp
 
 
+    def _recover_testset(self, update_data=False):
+        userid = self.fields.userid
+        holdout = self.test.evalset
+        test_users = holdout[userid].drop_duplicates()
+        if self.index.userid.training.new.isin(test_users).all():
+            testset = self.training
+        else:
+            testset = (self.training.query('{} in @test_users'.format(userid))
+                             .sort_values(userid))
+        if update_data:
+            self._test = self._test._replace(testset=testset)
+        return testset
+
+
     def test_to_coo(self, tensor_mode=False):
         userid, itemid, feedback = self.fields
         testset = self.test.testset
-        holdout = self.test.evalset
 
         if testset is None:
-            if self._test_unseen_users or (holdout is None):
+            if self._test_unseen_users or (self.test.evalset is None):
                 raise ValueError('Unable to read test data')
-            userid = self.fields.userid
-            test_users = holdout[userid].drop_duplicates()
-
-            if self.index.userid.training.new.isin(test_users).all():
-                testset = self.training
-            else:
-                testset = (self.training.query('{} in @test_users'.format(userid))
-                                 .sort_values(userid))
-
-            self._test = self._test._replace(testset=testset)
+            # returns already processed data, as it's based on the training set
+            testset = self._recover_testset(update_data=False)
 
         user_idx = testset[userid].values.astype(np.intp)
         item_idx = testset[itemid].values.astype(np.intp)
