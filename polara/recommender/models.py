@@ -1,5 +1,6 @@
 from functools import wraps
 from collections import namedtuple
+import warnings
 
 import pandas as pd
 import numpy as np
@@ -532,6 +533,9 @@ class RecommenderModel(object):
 class NonPersonalized(RecommenderModel):
 
     def __init__(self, kind, *args, **kwargs):
+        deprecation_msg = '''This is a deprecated method.
+        Use either PopularityModel or RandomModel instead.'''
+        warnings.warn(deprecation_msg, DeprecationWarning)
         super(NonPersonalized, self).__init__(*args, **kwargs)
         self.method = kind
 
@@ -572,10 +576,15 @@ class PopularityModel(RecommenderModel):
     def __init__(self, *args, **kwargs):
         super(PopularityModel, self).__init__(*args, **kwargs)
         self.method = 'MP'
+        self.by_feedback_value = False
 
     def build(self):
         itemid = self.data.fields.itemid
-        self.item_scores = self.data.training.groupby(itemid, sort=True).size().values
+        item_groups = self.data.training.groupby(itemid, sort=True)
+        if self.by_feedback_value:
+            self.items_scores = item_groups[feedback].sum().values
+        else:
+            self.item_scores = item_groups.size().values
 
     def slice_recommendations(self, test_data, shape, start, stop, test_users=None):
         slice_data = self._slice_test_data(test_data, start, stop)
