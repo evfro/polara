@@ -48,15 +48,28 @@ class ImplicitALS(RecommenderModel):
 
 
     def get_recommendations(self):
-        # prepare test matrix
-        matrix, _ = self.get_test_matrix()
-        matrix.data = self.confidence(matrix.data, alpha=self.alpha, weight=self.weight_func)
+        recalculate = self.data.test_unseen_users # used to force folding-in computation
+        if recalculate:
+            # prepare test matrix with preferences of unseen users
+            matrix, _ = self.get_test_matrix()
+            matrix.data = self.confidence(matrix.data, alpha=self.alpha, weight=self.weight_func)
+            num_users = matrix.shape[0]
+            users_idx = xrange(num_users)
+        else:
+            # prepare traing matrix and convert test user indices into
+            # corresponding training matrix rows
+            matrix = self.get_training_matrix()
+            testset = self.data._recover_testset(update_data=True)
+            userid = self.data.fields.userid
+            users_idx = testset[userid].drop_duplicates(keep='first').values
+            num_users = len(users_idx)
 
-        num_users = matrix.shape[0]
         top_recs = np.empty((num_users, self.topk), dtype=np.intp)
 
-        for user_row in xrange(num_users):
-            # the 'recalculate_user' argument is used to force folding-in computation
-            recs = self._model.recommend(user_row, matrix, N=self.topk, recalculate_user=True)
-            top_recs[user_row, :] = [item for item, _ in recs]
+        if self.filter_seen is False:
+            raise ValueError('The model always filters seen items from results.')
+
+        for i, user_row in enumerate(users_idx):
+            recs = self._model.recommend(user_row, matrix, N=self.topk, recalculate_user=recalculate)
+            top_recs[i, :] = [item for item, _ in recs]
         return top_recs
