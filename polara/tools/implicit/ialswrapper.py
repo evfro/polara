@@ -59,9 +59,8 @@ class ImplicitALS(RecommenderModel):
             # prepare traing matrix and convert test user indices into
             # corresponding training matrix rows
             matrix = self.get_training_matrix()
-            testset = self.data._recover_testset(update_data=True)
             userid = self.data.fields.userid
-            users_idx = testset[userid].drop_duplicates(keep='first').values
+            users_idx = self.data.test.evalset[userid].drop_duplicates(keep='first').values
             num_users = len(users_idx)
 
         top_recs = np.empty((num_users, self.topk), dtype=np.intp)
