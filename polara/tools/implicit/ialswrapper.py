@@ -1,6 +1,6 @@
 import numpy as np
 import implicit
-
+from polara.recommender.models import RecommenderModel
 
 class ImplicitALS(RecommenderModel):
 
