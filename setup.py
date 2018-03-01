@@ -8,9 +8,10 @@ _packages = ["polara",
             "polara/datasets",
             "polara/lib",
             "polara/tools",
-            "polara/tools/mymedialite",
-            "polara/tools/graphlab",
-            "polara/tools/implicit"]
+            "polara/recommender/external",
+            "polara/recommender/external/mymedialite",
+            "polara/recommender/external/graphlab",
+            "polara/recommender/external/implicit"]
 
 
 opts = dict(name="polara",
