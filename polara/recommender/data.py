@@ -203,6 +203,8 @@ class RecommenderData(object):
     def _validate_config(self):
         if self._test_unseen_users and not (self._holdout_size and self._test_ratio):
             raise ValueError('Both holdout_size and test_ratio must be positive when test_unseen_users is set to True')
+        if not self._test_unseen_users and (self._holdout_size==0) and (self._test_ratio>0):
+            raise ValueError('test_ratio cannot be nonzero when holdout_size is 0 and test_unseen_users is set to False')
 
         assert self._test_ratio < 1, 'Value of test_ratio can\'t be greater than or equal to 1'
 
@@ -486,7 +488,8 @@ class RecommenderData(object):
 
     def _reindex_test_users(self):
         self._reindex_testset_users()
-        self._assign_holdout_users_index()
+        if self._test.evalset is not None:
+            self._assign_holdout_users_index()
 
     def _filter_short_sessions(self):
         userid = self.fields.userid
@@ -505,7 +508,7 @@ class RecommenderData(object):
                 print msg.format(n_invalid_sessions, len(invalid_sessions), userid)
 
     def _align_test_users(self):
-        if self._test.testset is None:
+        if (self._test.testset is None) or (self._test.evalset is None):
             return
 
         userid = self.fields.userid
@@ -749,9 +752,13 @@ class RecommenderData(object):
 
 
     def get_test_shape(self, tensor_mode=False):
-        #TODO make it a property maybe
         userid = self.fields.userid
-        num_users = self.test.evalset[userid].nunique()
+        if self.test.evalset is None:
+            num_users = self.test.testset[userid].nunique()
+            #TODO make it a property
+        else:
+            num_users = self.test.evalset[userid].nunique()
+
         try:
             item_index = self.index.itemid.training
         except AttributeError:
@@ -764,6 +771,36 @@ class RecommenderData(object):
             shape = shape + (num_fdbks,)
 
         return shape
+
+
+    def set_test_data(self, testset=None, holdout=None, warm_start=False, reindex=True, copy=True):
+        '''Should be used only with custom data.'''
+        if warm_start and (testset is None):
+            raise ValueError('Please provide test users\' preferences by setting testset argument.')
+
+        if copy:
+            testset = testset.copy() if testset is not None else None
+            holdout = holdout.copy() if holdout is not None else None
+        self._test = namedtuple('TestData', 'testset evalset')._make([testset, holdout])
+        self.index = self.index._replace(userid=self.index.userid._replace(test=None))
+
+        self._test_unseen_users = warm_start
+        self._state = None
+        self._last_update_rule = None
+        self._test_ratio = None
+        self._holdout_size = None
+        self._notify(self.on_update_event)
+        self._change_properties.clear()
+
+        if (testset is None) and (holdout is None): # allows to clean up data
+            return
+
+        self._try_drop_unseen_test_items() # unseen = not present in training data
+        self._try_drop_unseen_test_users() # unseen = not present in training data
+        self._try_drop_invalid_test_users() # inconsistent between testset and holdout
+        if reindex:
+            self._try_reindex_test_data() # either assign known index, or reindex (if warm_start)
+        self._try_sort_test_data()
 
 
 class BinaryDataMixin(object):
