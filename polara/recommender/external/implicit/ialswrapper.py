@@ -1,6 +1,8 @@
 import numpy as np
 import implicit
 from polara.recommender.models import RecommenderModel
+from polara.tools.timing import Timer
+
 
 class ImplicitALS(RecommenderModel):
 
@@ -43,8 +45,10 @@ class ImplicitALS(RecommenderModel):
         matrix = self.get_training_matrix() # user_by_item sparse matrix
         matrix.data = self.confidence(matrix.data, alpha=self.alpha, weight=self.weight_func)
 
-        # build the model
-        self._model.fit(matrix.T) # implicit takes item_by_user matrix as input, need to transpose
+        with Timer(self.method, verbose=self.verbose):
+            # build the model
+            # implicit takes item_by_user matrix as input, need to transpose
+            self._model.fit(matrix.T)
 
 
     def get_recommendations(self):
