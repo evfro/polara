@@ -91,7 +91,13 @@ def assemble_scoring_matrices(recommendations, eval_data, key, target, is_positi
     return (rank_matrix, hits_rank, miss_rank, eval_matrix, eval_matrix_hits, eval_matrix_miss)
 
 
+def get_hr_score(hits_rank):
+    'Hit-Rate score'
+    return hits_rank.getnnz(axis=1).mean()
+
+
 def get_mrr_score(hits_rank):
+    'Mean Reciprocal Rank score'
     return hits_rank.power(-1, 'f8').max(axis=1).mean()
 
 
