@@ -773,14 +773,26 @@ class RecommenderData(object):
         return shape
 
 
-    def set_test_data(self, testset=None, holdout=None, warm_start=False, reindex=True, copy=True):
+    def set_test_data(self, testset=None, holdout=None, warm_start=False, test_users=None, reindex=True, copy=True):
         '''Should be used only with custom data.'''
-        if warm_start and (testset is None):
-            raise ValueError('Please provide test users\' preferences by setting testset argument.')
+        if warm_start and ((testset is None) and (test_users is None)):
+            raise ValueError('When warm_start is True, information about test users must be present. '
+                             'Please provide either testset or test_users argument.')
+
+        if (not warm_start) and (testset is not None):
+            raise ValueError('When warm_start is False, testset argument shouldn\'t be used.'
+                             'Make sure to provide at least one of holdout and test_users arguments instead.')
+
+        if (test_users is not None) and (testset is not None):
+            raise ValueError('testset and test_users cannot be provided together.')
 
         if copy:
             testset = testset.copy() if testset is not None else None
             holdout = holdout.copy() if holdout is not None else None
+
+        if test_users is not None:
+            testset = self._data.loc[lambda x: x[self.fields.userid].isin(test_users), list(self.fields)]
+
         self._test = namedtuple('TestData', 'testset evalset')._make([testset, holdout])
         self.index = self.index._replace(userid=self.index.userid._replace(test=None))
 
@@ -801,6 +813,7 @@ class RecommenderData(object):
         if reindex:
             self._try_reindex_test_data() # either assign known index, or reindex (if warm_start)
         self._try_sort_test_data()
+
 
 
 class BinaryDataMixin(object):
