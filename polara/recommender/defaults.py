@@ -6,7 +6,7 @@ test_ratio = 0.2 #split 80% of users for training, 20% for test
 test_fold = 5 #which fold to use for test data
 shuffle_data = False #randomly permute all records in initial data
 test_sample = None #sample a fraction of test data;  negative value will sample low-rated items
-test_unseen_users = True #make train and test disjoint by users
+warm_start = True #make train and test disjoint by users
 
 holdout_size = 3 #number of items hidden from each user
 permute_tops = False #affects how top-rated items are sorted in test-set

@@ -52,7 +52,7 @@ class ImplicitALS(RecommenderModel):
 
 
     def get_recommendations(self):
-        recalculate = self.data.test_unseen_users # used to force folding-in computation
+        recalculate = self.data.warm_start # used to force folding-in computation
         if recalculate:
             # prepare test matrix with preferences of unseen users
             matrix, _ = self.get_test_matrix()

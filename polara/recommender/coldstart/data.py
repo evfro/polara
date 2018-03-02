@@ -11,7 +11,7 @@ class ItemColdStartData(RecommenderData):
         super(ItemColdStartData, self).__init__(*args, **kwargs)
 
         self._test_ratio = 0.2
-        self._test_unseen_users = False
+        self._warm_start = False
         self._holdout_size = None  # needed for correct processing of test data
 
         # build unique items list to split them by folds
@@ -54,7 +54,7 @@ class ItemColdStartData(RecommenderData):
 
 
     def _check_state_transition(self):
-        assert not self._test_unseen_users
+        assert not self._warm_start
         assert self._holdout_size != 0 # needed for correct processing of test data
         assert self._test_ratio > 0
         new_state, update_rule = super(ItemColdStartData, self)._check_state_transition()

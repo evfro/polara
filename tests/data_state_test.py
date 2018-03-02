@@ -20,7 +20,7 @@ def define_state(usn, hsz, trt):
 def assign_config(usn, hsz, trt, state):
     data_model._test_ratio = trt
     data_model._holdout_size = hsz
-    data_model._test_unseen_users = usn
+    data_model._warm_start = usn
     data_model._state = state
 
 fields = ['userid', 'itemid', 'rating']
@@ -44,7 +44,7 @@ for usn in [False, True]:
                         print 'usn: {:b}, hsz: {:4}, trt: {:4}'.format(usn_new, hsz_new, trt_new),
                         data_model.test_ratio = trt_new
                         data_model.holdout_size = hsz_new
-                        data_model.test_unseen_users = usn_new
+                        data_model.warm_start = usn_new
                         try:
                             data_model._validate_config()
                         except ValueError as e:

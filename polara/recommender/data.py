@@ -82,7 +82,7 @@ class RecommenderData(object):
     _std_fields = ('userid', 'itemid', 'feedback')
 
     _config = {'_shuffle_data', '_test_ratio', '_test_fold',
-               '_test_unseen_users', '_holdout_size', '_test_sample',
+               '_warm_start', '_holdout_size', '_test_sample',
                '_permute_tops', '_random_holdout', '_negative_prediction'}
 
     def __init__(self, data, userid, itemid, feedback, custom_order=None, seed=None):
@@ -201,10 +201,10 @@ class RecommenderData(object):
 
 
     def _validate_config(self):
-        if self._test_unseen_users and not (self._holdout_size and self._test_ratio):
-            raise ValueError('Both holdout_size and test_ratio must be positive when test_unseen_users is set to True')
-        if not self._test_unseen_users and (self._holdout_size==0) and (self._test_ratio>0):
-            raise ValueError('test_ratio cannot be nonzero when holdout_size is 0 and test_unseen_users is set to False')
+        if self._warm_start and not (self._holdout_size and self._test_ratio):
+            raise ValueError('Both holdout_size and test_ratio must be positive when warm_start is set to True')
+        if not self._warm_start and (self._holdout_size==0) and (self._test_ratio>0):
+            raise ValueError('test_ratio cannot be nonzero when holdout_size is 0 and warm_start is set to False')
 
         assert self._test_ratio < 1, 'Value of test_ratio can\'t be greater than or equal to 1'
 
@@ -220,14 +220,14 @@ class RecommenderData(object):
         test_sample_change = '_test_sample' in self._change_properties
         test_data_change = test_fold_change or test_ratio_change
         holdout_sz_change = '_holdout_size' in self._change_properties
-        unseen_usr_change = '_test_unseen_users' in self._change_properties
+        unseen_usr_change = '_warm_start' in self._change_properties
         permute_change = '_permute_tops' in self._change_properties
         negative_change = ('_negative_prediction' in self._change_properties) and not self._random_holdout
         rnd_holdout_change = '_random_holdout' in self._change_properties
         any_holdout_change = holdout_sz_change or rnd_holdout_change or negative_change or permute_change
         empty_holdout = self._holdout_size == 0
         empty_testset = self._test_ratio == 0
-        test_unseen = self._test_unseen_users
+        test_unseen = self._warm_start
         last_state = self._state
         update_rule = defaultdict(bool)
         new_state = last_state
@@ -254,7 +254,7 @@ class RecommenderData(object):
                         new_state = 2
                     else:
                         new_state = 3
-        else: # this assumes that test_unseen_users is consistent with current state!
+        else: # this assumes that warm_start is consistent with current state!
             if last_state == 1: # hsz = 0, trt = 0, usn = False
                 if holdout_sz_change: # hsz > 0
                     new_state = 3 if test_ratio_change else 2
@@ -354,7 +354,7 @@ class RecommenderData(object):
                 # in that case _sample_holdout must be modified accordingly
                 holdout = self._sample_holdout(test_split)
 
-                if self._test_unseen_users: # state 4
+                if self._warm_start: # state 4
                     testset = self._sample_testset(test_split, holdout.index)
                     train_split = ~test_split
                 else: # state 3
@@ -458,7 +458,7 @@ class RecommenderData(object):
             self._filter_unseen_entity(itemid, self._test.holdout, 'holdout')
 
     def _try_drop_unseen_test_users(self):
-        if self.ensure_consistency and not self._test_unseen_users:
+        if self.ensure_consistency and not self._warm_start:
             # even in state 3 there could be unseen users
             userid = self.fields.userid
             self._filter_unseen_entity(userid, self._test.holdout, 'holdout')
@@ -471,7 +471,7 @@ class RecommenderData(object):
 
     def _try_reindex_test_data(self):
         self._assign_test_items_index()
-        if not self._test_unseen_users:
+        if not self._warm_start:
             self._assign_test_users_index()
         else:
             self._reindex_test_users()
@@ -729,7 +729,7 @@ class RecommenderData(object):
         testset = self.test.testset
 
         if testset is None:
-            if self._test_unseen_users or (self.test.holdout is None):
+            if self._warm_start or (self.test.holdout is None):
                 raise ValueError('Unable to read test data')
             # returns already processed data, as it's based on the training set
             testset = self._recover_testset(update_data=False)
@@ -796,7 +796,7 @@ class RecommenderData(object):
         self._test = namedtuple('TestData', 'testset holdout')._make([testset, holdout])
         self.index = self.index._replace(userid=self.index.userid._replace(test=None))
 
-        self._test_unseen_users = warm_start
+        self._warm_start = warm_start
         self._state = None
         self._last_update_rule = None
         self._test_ratio = None
