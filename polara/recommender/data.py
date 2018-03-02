@@ -773,7 +773,8 @@ class RecommenderData(object):
         return shape
 
 
-    def set_test_data(self, testset=None, holdout=None, warm_start=False, test_users=None, reindex=True, copy=True):
+    def set_test_data(self, testset=None, holdout=None, warm_start=False, test_users=None,
+                            reindex=True, ensure_consistency=True, copy=True):
         '''Should be used only with custom data.'''
         if warm_start and ((testset is None) and (test_users is None)):
             raise ValueError('When warm_start is True, information about test users must be present. '
@@ -804,11 +805,11 @@ class RecommenderData(object):
         self._notify(self.on_update_event)
         self._change_properties.clear()
 
-        if (testset is None) and (holdout is None): # allows to clean up data
-            return
+        if (testset is None) and (holdout is None): return # allows to cleanup data
 
-        self._try_drop_unseen_test_items() # unseen = not present in training data
-        self._try_drop_unseen_test_users() # unseen = not present in training data
+        if ensure_consistency: # allows to disable self.ensure_consistency without actually changing it
+            self._try_drop_unseen_test_items() # unseen = not present in training data
+            self._try_drop_unseen_test_users() # unseen = not present in training data
         self._try_drop_invalid_test_users() # inconsistent between testset and holdout
         if reindex:
             self._try_reindex_test_data() # either assign known index, or reindex (if warm_start)
