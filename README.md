@@ -146,9 +146,9 @@ from collections import namedtuple
 data_model = RecommenderData(train_data, 'user', 'item', 'rating')
 data_model._training = data_model._data
 testset = data_model._data
-evalset = test_data
+holdout = test_data
 #the number of held-out items in evaluation set must be constant
 data_model._holdout_size = #<number of held-out items in evaluation set>
-data_model._test = namedtuple('TestData', 'testset evalset')._make([testset, evalset])
+data_model._test = namedtuple('TestData', 'testset holdout')._make([testset, holdout])
 ```
 Now you can build recommender models and evaluate them within polara framework.

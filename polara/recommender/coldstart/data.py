@@ -91,7 +91,7 @@ class ItemColdStartData(RecommenderData):
 
     def _reindex_cold_items(self):
         itemid_cold = '{}_cold'.format(self.fields.itemid)
-        cold_item_index = self.reindex(self._test.evalset, itemid_cold, inplace=True, sort=False)
+        cold_item_index = self.reindex(self._test.holdout, itemid_cold, inplace=True, sort=False)
 
         try: # check if already modified item index to avoid nested assignemnt
             item_index = self.index.itemid.training
@@ -129,7 +129,7 @@ class ItemColdStartData(RecommenderData):
         # post-processing to leave only representative users
         # potentially filters out some cold items as well
         userid = self.fields.userid
-        holdout = self._test.evalset # use _ to avoid recusrion
+        holdout = self._test.holdout # use _ to avoid recusrion
         is_repr_user = holdout[userid].isin(repr_users.new)
 
         itemid_cold = '{}_cold'.format(self.fields.itemid)
@@ -170,7 +170,7 @@ class ItemColdStartData(RecommenderData):
 
 
     def _try_cleanup_cold_items(self):
-        holdout = self._test.evalset
+        holdout = self._test.holdout
         cold_index = self.index.itemid.cold_start
         item_index_query = []
         holdout_query = []
@@ -198,5 +198,5 @@ class ItemColdStartData(RecommenderData):
         itemid_cold = '{}_cold'.format(self.fields.itemid)
         cold_index = self.index.itemid.cold_start
         cold_index.sort_values('new', inplace=True)
-        holdout = self._test.evalset
+        holdout = self._test.holdout
         holdout.sort_values(itemid_cold, inplace=True)

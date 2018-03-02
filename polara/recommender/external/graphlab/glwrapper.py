@@ -139,7 +139,7 @@ class GraphlabFactorization(RecommenderModel):
 
     def get_recommendations(self):
         userid = self.data.fields.userid
-        test_users = self.data.test.evalset[userid].drop_duplicates().values
+        test_users = self.data.test.holdout[userid].drop_duplicates().values
 
         recommend = self.gl_model.recommend
         top_recs = recommend(users=test_users,
@@ -152,7 +152,7 @@ class GraphlabFactorization(RecommenderModel):
 
     def evaluate_rmse(self):
         feedback = self.data.fields.feedback
-        holdout = gl.SFrame(self.data.test.evalset)
+        holdout = gl.SFrame(self.data.test.holdout)
         return self.gl_model.evaluate_rmse(holdout, feedback)['rmse_overall']
 
 

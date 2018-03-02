@@ -64,7 +64,7 @@ class ImplicitALS(RecommenderModel):
             # corresponding training matrix rows
             matrix = self.get_training_matrix()
             userid = self.data.fields.userid
-            users_idx = self.data.test.evalset[userid].drop_duplicates(keep='first').values
+            users_idx = self.data.test.holdout[userid].drop_duplicates(keep='first').values
             num_users = len(users_idx)
 
         top_recs = np.empty((num_users, self.topk), dtype=np.intp)

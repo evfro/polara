@@ -376,7 +376,7 @@ class RecommenderData(object):
 
         self._state = new_state
         self._test_split = test_split
-        self._test = namedtuple('TestData', 'testset evalset')._make([testset, holdout])
+        self._test = namedtuple('TestData', 'testset holdout')._make([testset, holdout])
 
         if full_update:
             self._training = self._data.loc[train_split, list(self.fields)]
@@ -455,13 +455,13 @@ class RecommenderData(object):
         if self.ensure_consistency:
             itemid = self.fields.itemid
             self._filter_unseen_entity(itemid, self._test.testset, 'testset')
-            self._filter_unseen_entity(itemid, self._test.evalset, 'holdout')
+            self._filter_unseen_entity(itemid, self._test.holdout, 'holdout')
 
     def _try_drop_unseen_test_users(self):
         if self.ensure_consistency and not self._test_unseen_users:
             # even in state 3 there could be unseen users
             userid = self.fields.userid
-            self._filter_unseen_entity(userid, self._test.evalset, 'holdout')
+            self._filter_unseen_entity(userid, self._test.holdout, 'holdout')
 
     def _try_drop_invalid_test_users(self):
         if self.holdout_size >= 1:
@@ -479,21 +479,21 @@ class RecommenderData(object):
     def _assign_test_items_index(self):
         itemid = self.fields.itemid
         self._map_entity(itemid, self._test.testset)
-        self._map_entity(itemid, self._test.evalset)
+        self._map_entity(itemid, self._test.holdout)
 
     def _assign_test_users_index(self):
         userid = self.fields.userid
         self._map_entity(userid, self._test.testset)
-        self._map_entity(userid, self._test.evalset)
+        self._map_entity(userid, self._test.holdout)
 
     def _reindex_test_users(self):
         self._reindex_testset_users()
-        if self._test.evalset is not None:
+        if self._test.holdout is not None:
             self._assign_holdout_users_index()
 
     def _filter_short_sessions(self):
         userid = self.fields.userid
-        holdout = self._test.evalset
+        holdout = self._test.holdout
 
         holdout_sessions = holdout.groupby(userid, sort=False)
         holdout_sessions_len = holdout_sessions.size()
@@ -508,12 +508,12 @@ class RecommenderData(object):
                 print msg.format(n_invalid_sessions, len(invalid_sessions), userid)
 
     def _align_test_users(self):
-        if (self._test.testset is None) or (self._test.evalset is None):
+        if (self._test.testset is None) or (self._test.holdout is None):
             return
 
         userid = self.fields.userid
         testset = self._test.testset
-        holdout = self._test.evalset
+        holdout = self._test.holdout
 
         holdout_in_testset = holdout[userid].isin(testset[userid].unique())
         testset_in_holdout = testset[userid].isin(holdout[userid].unique())
@@ -604,12 +604,12 @@ class RecommenderData(object):
         # this is only for state 4
         userid = self.fields.userid
         test_user_index = self.index.userid.test.set_index('old').new
-        self._test.evalset.loc[:, userid] = self._test.evalset.loc[:, userid].map(test_user_index)
+        self._test.holdout.loc[:, userid] = self._test.holdout.loc[:, userid].map(test_user_index)
 
     def _try_sort_test_data(self):
         userid = self.fields.userid
         testset = self._test.testset
-        holdout = self._test.evalset
+        holdout = self._test.holdout
         if testset is not None:
             testset.sort_values(userid, inplace=True)
         if holdout is not None:
@@ -712,7 +712,7 @@ class RecommenderData(object):
 
     def _recover_testset(self, update_data=False):
         userid = self.fields.userid
-        holdout = self.test.evalset
+        holdout = self.test.holdout
         test_users = holdout[userid].drop_duplicates()
         if self.index.userid.training.new.isin(test_users).all():
             testset = self.training
@@ -729,7 +729,7 @@ class RecommenderData(object):
         testset = self.test.testset
 
         if testset is None:
-            if self._test_unseen_users or (self.test.evalset is None):
+            if self._test_unseen_users or (self.test.holdout is None):
                 raise ValueError('Unable to read test data')
             # returns already processed data, as it's based on the training set
             testset = self._recover_testset(update_data=False)
@@ -753,11 +753,11 @@ class RecommenderData(object):
 
     def get_test_shape(self, tensor_mode=False):
         userid = self.fields.userid
-        if self.test.evalset is None:
+        if self.test.holdout is None:
             num_users = self.test.testset[userid].nunique()
             #TODO make it a property
         else:
-            num_users = self.test.evalset[userid].nunique()
+            num_users = self.test.holdout[userid].nunique()
 
         try:
             item_index = self.index.itemid.training
@@ -793,7 +793,7 @@ class RecommenderData(object):
         if test_users is not None:
             testset = self._data.loc[lambda x: x[self.fields.userid].isin(test_users), list(self.fields)]
 
-        self._test = namedtuple('TestData', 'testset evalset')._make([testset, holdout])
+        self._test = namedtuple('TestData', 'testset holdout')._make([testset, holdout])
         self.index = self.index._replace(userid=self.index.userid._replace(test=None))
 
         self._test_unseen_users = warm_start
@@ -839,18 +839,18 @@ class BinaryDataMixin(object):
             userid = self.fields.userid
             testset = self._binarize(self.test.testset)
             test_users = testset[userid].unique()
-            user_sel = self.test.evalset[userid].isin(test_users)
-            evalset = self.test.evalset[user_sel].copy()
-            self._test = namedtuple('TestData', 'testset evalset')._make([testset, evalset])
+            user_sel = self.test.holdout[userid].isin(test_users)
+            holdout = self.test.holdout[user_sel].copy()
+            self._test = namedtuple('TestData', 'testset holdout')._make([testset, holdout])
             if len(test_users) != (testset[userid].max()+1):
                 # remove gaps in test user indices
                 self._update_test_user_index()
 
     def _update_test_user_index(self):
-        testset, evalset = self._test
+        testset, holdout = self._test
         userid = self.fields.userid
         new_test_idx = self.reindex(testset, userid, sort=False, inplace=True)
-        evalset.loc[:, userid] = evalset[userid].map(new_test_idx.set_index('old').new)
+        holdout.loc[:, userid] = holdout[userid].map(new_test_idx.set_index('old').new)
         new_test_idx.old = new_test_idx.old.map(self.index.userid.test.set_index('new').old)
         self.index = self.index._replace(userid=self.index.userid._replace(test=new_test_idx))
 

@@ -247,15 +247,15 @@ class RecommenderModel(object):
             scores, seen_idx = self._user_scores(user_info)
         else:
             testset = self.data.test.testset
-            evalset = self.data.test.evalset
+            holdout = self.data.test.holdout
             user_data = self._make_user(user_info)
             try:
                 # makes a "fake" test user
-                self.data._test = namedtuple('TestData', 'testset evalset')._make([user_data, None])
+                self.data._test = namedtuple('TestData', 'testset holdout')._make([user_data, None])
                 scores, seen_idx = self._user_scores(0)
             finally:
                 # restore original data - prevent information loss
-                self.data._test = namedtuple('TestData', 'testset evalset')._make([testset, evalset])
+                self.data._test = namedtuple('TestData', 'testset holdout')._make([testset, holdout])
 
         _topk = self.topk
         self.topk = topk or _topk
@@ -308,7 +308,7 @@ class RecommenderModel(object):
 
     def get_matched_predictions(self):
         userid, itemid = self.data.fields.userid, self.data.fields.itemid
-        holdout_data = self.data.test.evalset[itemid]
+        holdout_data = self.data.test.holdout[itemid]
         holdout_size = self.data.holdout_size
         holdout_matrix = holdout_data.values.reshape(-1, holdout_size).astype(np.int64)
 
@@ -323,7 +323,7 @@ class RecommenderModel(object):
 
     def get_feedback_data(self, on_level=None):
         feedback = self.data.fields.feedback
-        eval_data = self.data.test.evalset[feedback].values
+        eval_data = self.data.test.holdout[feedback].values
         holdout = self.data.holdout_size
         feedback_data = eval_data.reshape(-1, holdout)
 
@@ -354,7 +354,7 @@ class RecommenderModel(object):
 
         recommendations = self.recommendations[:, :topk] # will recalculate if empty
 
-        eval_data = self.data.test.evalset
+        eval_data = self.data.test.holdout
         is_positive = None
         if self.switch_positive is None:
             # all recommendations are considered positive predictions
@@ -835,7 +835,7 @@ class CoffeeModel(RecommenderModel):
     def get_holdout_slice(self, start, stop):
         userid = self.data.fields.userid
         itemid = self.data.fields.itemid
-        eval_data = self.data.test.evalset
+        eval_data = self.data.test.holdout
 
         user_sel = (eval_data[userid] >= start) & (eval_data[userid] < stop)
         holdout_users = eval_data.loc[user_sel, userid].values.astype(np.int64) - start
