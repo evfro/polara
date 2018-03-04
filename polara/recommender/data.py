@@ -200,6 +200,13 @@ class RecommenderData(object):
             self._try_sort_test_data()
 
 
+    def prepare_training_only(self):
+        self.holdout_size = 0 # do not form holdout
+        self.test_ratio = 0 # do not form testset
+        self.warm_start = False # required for correct state transition handling
+        self.prepare()
+
+
     def _validate_config(self):
         if self._warm_start and not (self._holdout_size and self._test_ratio):
             raise ValueError('Both holdout_size and test_ratio must be positive when warm_start is set to True')
@@ -781,7 +788,7 @@ class RecommenderData(object):
                              'Please provide either testset or test_users argument.')
 
         if (not warm_start) and (testset is not None):
-            raise ValueError('When warm_start is False, testset argument shouldn\'t be used.'
+            raise ValueError('When warm_start is False, testset argument shouldn\'t be used. '
                              'Make sure to provide at least one of holdout and test_users arguments instead.')
 
         if (test_users is not None) and (testset is not None):
