@@ -346,7 +346,7 @@ class RecommenderModel(object):
         return positive_feedback
 
 
-    def _evaluate(self, method='hits', topk=None, on_feedback_level=None):
+    def evaluate(self, method='hits', topk=None, on_feedback_level=None):
         userid, itemid, feedback = self.data.fields
         # support rolling back scenario for @k calculations
         if topk > self.topk:
@@ -376,21 +376,22 @@ class RecommenderModel(object):
                                                  is_positive, feedback=feedback)
 
         if method == 'relevance': # no need for feedback
-            scores = _get_relevance_scores(*scoring_data, not_rated_penalty=not_rated_penalty)
+            scores = get_relevance_scores(*scoring_data, not_rated_penalty=not_rated_penalty)
         elif method == 'ranking':
             ndcg_alternative = get_default('ndcg_alternative')
             topk = recommendations.shape[1] # handle topk=None case
             # topk has to be passed explicitly, otherwise it's unclear how to
             # estimate ideal ranking for NDCG and NDCL metrics in get_ndcr_discounts
-            scores = _get_ranking_scores(*scoring_data, switch_positive=self.switch_positive, topk=topk, alternative=ndcg_alternative)
+            scores = get_ranking_scores(*scoring_data, switch_positive=self.switch_positive, topk=topk, alternative=ndcg_alternative)
         elif method == 'hits': # no need for feedback
-            scores = _get_hits(*scoring_data, not_rated_penalty=not_rated_penalty)
+            scores = get_hits(*scoring_data, not_rated_penalty=not_rated_penalty)
         else:
             raise NotImplementedError
         return scores
 
 
-    def evaluate(self, method='hits', topk=None, on_feedback_level=None):
+    def _evaluate(self, method='hits', topk=None, on_feedback_level=None):
+        '''This is the old implementation - to be deprected. Used only for testing.'''
         #support rolling back scenario for @k calculations
         if topk > self.topk:
             self.topk = topk #will also flush old recommendations
@@ -400,14 +401,14 @@ class RecommenderModel(object):
 
         if method == 'relevance':
             positive_feedback = self.get_positive_feedback(on_feedback_level)
-            scores = get_relevance_scores(matched_predictions, positive_feedback, self.not_rated_penalty)
+            scores = _get_relevance_scores(matched_predictions, positive_feedback, self.not_rated_penalty)
         elif method == 'ranking':
             feedback = self.get_feedback_data(on_feedback_level)
             ndcg_alternative = get_default('ndcg_alternative')
-            scores = get_ranking_scores(matched_predictions, feedback, self.switch_positive, alternative=ndcg_alternative)
+            scores = _get_ranking_scores(matched_predictions, feedback, self.switch_positive, alternative=ndcg_alternative)
         elif method == 'hits':
             positive_feedback = self.get_positive_feedback(on_feedback_level)
-            scores = get_hits(matched_predictions, positive_feedback, self.not_rated_penalty)
+            scores = _get_hits(matched_predictions, positive_feedback, self.not_rated_penalty)
         else:
             raise NotImplementedError
         return scores

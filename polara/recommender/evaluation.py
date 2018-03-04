@@ -146,7 +146,7 @@ def get_ndcl_score(eval_matrix, discounts_matrix, ideal_discounts, switch_positi
     return get_ndcr_score(eval_matrix, -discounts_matrix, -ideal_discounts, alternative=alternative)
 
 
-def _get_ranking_scores(rank_matrix, hits_rank, miss_rank, eval_matrix, eval_matrix_hits, eval_matrix_miss, switch_positive=None, topk=None, alternative=False):
+def get_ranking_scores(rank_matrix, hits_rank, miss_rank, eval_matrix, eval_matrix_hits, eval_matrix_miss, switch_positive=None, topk=None, alternative=False):
     discounts_matrix, ideal_discounts = get_ndcr_discounts(rank_matrix, eval_matrix, topk)
     ndcg = get_ndcg_score(eval_matrix_hits, discounts_matrix, ideal_discounts, alternative=alternative)
     ndcl = None
@@ -157,7 +157,7 @@ def _get_ranking_scores(rank_matrix, hits_rank, miss_rank, eval_matrix, eval_mat
     return ranking_score
 
 
-def _get_relevance_data(rank_matrix, hits_rank, miss_rank, eval_matrix, eval_matrix_hits, eval_matrix_miss, not_rated_penalty=None, per_key=False):
+def get_relevance_data(rank_matrix, hits_rank, miss_rank, eval_matrix, eval_matrix_hits, eval_matrix_miss, not_rated_penalty=None, per_key=False):
     axis = 1 if per_key else None
     true_positive = hits_rank.getnnz(axis=axis)
     if miss_rank is None:
@@ -177,18 +177,18 @@ def _get_relevance_data(rank_matrix, hits_rank, miss_rank, eval_matrix, eval_mat
     return [true_positive, false_positive, true_negative, false_negative]
 
 
-def _get_hits(rank_matrix, hits_rank, miss_rank, eval_matrix, eval_matrix_hits, eval_matrix_miss, not_rated_penalty=None):
+def get_hits(rank_matrix, hits_rank, miss_rank, eval_matrix, eval_matrix_hits, eval_matrix_miss, not_rated_penalty=None):
     hits = namedtuple('Hits', ['true_positive', 'false_positive',
                                'true_negative', 'false_negative'])
-    hits = hits._make(_get_relevance_data(rank_matrix, hits_rank, miss_rank,
+    hits = hits._make(get_relevance_data(rank_matrix, hits_rank, miss_rank,
                                           eval_matrix, eval_matrix_hits, eval_matrix_miss,
                                           not_rated_penalty, False))
     return hits
 
 
-def _get_relevance_scores(rank_matrix, hits_rank, miss_rank, eval_matrix, eval_matrix_hits, eval_matrix_miss, not_rated_penalty=None):
+def get_relevance_scores(rank_matrix, hits_rank, miss_rank, eval_matrix, eval_matrix_hits, eval_matrix_miss, not_rated_penalty=None):
     [true_positive, false_positive,
-     true_negative, false_negative] = _get_relevance_data(rank_matrix, hits_rank, miss_rank,
+     true_negative, false_negative] = get_relevance_data(rank_matrix, hits_rank, miss_rank,
                                                           eval_matrix, eval_matrix_hits, eval_matrix_miss,
                                                           not_rated_penalty, True)
 
@@ -221,13 +221,15 @@ def _get_relevance_scores(rank_matrix, hits_rank, miss_rank, eval_matrix, eval_m
     return scores
 
 
+# below are the old methods - to be deprecated. Currently only used for testing.
+
 def unmask(x):
     # return `None` instead of single  `mask` value
     return None if x is np.ma.masked else x
 
 
-def get_hits(matched_predictions, positive_feedback, not_rated_penalty):
-    reldata = get_relevance_data(matched_predictions, positive_feedback, not_rated_penalty)
+def _get_hits(matched_predictions, positive_feedback, not_rated_penalty):
+    reldata = _get_relevance_data(matched_predictions, positive_feedback, not_rated_penalty)
     true_pos, false_pos = reldata.tp, reldata.fp
     true_neg, false_neg = reldata.tn, reldata.fn
 
@@ -241,9 +243,9 @@ def get_hits(matched_predictions, positive_feedback, not_rated_penalty):
     return hits
 
 
-def get_relevance_scores(matched_predictions, positive_feedback, not_rated_penalty):
+def _get_relevance_scores(matched_predictions, positive_feedback, not_rated_penalty):
     users_num = matched_predictions.shape[0]
-    reldata = get_relevance_data(matched_predictions, positive_feedback, not_rated_penalty)
+    reldata = _get_relevance_data(matched_predictions, positive_feedback, not_rated_penalty)
     true_pos, false_pos = reldata.tp, reldata.fp
     true_neg, false_neg = reldata.tn, reldata.fn
 
@@ -271,7 +273,7 @@ def get_relevance_scores(matched_predictions, positive_feedback, not_rated_penal
     return scores
 
 
-def get_ranking_scores(matched_predictions, feedback_data, switch_positive, alternative=True):
+def _get_ranking_scores(matched_predictions, feedback_data, switch_positive, alternative=True):
     users_num, topk, holdout = matched_predictions.shape
     ideal_scores_idx = np.argsort(feedback_data, axis=1)[:, ::-1] #returns column index only
     ideal_scores_idx = np.ravel_multi_index((np.arange(feedback_data.shape[0])[:, None], ideal_scores_idx), dims=feedback_data.shape)
@@ -307,7 +309,7 @@ def get_ranking_scores(matched_predictions, feedback_data, switch_positive, alte
     return ranking_score
 
 
-def get_relevance_data(matched_items, positive_feedback, not_rated_penalty):
+def _get_relevance_data(matched_items, positive_feedback, not_rated_penalty):
     negative_feedback = ~positive_feedback
     missed_items = ~matched_items
 
