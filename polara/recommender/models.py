@@ -306,62 +306,22 @@ class RecommenderModel(object):
         return top_recs
 
 
-    def get_matched_predictions(self):
-        userid, itemid = self.data.fields.userid, self.data.fields.itemid
-        holdout_data = self.data.test.holdout[itemid]
-        holdout_size = self.data.holdout_size
-        holdout_matrix = holdout_data.values.reshape(-1, holdout_size).astype(np.int64)
-
-        recommendations = self.recommendations #will recalculate if empty
-
-        if recommendations.shape[0] != holdout_matrix.shape[0]:
-            raise ValueError('Incompatible test and holdout size.')
-
-        matched_predictions = (recommendations[:, :, None] == holdout_matrix[:, None, :])
-        return matched_predictions
-
-
-    def get_feedback_data(self, on_level=None):
-        feedback = self.data.fields.feedback
-        eval_data = self.data.test.holdout[feedback].values
-        holdout = self.data.holdout_size
-        feedback_data = eval_data.reshape(-1, holdout)
-
-        if on_level is not None:
-            try:
-                iter(on_level)
-            except TypeError:
-                feedback_data = np.ma.masked_not_equal(feedback_data, on_level)
-            else:
-                mask_level = np.in1d(feedback_data.ravel(),
-                                     on_level,
-                                     invert=True).reshape(feedback_data.shape)
-                feedback_data = np.ma.masked_where(mask_level, feedback_data)
-        return feedback_data
-
-
-    def get_positive_feedback(self, on_level=None):
-        feedback_data = self.get_feedback_data(on_level)
-        positive_feedback = feedback_data >= self.switch_positive
-        return positive_feedback
-
-
     def evaluate(self, method='hits', topk=None, on_feedback_level=None):
-        userid, itemid, feedback = self.data.fields
-        # support rolling back scenario for @k calculations
+        feedback = self.data.fields.feedback
         if topk > self.topk:
             self.topk = topk # will also flush old recommendations
 
+        # support rolling back scenario for @k calculations
         recommendations = self.recommendations[:, :topk] # will recalculate if empty
 
         eval_data = self.data.test.holdout
-        is_positive = None
         if self.switch_positive is None:
             # all recommendations are considered positive predictions
             # this is a proper setting for binary data problems (implicit feedback)
             # in this case all unrated items, recommended by an algorithm
             # assumed to be "honest" false positives and therefore penalty equals 1
             not_rated_penalty = 1 if self.not_rated_penalty is None else self.not_rated_penalty
+            is_positive = None
         else:
             # if data is not binary (explicit feedback), the intuition is different
             # it becomes unclear whether unrated items are "honest" false positives
@@ -390,24 +350,64 @@ class RecommenderModel(object):
         return scores
 
 
+    def _get_matched_predictions(self):
+        userid, itemid = self.data.fields.userid, self.data.fields.itemid
+        holdout_data = self.data.test.holdout[itemid]
+        holdout_size = self.data.holdout_size
+        holdout_matrix = holdout_data.values.reshape(-1, holdout_size).astype(np.int64)
+
+        recommendations = self.recommendations #will recalculate if empty
+
+        if recommendations.shape[0] != holdout_matrix.shape[0]:
+            raise ValueError('Incompatible test and holdout size.')
+
+        matched_predictions = (recommendations[:, :, None] == holdout_matrix[:, None, :])
+        return matched_predictions
+
+
+    def _get_feedback_data(self, on_level=None):
+        feedback = self.data.fields.feedback
+        eval_data = self.data.test.holdout[feedback].values
+        holdout = self.data.holdout_size
+        feedback_data = eval_data.reshape(-1, holdout)
+
+        if on_level is not None:
+            try:
+                iter(on_level)
+            except TypeError:
+                feedback_data = np.ma.masked_not_equal(feedback_data, on_level)
+            else:
+                mask_level = np.in1d(feedback_data.ravel(),
+                                     on_level,
+                                     invert=True).reshape(feedback_data.shape)
+                feedback_data = np.ma.masked_where(mask_level, feedback_data)
+        return feedback_data
+
+
+    def _get_positive_feedback(self, on_level=None):
+        feedback_data = self._get_feedback_data(on_level)
+        positive_feedback = feedback_data >= self.switch_positive
+        return positive_feedback
+
+
     def _evaluate(self, method='hits', topk=None, on_feedback_level=None):
         '''This is the old implementation - to be deprected. Used only for testing.'''
         #support rolling back scenario for @k calculations
         if topk > self.topk:
             self.topk = topk #will also flush old recommendations
 
-        matched_predictions = self.get_matched_predictions()
+        matched_predictions = self._get_matched_predictions()
         matched_predictions = matched_predictions[:, :topk, :]
 
         if method == 'relevance':
-            positive_feedback = self.get_positive_feedback(on_feedback_level)
+            positive_feedback = self._get_positive_feedback(on_feedback_level)
             scores = _get_relevance_scores(matched_predictions, positive_feedback, self.not_rated_penalty)
         elif method == 'ranking':
-            feedback = self.get_feedback_data(on_feedback_level)
+            feedback = self._get_feedback_data(on_feedback_level)
             ndcg_alternative = get_default('ndcg_alternative')
             scores = _get_ranking_scores(matched_predictions, feedback, self.switch_positive, alternative=ndcg_alternative)
         elif method == 'hits':
-            positive_feedback = self.get_positive_feedback(on_feedback_level)
+            positive_feedback = self._get_positive_feedback(on_feedback_level)
             scores = _get_hits(matched_predictions, positive_feedback, self.not_rated_penalty)
         else:
             raise NotImplementedError
