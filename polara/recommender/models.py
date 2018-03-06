@@ -12,7 +12,6 @@ from scipy.sparse.linalg import svds
 from polara.recommender import data, defaults
 from polara.recommender.evaluation import get_hits, get_relevance_scores, get_ranking_scores
 from polara.recommender.evaluation import assemble_scoring_matrices
-from polara.recommender.evaluation import  _get_hits, _get_relevance_scores, _get_ranking_scores
 from polara.recommender.utils import array_split, NNZ_MAX
 from polara.lib.hosvd import tucker_als
 from polara.lib.sparse import csc_matvec
