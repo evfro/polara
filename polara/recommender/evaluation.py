@@ -93,12 +93,14 @@ def assemble_scoring_matrices(recommendations, eval_data, key, target, is_positi
 
 def get_hr_score(hits_rank):
     'Hit-Rate score'
-    return hits_rank.getnnz(axis=1).mean()
+    hr = hits_rank.getnnz(axis=1).mean()
+    return namedtuple('Relevance', ['hr',])._make([hr,])
 
 
 def get_mrr_score(hits_rank):
     'Mean Reciprocal Rank score'
-    return hits_rank.power(-1, 'f8').max(axis=1).mean()
+    mrr = hits_rank.power(-1, 'f8').max(axis=1).mean()
+    return namedtuple('Ranking', ['mrr',])._make([mrr,])
 
 
 def get_ndcr_discounts(rank_matrix, eval_matrix, topn):

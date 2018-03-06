@@ -336,13 +336,19 @@ class RecommenderModel(object):
                                                  is_positive, feedback=feedback)
 
         if method == 'relevance': # no need for feedback
-            scores = get_relevance_scores(*scoring_data, not_rated_penalty=not_rated_penalty)
+            if self.data.holdout_size == 1:
+                scores = get_hr_score(scoring_data[1])
+            else:
+                scores = get_relevance_scores(*scoring_data, not_rated_penalty=not_rated_penalty)
         elif method == 'ranking':
-            ndcg_alternative = get_default('ndcg_alternative')
-            topk = recommendations.shape[1] # handle topk=None case
-            # topk has to be passed explicitly, otherwise it's unclear how to
-            # estimate ideal ranking for NDCG and NDCL metrics in get_ndcr_discounts
-            scores = get_ranking_scores(*scoring_data, switch_positive=self.switch_positive, topk=topk, alternative=ndcg_alternative)
+            if self.data.holdout_size == 1:
+                scores = get_mrr_score(scoring_data[1])
+            else:
+                ndcg_alternative = get_default('ndcg_alternative')
+                topk = recommendations.shape[1] # handle topk=None case
+                # topk has to be passed explicitly, otherwise it's unclear how to
+                # estimate ideal ranking for NDCG and NDCL metrics in get_ndcr_discounts
+                scores = get_ranking_scores(*scoring_data, switch_positive=self.switch_positive, topk=topk, alternative=ndcg_alternative)
         elif method == 'hits': # no need for feedback
             scores = get_hits(*scoring_data, not_rated_penalty=not_rated_penalty)
         else:
