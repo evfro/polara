@@ -67,6 +67,7 @@ class RecommenderModel(object):
         self.switch_positive  = switch_positive or get_default('switch_positive')
         self.verify_integrity =  get_default('verify_integrity')
 
+        # TODO sorting in data must be by self._key, also need to change get_test_data
         self._key = self.data.fields.userid
         self._target = self.data.fields.itemid
 
@@ -167,6 +168,7 @@ class RecommenderModel(object):
         test_shape = self.data.get_test_shape(tensor_mode=tensor_mode)
 
         idx_diff = np.diff(user_idx)
+        # TODO sorting by self._key
         assert (idx_diff >= 0).all() # calculations assume testset is sorted by users!
 
         # TODO only required when testset consists of known users
