@@ -6,6 +6,7 @@ test_ratio = 0.2 #split 80% of users for training, 20% for test
 test_fold = 5 #which fold to use for test data
 shuffle_data = False #randomly permute all records in initial data
 test_sample = None #sample a fraction of test data;  negative value will sample low-rated items
+warm_start = True #make train and test disjoint by users
 
 holdout_size = 3 #number of items hidden from each user
 permute_tops = False #affects how top-rated items are sorted in test-set
@@ -14,7 +15,7 @@ negative_prediction = False #put negative feedback into evaluation set
 
 
 #MODELS
-switch_positive = 0 #feedback values below are treated as negative feedback
+switch_positive = None #feedback values below are treated as negative feedback
 verify_integrity = True
 #svd
 svd_rank = 10
@@ -32,7 +33,6 @@ filter_seen = True #prevent seen items from appearing in recommendations
 
 
 #EVALUATION
-not_rated_penalty = 0 #penalize predictions that were not rated by users
 ndcg_alternative = True  #use exponential instead of linear relevance contribution in nDCG
 
 
