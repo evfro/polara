@@ -1,7 +1,7 @@
 # POLARA
 Polara is the first recommendation framework that allows a deeper analysis of recommender systems performance, based on the idea of feedback polarity (by analogy with sentiment polarity in NLP).
 
-In addition to standard question of "how good a recommender system is at recommending relevant items", it allows assessing the ability of a recommender system to **avoid irrelevant recommendations** (thus, less likely to disappoint a user). You can read more about this idea in a reasearch paper [Fifty Shades of Ratings: How to Benefit from a Negative Feedback in Top-N Recommendations Tasks](http://arxiv.org/abs/1607.04228). The research results can be easily reproduced with this framework, visit a "fixed state" version of the code at https://github.com/Evfro/fifty-shades (there're also many usage examples).
+In addition to standard question of "how good a recommender system is at recommending relevant items", it allows assessing the ability of a recommender system to **avoid irrelevant recommendations** (thus, less likely to disappoint a user). You can read more about this idea in a research paper [Fifty Shades of Ratings: How to Benefit from a Negative Feedback in Top-N Recommendations Tasks](http://arxiv.org/abs/1607.04228). The research results can be easily reproduced with this framework, visit a "fixed state" version of the code at https://github.com/Evfro/fifty-shades (there're also many usage examples).
 
 The framework also features efficient tensor-based implementation of an algorithm, proposed in the paper, that takes full advantage of the polarity-based formulation. Currently, there is an [online demo](http://coremodel.azurewebsites.net) (for test purposes only), that demonstrates the effect of taking into account feedback polarity.
 
@@ -11,7 +11,7 @@ The framework also features efficient tensor-based implementation of an algorith
 
 The framework heavily depends on `Pandas, Numpy, Scipy` and `Numba` packages. Better performance can be achieved with `mkl` (optional). It's also recommended to use `jupyter notebook` for experimentation. Visualization of results can be done with help of `matplotlib` and optionally `seaborn`. The easiest way to get all those at once is to use the latest [Anaconda distribution](https://www.continuum.io/downloads).
 
-If you use a separate conda environment for testing, the following command can be used to ensure that all required dependencies are in place (see [this](http://conda.pydata.org/docs/commands/conda-install.html) for more info):
+If you use a separate `conda` environment for testing, the following command can be used to ensure that all required dependencies are in place (see [this](http://conda.pydata.org/docs/commands/conda-install.html) for more info):
 
 `conda install --file conda_req.txt`
 
@@ -21,7 +21,7 @@ Alternatively, a new conda environment with all required packages can be created
 
 
 ## Installation
-If you use specific conda environment, don't forget to activate it first with either `source activate <your_environment_name>` (Linux) or  `activate <your_environment_name>` (Windows). Clone this repository to your local machine (`git clone git://github.com/evfro/polara.git`). Once in the root of the newly created local repository, run
+If you use specific `conda` environment, don't forget to activate it first with either `source activate <your_environment_name>` (Linux) or  `activate <your_environment_name>` (Windows). Clone this repository to your local machine (`git clone git://github.com/evfro/polara.git`). Once in the root of the newly created local repository, run
 
 `python setup.py install`.
 
@@ -124,31 +124,29 @@ which results in something like:
 | ... | ... | ... | ... | ... |
 
 ## Custom pipelines
-Polara by default takes care of raw data and helps to organize full evaluation pipeline, that includes splitting data into training, test and evaluation datasets, performing cross-validation and gathering results. However, if you need more control on that workflow, you can easily implement your custom  usage scenario for you own needs.
+Polara by default takes care of raw data and helps to organize full evaluation pipeline, that includes splitting data into training, test and evaluation datasets, performing cross-validation and gathering results. However, if you need more control on that workflow, you can easily implement your custom usage scenario for you own needs.
 
 ### Build models without evaluation
-If you simply want to build a model on pre-processed data, then you only need to define a training set. This can be easily achived with the following lines of code (assuming you have a pandas dataframe named `train_data` with corresponding "user", "item" and "rating" columns):
+If you simply want to build a model on a provided data, then you only need to define a training set. This can be easily achieved with the help of `prepare_training_only` method (assuming you have a pandas dataframe named `train_data` with corresponding "user", "item" and "rating" columns):
 ```python
 data_model = RecommenderData(train_data, 'user', 'item', 'rating')
-# mind underscores for training and test attributes,
-# this ensures no automated data-processing triggers are activated
-data_model._training = data_model._data
-data_model._test = None
+data_model.prepare_training_only()
 ```
 Now you are ready to build your models (as in examples above) and export them to whatever workflow you currently have.
 
-### Cold-start and known-user scenarios
-By default polara makes testset and trainset disjoint by users, which allows to evaluate models against both *user cold-start* and more common *known user* scenarios (see the paper mentioned above for explanation).
-However in some situations (for example, when polara is used within a larger pipeline) you might want to implement strictly a *known user* scenario to assess the quality of your recommender system on the unseen (held-out) items for those known users. In that case your test users are exactly the same as training users. Assuming that you have prepared both training (`train_data` dataframe) and evaluation data (`test_data` dataframe), the goal can be achieved with the following code:
-```python
-from collections import namedtuple
+### Warm-start and known-user scenarios
+By default polara makes testset and trainset disjoint by users, which allows to evaluate models against *user warm-start*.
+However in some situations (for example, when polara is used within a larger pipeline) you might want to implement strictly a *known user* scenario to assess the quality of your recommender system on the unseen (held-out) items for the known users. The change between these two scenarios as controlled by setting `data_model.warm_start` attribute to `True` or `False`. See [Warm-start and standard scenarios](examples/Warm-start and standard scenarios.ipynb) Jupyter notebook as an example.
 
-data_model = RecommenderData(train_data, 'user', 'item', 'rating')
-data_model._training = data_model._data
-testset = data_model._data
-holdout = test_data
-#the number of held-out items in evaluation set must be constant
-data_model._holdout_size = #<number of held-out items in evaluation set>
-data_model._test = namedtuple('TestData', 'testset holdout')._make([testset, holdout])
+### Externally provided test data
+If you don't want polara to perform data splitting (for example, when your test data is already provided), you can use the `set_test_data` method of a `RecommenderData` instance. It has a number of input arguments that cover all major cases of externally provided data. For example, assuming that you have new users' preferences encoded in the `unseen_data` dataframe and the corresponding held-out preferences in the `holdout` dataframe, the following command allows to include them into the data model:  
+```python
+data_model.set_test_data(testset=unseen_data, holdout=holdout, warm_start=True)
 ```
-Now you can build recommender models and evaluate them within polara framework.
+Polara will automatically perform all required transformations to ensure correct functioning of the evaluation pipeline. To evaluate models you simply call standard methods without any modifications:
+```python
+svd.build()
+svd.evaluate()
+```
+In this case the recommendations are generated based on the testset and evaluated against the holdout.
+See more usage examples in the [Custom evaluation](examples/Custom evaluation.ipynb) notebook.

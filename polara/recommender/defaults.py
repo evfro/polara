@@ -33,7 +33,6 @@ filter_seen = True #prevent seen items from appearing in recommendations
 
 
 #EVALUATION
-not_rated_penalty = None #penalize predictions that were not rated by users
 ndcg_alternative = True  #use exponential instead of linear relevance contribution in nDCG
 
 

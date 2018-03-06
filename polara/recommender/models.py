@@ -12,7 +12,6 @@ from scipy.sparse.linalg import svds
 from polara.recommender import data, defaults
 from polara.recommender.evaluation import get_hits, get_relevance_scores, get_ranking_scores
 from polara.recommender.evaluation import assemble_scoring_matrices
-from polara.recommender.evaluation import  _get_hits, _get_relevance_scores, _get_ranking_scores
 from polara.recommender.utils import array_split, NNZ_MAX
 from polara.lib.hosvd import tucker_als
 from polara.lib.sparse import csc_matvec
@@ -67,10 +66,8 @@ class RecommenderModel(object):
         # (in contrast to `on_feedback_level` argument of self.evaluate)
         self.switch_positive  = switch_positive or get_default('switch_positive')
         self.verify_integrity =  get_default('verify_integrity')
-        self.not_rated_penalty = 0
-        # TODO make not_rated_penalty input argument in evaluate function
-        # as it is not a model attriute in fact
 
+        # TODO sorting in data must be by self._key, also need to change get_test_data
         self._key = self.data.fields.userid
         self._target = self.data.fields.itemid
 
@@ -171,6 +168,7 @@ class RecommenderModel(object):
         test_shape = self.data.get_test_shape(tensor_mode=tensor_mode)
 
         idx_diff = np.diff(user_idx)
+        # TODO sorting by self._key
         assert (idx_diff >= 0).all() # calculations assume testset is sorted by users!
 
         # TODO only required when testset consists of known users
@@ -306,7 +304,7 @@ class RecommenderModel(object):
         return top_recs
 
 
-    def evaluate(self, method='hits', topk=None, on_feedback_level=None):
+    def evaluate(self, method='hits', topk=None, not_rated_penalty=None, on_feedback_level=None):
         feedback = self.data.fields.feedback
         if topk > self.topk:
             self.topk = topk # will also flush old recommendations
@@ -320,7 +318,7 @@ class RecommenderModel(object):
             # this is a proper setting for binary data problems (implicit feedback)
             # in this case all unrated items, recommended by an algorithm
             # assumed to be "honest" false positives and therefore penalty equals 1
-            not_rated_penalty = 1 if self.not_rated_penalty is None else self.not_rated_penalty
+            not_rated_penalty = 1 if not_rated_penalty is None else not_rated_penalty
             is_positive = None
         else:
             # if data is not binary (explicit feedback), the intuition is different
@@ -328,7 +326,7 @@ class RecommenderModel(object):
             # as among these items can be both top rated and down-rated
             # the defualt setting in this case is to ignore such items at all
             # by setting penalty to 0, however, it is adjustable
-            not_rated_penalty = self.not_rated_penalty or 0
+            not_rated_penalty = not_rated_penalty or 0
             is_positive = (eval_data[feedback] >= self.switch_positive).values
 
         scoring_data = assemble_scoring_matrices(recommendations, eval_data,
@@ -394,30 +392,6 @@ class RecommenderModel(object):
         feedback_data = self._get_feedback_data(on_level)
         positive_feedback = feedback_data >= self.switch_positive
         return positive_feedback
-
-
-    def _evaluate(self, method='hits', topk=None, on_feedback_level=None):
-        '''This is the old implementation - to be deprected. Used only for testing.'''
-        #support rolling back scenario for @k calculations
-        if topk > self.topk:
-            self.topk = topk #will also flush old recommendations
-
-        matched_predictions = self._get_matched_predictions()
-        matched_predictions = matched_predictions[:, :topk, :]
-
-        if method == 'relevance':
-            positive_feedback = self._get_positive_feedback(on_feedback_level)
-            scores = _get_relevance_scores(matched_predictions, positive_feedback, self.not_rated_penalty)
-        elif method == 'ranking':
-            feedback = self._get_feedback_data(on_feedback_level)
-            ndcg_alternative = get_default('ndcg_alternative')
-            scores = _get_ranking_scores(matched_predictions, feedback, self.switch_positive, alternative=ndcg_alternative)
-        elif method == 'hits':
-            positive_feedback = self._get_positive_feedback(on_feedback_level)
-            scores = _get_hits(matched_predictions, positive_feedback, self.not_rated_penalty)
-        else:
-            raise NotImplementedError
-        return scores
 
 
     @staticmethod
