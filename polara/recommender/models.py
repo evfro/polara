@@ -67,9 +67,6 @@ class RecommenderModel(object):
         # (in contrast to `on_feedback_level` argument of self.evaluate)
         self.switch_positive  = switch_positive or get_default('switch_positive')
         self.verify_integrity =  get_default('verify_integrity')
-        self.not_rated_penalty = 0
-        # TODO make not_rated_penalty input argument in evaluate function
-        # as it is not a model attriute in fact
 
         self._key = self.data.fields.userid
         self._target = self.data.fields.itemid
@@ -306,7 +303,7 @@ class RecommenderModel(object):
         return top_recs
 
 
-    def evaluate(self, method='hits', topk=None, on_feedback_level=None):
+    def evaluate(self, method='hits', topk=None, not_rated_penalty=None, on_feedback_level=None):
         feedback = self.data.fields.feedback
         if topk > self.topk:
             self.topk = topk # will also flush old recommendations
@@ -320,7 +317,7 @@ class RecommenderModel(object):
             # this is a proper setting for binary data problems (implicit feedback)
             # in this case all unrated items, recommended by an algorithm
             # assumed to be "honest" false positives and therefore penalty equals 1
-            not_rated_penalty = 1 if self.not_rated_penalty is None else self.not_rated_penalty
+            not_rated_penalty = 1 if not_rated_penalty is None else not_rated_penalty
             is_positive = None
         else:
             # if data is not binary (explicit feedback), the intuition is different
@@ -328,7 +325,7 @@ class RecommenderModel(object):
             # as among these items can be both top rated and down-rated
             # the defualt setting in this case is to ignore such items at all
             # by setting penalty to 0, however, it is adjustable
-            not_rated_penalty = self.not_rated_penalty or 0
+            not_rated_penalty = not_rated_penalty or 0
             is_positive = (eval_data[feedback] >= self.switch_positive).values
 
         scoring_data = assemble_scoring_matrices(recommendations, eval_data,
