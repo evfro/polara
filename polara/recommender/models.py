@@ -41,6 +41,19 @@ def clean_build_decorator(build_func):
         return build_res
     return wrapper
 
+
+def with_metaclass(mcls):
+    # this is used to ensure python 2/3 interoperablity, taken from:
+    #https://stackoverflow.com/questions/22409430/portable-meta-class-between-python2-and-python3
+    def decorator(cls):
+        body = vars(cls).copy()
+        # clean out class body
+        body.pop('__dict__', None)
+        body.pop('__weakref__', None)
+        return mcls(cls.__name__, cls.__bases__, body)
+    return decorator
+
+
 class MetaModel(type):
     # performs cleaning of the instance when build method is called
     # propagates the action to any subclasses, key idea is borrowed from here:
@@ -52,10 +65,8 @@ class MetaModel(type):
         return cls
 
 
+@with_metaclass(MetaModel)
 class RecommenderModel(object):
-
-    __metaclass__ = MetaModel
-
     _config = ('topk', 'filter_seen', 'switch_positive', 'verify_integrity')
     _pad_const = -1 # used for sparse data
 
