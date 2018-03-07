@@ -1,5 +1,5 @@
+from io import BytesIO
 import pandas as pd
-from StringIO import StringIO
 
 try:
     from pandas.io.common import ZipFile
@@ -15,7 +15,7 @@ def get_movielens_data(local_file=None, get_ratings=True, get_genres=False,
         from requests import get
         zip_file_url = 'http://files.grouplens.org/datasets/movielens/ml-1m.zip'
         zip_response = get(zip_file_url)
-        zip_contents = StringIO(zip_response.content)
+        zip_contents = BytesIO(zip_response.content)
     else:
         zip_contents = local_file
 
@@ -29,8 +29,8 @@ def get_movielens_data(local_file=None, get_ratings=True, get_genres=False,
         if get_ratings:
             zdata = zfile.read(zip_file)
             delimiter = ','
-            zdata = zdata.replace('::', delimiter) # makes data compatible with pandas c-engine
-            ml_data = pd.read_csv(StringIO(zdata), sep=delimiter, header=header, engine='c',
+            zdata = zdata.replace(b'::', delimiter.encode()) # makes data compatible with pandas c-engine
+            ml_data = pd.read_csv(BytesIO(zdata), sep=delimiter, header=header, engine='c',
                                     names=['userid', 'movieid', 'rating', 'timestamp'],
                                     usecols=['userid', 'movieid', 'rating'])
 
