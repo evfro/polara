@@ -1,3 +1,10 @@
+# python 2/3 interoperability
+from __future__ import print_function
+try:
+    range = xrange
+except NameError:
+    pass
+
 from functools import wraps
 from collections import namedtuple
 import warnings
@@ -34,6 +41,19 @@ def clean_build_decorator(build_func):
         return build_res
     return wrapper
 
+
+def with_metaclass(mcls):
+    # this is used to ensure python 2/3 interoperablity, taken from:
+    #https://stackoverflow.com/questions/22409430/portable-meta-class-between-python2-and-python3
+    def decorator(cls):
+        body = vars(cls).copy()
+        # clean out class body
+        body.pop('__dict__', None)
+        body.pop('__weakref__', None)
+        return mcls(cls.__name__, cls.__bases__, body)
+    return decorator
+
+
 class MetaModel(type):
     # performs cleaning of the instance when build method is called
     # propagates the action to any subclasses, key idea is borrowed from here:
@@ -45,10 +65,8 @@ class MetaModel(type):
         return cls
 
 
+@with_metaclass(MetaModel)
 class RecommenderModel(object):
-
-    __metaclass__ = MetaModel
-
     _config = ('topk', 'filter_seen', 'switch_positive', 'verify_integrity')
     _pad_const = -1 # used for sparse data
 
@@ -83,7 +101,7 @@ class RecommenderModel(object):
         if self._recommendations is None:
             if not self._is_ready:
                 if self.verbose:
-                    print '{} model is not ready. Rebuilding.'.format(self.method)
+                    print('{} model is not ready. Rebuilding.'.format(self.method))
                 self.build()
             self._recommendations = self.get_recommendations()
         return self._recommendations
@@ -626,7 +644,7 @@ class CooccurrenceModel(RecommenderModel):
         # TODO implement matmat multiplication instead of iteration with matvec
             res_type = np.result_type(i2i_mat.dtype, tst_mat.dtype)
             scores = np.empty((tst_mat.shape[0], i2i_mat.shape[1]), dtype=res_type)
-            for i in xrange(tst_mat.shape[0]):
+            for i in range(tst_mat.shape[0]):
                 v = tst_mat.getrow(i)
                 scores[i, :] = csc_matvec(i2i_mat, v, dense_output=True, dtype=res_type)
         else:
@@ -671,7 +689,7 @@ class SVDModel(RecommenderModel):
             self._recommendations = None
 
     def _check_reduced_rank(self, rank):
-        for entity, factor in self.factors.iteritems():
+        for entity, factor in self.factors.items():
             if factor is None:
                 continue
 

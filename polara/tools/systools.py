@@ -1,4 +1,7 @@
+# python 2/3 interoperability
 from __future__ import division
+from __future__ import print_function
+
 import os
 import sys
 import ctypes
@@ -34,7 +37,7 @@ def platform_free_memory():
         try:
             import psutil
         except ImportError:
-            print 'Please, install psutil.'
+            print('Please, install psutil.')
         memory_status = psutil.virtual_memory
         mem = memory_status.free / (1024**3) # return in gigabytes
     else:

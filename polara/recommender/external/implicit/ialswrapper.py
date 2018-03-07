@@ -1,3 +1,9 @@
+# python 2/3 interoperability
+try:
+    range = xrange
+except NameError:
+    pass
+
 import numpy as np
 import implicit
 from polara.recommender.models import RecommenderModel
@@ -58,7 +64,7 @@ class ImplicitALS(RecommenderModel):
             matrix, _ = self.get_test_matrix()
             matrix.data = self.confidence(matrix.data, alpha=self.alpha, weight=self.weight_func)
             num_users = matrix.shape[0]
-            users_idx = xrange(num_users)
+            users_idx = range(num_users)
         else:
             # prepare traing matrix and convert test user indices into
             # corresponding training matrix rows
