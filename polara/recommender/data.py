@@ -105,7 +105,7 @@ class RecommenderData(object):
 
         self._custom_order = custom_order
         self.fields = namedtuple('Fields', self._std_fields)
-        self.fields = self.fields._make(map(eval, self._std_fields))
+        self.fields = self.fields(**dict(zip(self._std_fields, fields)))
         self.index = namedtuple('DataIndex', self._std_fields)
         self.index = self.index._make([None]*len(self._std_fields))
 
