@@ -1,4 +1,10 @@
+# python 2/3 interoperability
 from __future__ import division
+try:
+    range = xrange
+except NameError:
+    pass
+
 import math
 import types
 from collections import defaultdict, OrderedDict
@@ -93,11 +99,11 @@ def _jaccard_similarity_inplace(sdata, indcs, pntrs, nf):
     # it doesn't enforce  1 on the diagonal!
     # so the similarity data must be prepared accordingly
     ncols = len(pntrs) - 1
-    for col in xrange(ncols):
+    for col in range(ncols):
         lind = pntrs[col]
         rind = pntrs[col+1]
         nf_col = nf[col]
-        for j in xrange(lind, rind):
+        for j in range(lind, rind):
             row = indcs[j]
             denom = nf_col + nf[row] - sdata[j]
             sdata[j] /= denom
@@ -144,18 +150,18 @@ def _jaccard_similarity_weighted_tri(dat, ind, ptr, shift):
     rows = [z,]
 
     nrows = len(ptr) - 1
-    for i in xrange(nrows):
+    for i in range(nrows):
         lind_i = ptr[i]
         rind_i = ptr[i+1]
         if lind_i != rind_i:
             ish = i + shift
-            for j in xrange(ish, nrows):
+            for j in range(ish, nrows):
                 lind_j = ptr[j]
                 rind_j = ptr[j+1]
                 min_sum = 0
                 max_sum = 0
-                for k in xrange(lind_j, rind_j):
-                    for s in xrange(lind_i, rind_i):
+                for k in range(lind_j, rind_j):
+                    for s in range(lind_i, rind_i):
                         iind = ind[s]
                         jind = ind[k]
                         if iind == jind:
@@ -167,8 +173,8 @@ def _jaccard_similarity_weighted_tri(dat, ind, ptr, shift):
                     else:
                         max_sum += dat[k]
 
-                for s in xrange(lind_i, rind_i):
-                    for k in xrange(lind_j, rind_j):
+                for s in range(lind_i, rind_i):
+                    for k in range(lind_j, rind_j):
                         iind = ind[s]
                         jind = ind[k]
                         if iind == jind:

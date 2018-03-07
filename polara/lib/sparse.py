@@ -1,3 +1,9 @@
+# python 2/3 interoperability
+try:
+    range = xrange
+except NameError:
+    pass
+
 import numpy as np
 import scipy as sp
 from scipy import sparse
@@ -9,7 +15,7 @@ from numba import jit
 @jit(nopython=True, nogil=True)
 def matvec2dense(m_ptr, m_ind, m_val, v_nnz, v_val, out):
     l = len(v_nnz)
-    for j in xrange(l):
+    for j in range(l):
         col_start = v_nnz[j]
         col_end = col_start + 1
         ind_start = m_ptr[col_start]
@@ -21,7 +27,7 @@ def matvec2dense(m_ptr, m_ind, m_val, v_nnz, v_val, out):
 @jit(nopython=True, nogil=True)
 def matvec2sparse(m_ptr, m_ind, m_val, v_nnz, v_val, sizes, indices, data):
     l = len(sizes) - 1
-    for j in xrange(l):
+    for j in range(l):
         col_start = v_nnz[j]
         col_end = col_start + 1
         ind_start = m_ptr[col_start]
@@ -64,10 +70,10 @@ def _blockify(ind, ptr, major_dim):
     # indices must be intp in order to avoid overflow
     # major_dim is shape[0] for csc format and shape[1] for csr format
     n = len(ptr) - 1
-    for i in xrange(1, n): #first row/col is unchanged
+    for i in range(1, n): #first row/col is unchanged
         lind = ptr[i]
         rind = ptr[i+1]
-        for j in xrange(lind, rind):
+        for j in range(lind, rind):
             shift_ind = i * major_dim
             ind[j] += shift_ind
 

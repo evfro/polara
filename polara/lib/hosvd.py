@@ -1,3 +1,10 @@
+# python 2/3 interoperability
+from __future__ import print_function
+try:
+    range = xrange
+except NameError:
+    pass
+
 import numpy as np
 from numba import jit
 
@@ -6,12 +13,12 @@ def double_tensordot(idx, val, U, V, new_shape1, new_shape2, ten_mode0, ten_mode
     I = idx.shape[0]
     J = new_shape1
     K = new_shape2
-    for i in xrange(I):
+    for i in range(I):
         i0 = idx[i, ten_mode0]
         i1 = idx[i, ten_mode1]
         i2 = idx[i, ten_mode2]
-        for j in xrange(J):
-            for k in xrange(K):
+        for j in range(J):
+            for k in range(K):
                 res[i0, j, k] += val[i] * U[i1, j] * V[i2, k]
 
 
@@ -44,7 +51,7 @@ def tucker_als(idx, val, shape, core_shape, iters=25, growth_tol=0.01, batch_run
     '''
     def log_status(msg):
         if not batch_run:
-            print msg
+            print(msg)
 
     if not (idx.flags.c_contiguous and val.flags.c_contiguous):
         raise ValueError('Warning! Imput arrays must be C-contigous.')
@@ -52,7 +59,7 @@ def tucker_als(idx, val, shape, core_shape, iters=25, growth_tol=0.01, batch_run
 
     #TODO: it's better to implement check for future
     #if np.any(idx[1:, 0]-idx[:-1, 0]) < 0):
-    #    print 'Warning! Index array must be sorted by first column in ascending order.'
+    #    print('Warning! Index array must be sorted by first column in ascending order.')
 
     r0, r1, r2 = core_shape
 
@@ -67,7 +74,7 @@ def tucker_als(idx, val, shape, core_shape, iters=25, growth_tol=0.01, batch_run
 
     g_norm_old = 0
 
-    for i in xrange(iters):
+    for i in range(iters):
         log_status('Step %i of %i' % (i+1, iters))
         u0 = tensordot2(idx, val, shape, u2, u1, ((2, 0), (1, 0)))\
             .reshape(shape[0], r1*r2)

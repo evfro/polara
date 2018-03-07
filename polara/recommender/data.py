@@ -1,3 +1,6 @@
+# python 2/3 interoperability
+from __future__ import print_function
+
 from weakref import WeakKeyDictionary
 from collections import namedtuple
 from collections import defaultdict
@@ -102,7 +105,7 @@ class RecommenderData(object):
 
         self._custom_order = custom_order
         self.fields = namedtuple('Fields', self._std_fields)
-        self.fields = self.fields._make(map(eval, self._std_fields))
+        self.fields = self.fields(**dict(zip(self._std_fields, fields)))
         self.index = namedtuple('DataIndex', self._std_fields)
         self.index = self.index._make([None]*len(self._std_fields))
 
@@ -138,7 +141,7 @@ class RecommenderData(object):
         #[1:] omits undersacores in properties names
         params = params or [prop[1:] for prop in self._config]
         config_vals = defaults.get_config(params)
-        for name, value in config_vals.iteritems():
+        for name, value in config_vals.items():
             internal_name = '_{}'.format(name)
             setattr(self, internal_name, value)
 
@@ -174,7 +177,7 @@ class RecommenderData(object):
 
     def _verified_data_property(self, data_property):
         if data_property in self._change_properties:
-            print 'The value of {} might be not effective yet.'.format(data_property[1:])
+            print('The value of {} might be not effective yet.'.format(data_property[1:]))
         return getattr(self, data_property)
 
 
@@ -185,7 +188,7 @@ class RecommenderData(object):
 
     def prepare(self):
         if self.verbose:
-            print 'Preparing data...'
+            print('Preparing data...')
 
         update_rule = self._split_data()
 
@@ -199,6 +202,8 @@ class RecommenderData(object):
             self._try_reindex_test_data() # either assign known index, or (if testing for unseen users) reindex
             self._try_sort_test_data()
 
+        if self.verbose:
+            print('Done.')
 
     def prepare_training_only(self):
         self.holdout_size = 0 # do not form holdout
@@ -344,10 +349,10 @@ class RecommenderData(object):
         if not (full_update or test_update):
             # TODO place assert new_state == self._state into tests
             if self.verbose:
-                print 'Data is ready. No action was taken.'
+                print('Data is ready. No action was taken.')
             return update_rule
 
-        if self._test_ratio:
+        if self._test_ratio > 0:
             if full_update:
                 test_split = self._split_test_index()
             else: #test_update
@@ -426,7 +431,7 @@ class RecommenderData(object):
         # check that folds' sizes will be balanced (in terms of a number of items)
         if self.verify_sessions_length_distribution:
             if self.is_not_uniform(user_idx):
-                print 'Users are not uniformly ordered! Unable to split test set reliably.'
+                print('Users are not uniformly ordered! Unable to split test set reliably.')
             self.verify_sessions_length_distribution = False
         user_sessions_len = user_sessions.size()
         return user_sessions_len, user_idx
@@ -512,7 +517,7 @@ class RecommenderData(object):
             holdout.query('{} not in @invalid_session_index'.format(userid), inplace=True)
             if self.verbose:
                 msg = '{} of {} {}\'s were filtered out from holdout. Reason: not enough items.'
-                print msg.format(n_invalid_sessions, len(invalid_sessions), userid)
+                print(msg.format(n_invalid_sessions, len(invalid_sessions), userid))
 
     def _align_test_users(self):
         if (self._test.testset is None) or (self._test.holdout is None):
@@ -532,7 +537,7 @@ class RecommenderData(object):
             if self.verbose:
                 REASON = 'Reason: inconsistent with testset'
                 msg = '{} {}\'s were filtered out from holdout. {}.'
-                print msg.format(n_unique_users, userid, REASON)
+                print(msg.format(n_unique_users, userid, REASON))
 
         if not testset_in_holdout.all():
             invalid_testset_users = testset.loc[~testset_in_holdout, userid]
@@ -541,7 +546,7 @@ class RecommenderData(object):
             if self.verbose:
                 REASON = 'Reason: inconsistent with holdout'
                 msg = '{} {}\'s were filtered out from testset. {}.'
-                print msg.format(n_unique_users, userid, REASON)
+                print(msg.format(n_unique_users, userid, REASON))
 
     def _reindex_train_users(self):
         userid = self.fields.userid
@@ -600,7 +605,7 @@ class RecommenderData(object):
             if self.verbose:
                 UNSEEN = 'not in the training data'
                 msg = '{} unique {}\'s within {} {} interactions were filtered. Reason: {}.'
-                print msg.format(n_unseen_entities, entity, (~seen_data).sum(), label, UNSEEN)
+                print(msg.format(n_unseen_entities, entity, (~seen_data).sum(), label, UNSEEN))
 
     def _reindex_testset_users(self):
         userid = self.fields.userid
@@ -807,8 +812,8 @@ class RecommenderData(object):
         self._warm_start = warm_start
         self._state = None
         self._last_update_rule = None
-        self._test_ratio = None
-        self._holdout_size = None
+        self._test_ratio = -1
+        self._holdout_size = -1
         self._notify(self.on_update_event)
         self._change_properties.clear()
 

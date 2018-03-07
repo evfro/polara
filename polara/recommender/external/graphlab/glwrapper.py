@@ -1,3 +1,6 @@
+# python 2/3 interoperability
+from __future__ import print_function
+
 import numpy as np
 from polara.recommender.models import RecommenderModel
 import graphlab as gl
@@ -135,7 +138,7 @@ class GraphlabFactorization(RecommenderModel):
                                     target=self.data.fields.feedback,
                                     **params)
         if self.verbose:
-            print '{} training time: {}s'.format(self.method, self.gl_model.training_time)
+            print('{} training time: {}s'.format(self.method, self.gl_model.training_time))
 
     def get_recommendations(self):
         userid = self.data.fields.userid

@@ -1,3 +1,10 @@
+# python 2/3 interoperability
+from __future__ import print_function
+try:
+    range = xrange
+except NameError:
+    pass
+
 import pandas as pd
 
 
@@ -30,7 +37,7 @@ def evaluate_models(models, metrics, topk=None):
     for metric in metrics:
         model_scores = []
         for model in models:
-            #print 'model {}'.format(model.method)
+            #print('model {}'.format(model.method))
             scores = model.evaluate(method=metric, topk=topk)
             model_scores.append(scores)
         metric_scores.append(pd.DataFrame(model_scores, index=[model.method for model in models]).T)
@@ -71,7 +78,7 @@ def holdout_test_pair(model1, model2, holdout_sizes=[1], metrics=['hits']):
     data1 = model1.data
     data2 = model2.data
     for i in holdout_sizes:
-        print i,
+        print(i, end=' ')
         data1.holdout_size = i
         data1.update()
         data2.holdout_size = i
@@ -90,7 +97,7 @@ def holdout_test(models, holdout_sizes=[1], metrics=['hits']):
 
     build_models(models)
     for i in holdout_sizes:
-        print i,
+        print(i, end=' ')
         data.holdout_size = i
         data.update()
 
@@ -110,7 +117,7 @@ def topk_test(models, topk_list=[10], metrics=['hits']):
 
     build_models(models)
     for topk in topk_list:
-        print topk,
+        print(topk, end=' ')
         metric_scores = evaluate_models(models, metrics, topk)
         topk_scores.append(metric_scores)
 
