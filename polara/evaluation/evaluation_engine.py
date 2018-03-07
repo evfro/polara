@@ -1,5 +1,10 @@
 # python 2/3 interoperability
 from __future__ import print_function
+try:
+    range = xrange
+except NameError:
+    pass
+
 import pandas as pd
 
 

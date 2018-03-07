@@ -1,5 +1,10 @@
 # python 2/3 interoperability
 from __future__ import print_function
+try:
+    range = xrange
+except NameError:
+    pass
+
 from functools import wraps
 from collections import namedtuple
 import warnings
@@ -628,7 +633,7 @@ class CooccurrenceModel(RecommenderModel):
         # TODO implement matmat multiplication instead of iteration with matvec
             res_type = np.result_type(i2i_mat.dtype, tst_mat.dtype)
             scores = np.empty((tst_mat.shape[0], i2i_mat.shape[1]), dtype=res_type)
-            for i in xrange(tst_mat.shape[0]):
+            for i in range(tst_mat.shape[0]):
                 v = tst_mat.getrow(i)
                 scores[i, :] = csc_matvec(i2i_mat, v, dense_output=True, dtype=res_type)
         else:
