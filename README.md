@@ -7,7 +7,7 @@ The framework also features efficient tensor-based implementation of an algorith
 
 
 ## Prerequisites
-**Note:** Currently runs on python 2 only (python 3 support in plans).
+Current version of Polara supports both Python 2 and Python 3 environments. Future versions are likely to drop support of Python 2 to make a better use of Python 3 features. 
 
 The framework heavily depends on `Pandas, Numpy, Scipy` and `Numba` packages. Better performance can be achieved with `mkl` (optional). It's also recommended to use `jupyter notebook` for experimentation. Visualization of results can be done with help of `matplotlib` and optionally `seaborn`. The easiest way to get all those at once is to use the latest [Anaconda distribution](https://www.continuum.io/downloads).
 
