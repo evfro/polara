@@ -1,3 +1,5 @@
+# python 2/3 interoperability
+from __future__ import print_function
 from functools import wraps
 from collections import namedtuple
 import warnings
@@ -83,7 +85,7 @@ class RecommenderModel(object):
         if self._recommendations is None:
             if not self._is_ready:
                 if self.verbose:
-                    print '{} model is not ready. Rebuilding.'.format(self.method)
+                    print('{} model is not ready. Rebuilding.'.format(self.method))
                 self.build()
             self._recommendations = self.get_recommendations()
         return self._recommendations
