@@ -324,7 +324,7 @@ class RecommenderModel(object):
 
     def evaluate(self, method='hits', topk=None, not_rated_penalty=None, on_feedback_level=None):
         feedback = self.data.fields.feedback
-        if topk > self.topk:
+        if int(topk or 0) > self.topk:
             self.topk = topk # will also flush old recommendations
 
         # support rolling back scenario for @k calculations

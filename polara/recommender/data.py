@@ -352,7 +352,7 @@ class RecommenderData(object):
                 print('Data is ready. No action was taken.')
             return update_rule
 
-        if self._test_ratio:
+        if self._test_ratio > 0:
             if full_update:
                 test_split = self._split_test_index()
             else: #test_update
@@ -812,8 +812,8 @@ class RecommenderData(object):
         self._warm_start = warm_start
         self._state = None
         self._last_update_rule = None
-        self._test_ratio = None
-        self._holdout_size = None
+        self._test_ratio = -1
+        self._holdout_size = -1
         self._notify(self.on_update_event)
         self._change_properties.clear()
 
