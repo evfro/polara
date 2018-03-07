@@ -141,7 +141,7 @@ class RecommenderData(object):
         #[1:] omits undersacores in properties names
         params = params or [prop[1:] for prop in self._config]
         config_vals = defaults.get_config(params)
-        for name, value in config_vals.iteritems():
+        for name, value in config_vals.items():
             internal_name = '_{}'.format(name)
             setattr(self, internal_name, value)
 

@@ -678,7 +678,7 @@ class SVDModel(RecommenderModel):
             self._recommendations = None
 
     def _check_reduced_rank(self, rank):
-        for entity, factor in self.factors.iteritems():
+        for entity, factor in self.factors.items():
             if factor is None:
                 continue
 
