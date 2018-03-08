@@ -32,7 +32,7 @@ A special effort was made to make a *recsys for humans*, which stresses on the e
 ```python
 from polara.recommender.data import RecommenderData
 from polara.recommender.models import SVDModel
-from polara.tools.movielens import get_movielens_data
+from polara.datasets.movielens import get_movielens_data
 # get data and convert it into appropriate format
 ml_data = get_movielens_data(get_genres=False)
 data_model = RecommenderData(ml_data, 'userid', 'movieid', 'rating')
@@ -87,13 +87,13 @@ Here's an example of how to perform **top-*k* recommendations** experiments with
 
 ```python
 from polara.evaluation import evaluation_engine as ee
-from polara.recommender.models import NonPersonalized
+from polara.recommender.models import PopularityModel, RandomModel
 
 # define models
 i2i = CooccurrenceModel(data_model)
 svd = SVDModel(data_model)
-popular =  NonPersonalized('mostpopular', data_model)
-random = NonPersonalized('random', data_model)
+popular = PopularityModel(data_model)
+random = RandomModel(data_model)
 models = [i2i, svd, popular, random]
 
 metrics = ['ranking', 'relevance'] # metrics for evaluation: NDGC, Precision, Recall, etc.
