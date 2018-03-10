@@ -779,14 +779,15 @@ class CoffeeModel(RecommenderModel):
 
     def slice_recommendations(self, test_data, shape, start, stop, test_users=None):
         test_tensor_unfolded, slice_idx = self.get_test_tensor(test_data, shape, start, stop)
-        num_users = stop - start
-        num_items = shape[1]
-        num_fdbks = shape[2]
         v = self.factors[self.data.fields.itemid]
         w = self.factors[self.data.fields.feedback]
 
+        num_users = stop - start
+        num_items = shape[1]
+        num_fdbks = shape[2]
+
         # assume that w.shape[1] < v.shape[1] (allows for more efficient calculations)
-        scores = test_tensor_unfolded.dot(w).reshape(num_users, num_items, w.shape[1])
+        scores = test_tensor_unfolded.dot(w).reshape(num_users, num_items, num_fdbks)
         scores = np.tensordot(scores, v, axes=(1, 0))
         scores = np.tensordot(np.tensordot(scores, v, axes=(2, 1)), w, axes=(1, 1))
         scores = self.flatten_scores(scores, self.flattener)
