@@ -5,8 +5,7 @@ except NameError:
     pass
 
 import numpy as np
-import scipy as sp
-import scipy.sparse
+from scipy.sparse import csr_matrix
 from numba import jit
 
 # matvec implementation is based on
@@ -60,7 +59,7 @@ def csc_matvec(mat_csc, vec, dense_output=True, dtype=None):
         indices = np.empty((n,), dtype=np.intp)
         indptr = np.array([0, n], dtype=np.intp)
         matvec2sparse(m_ptr, m_ind, m_val, v_nnz, v_val, sizes, indices, data)
-        res = sp.sparse.csr_matrix((data, indices, indptr), shape=(1, mat_csc.shape[0]), dtype=res_dtype)
+        res = csr_matrix((data, indices, indptr), shape=(1, mat_csc.shape[0]), dtype=res_dtype)
         res.sum_duplicates() # expensive operation
     return res
 

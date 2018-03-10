@@ -17,7 +17,6 @@ from collections import defaultdict, OrderedDict
 import numpy as np
 from numba import jit
 import scipy as sp
-import scipy.sparse
 from scipy.sparse import csc_matrix, csr_matrix, coo_matrix, SparseEfficiencyWarning
 import warnings
 
