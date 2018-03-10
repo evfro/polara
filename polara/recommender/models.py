@@ -373,46 +373,6 @@ class RecommenderModel(object):
         return scores
 
 
-    def _get_matched_predictions(self):
-        userid, itemid = self.data.fields.userid, self.data.fields.itemid
-        holdout_data = self.data.test.holdout[itemid]
-        holdout_size = self.data.holdout_size
-        holdout_matrix = holdout_data.values.reshape(-1, holdout_size).astype(np.int64)
-
-        recommendations = self.recommendations #will recalculate if empty
-
-        if recommendations.shape[0] != holdout_matrix.shape[0]:
-            raise ValueError('Incompatible test and holdout size.')
-
-        matched_predictions = (recommendations[:, :, None] == holdout_matrix[:, None, :])
-        return matched_predictions
-
-
-    def _get_feedback_data(self, on_level=None):
-        feedback = self.data.fields.feedback
-        eval_data = self.data.test.holdout[feedback].values
-        holdout = self.data.holdout_size
-        feedback_data = eval_data.reshape(-1, holdout)
-
-        if on_level is not None:
-            try:
-                iter(on_level)
-            except TypeError:
-                feedback_data = np.ma.masked_not_equal(feedback_data, on_level)
-            else:
-                mask_level = np.in1d(feedback_data.ravel(),
-                                     on_level,
-                                     invert=True).reshape(feedback_data.shape)
-                feedback_data = np.ma.masked_where(mask_level, feedback_data)
-        return feedback_data
-
-
-    def _get_positive_feedback(self, on_level=None):
-        feedback_data = self._get_feedback_data(on_level)
-        positive_feedback = feedback_data >= self.switch_positive
-        return positive_feedback
-
-
     @staticmethod
     def topsort(a, topk):
         parted = np.argpartition(a, -topk)[-topk:]
