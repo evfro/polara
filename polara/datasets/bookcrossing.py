@@ -1,5 +1,5 @@
+from io import BytesIO
 import pandas as pd
-from StringIO import StringIO
 
 try:
     from pandas.io.common import ZipFile
@@ -13,7 +13,7 @@ def get_bx_data(local_file=None, get_ratings=True, get_users=False, get_books=Fa
         from requests import get
         zip_file_url = 'http://www2.informatik.uni-freiburg.de/~cziegler/BX/BX-CSV-Dump.zip'
         zip_response = get(zip_file_url)
-        zip_contents = StringIO(zip_response.content)
+        zip_contents = BytesIO(zip_response.content)
     else:
         zip_contents = local_file
 
@@ -26,7 +26,7 @@ def get_bx_data(local_file=None, get_ratings=True, get_users=False, get_books=Fa
         delimiter = ';'
         if get_ratings:
             zdata = zfile.read(zip_file)
-            ratings = pd.read_csv(StringIO(zdata), sep=delimiter, header=0, engine='c')
+            ratings = pd.read_csv(BytesIO(zdata), sep=delimiter, header=0, engine='c')
 
         if get_users:
             zip_file = zip_files[zip_files.str.contains('users', flags=2)].iat[0]
