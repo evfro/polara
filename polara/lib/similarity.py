@@ -41,7 +41,7 @@ def _fix_empty_features(feature_mat):
 
 
 def set_diagonal_values(mat, val=1):
-    #disable warning when setting diagonal elements of sparse similarity matrix
+    # disable warning when setting diagonal elements of sparse similarity matrix
     with warnings.catch_warnings():
         warnings.simplefilter('ignore', category=SparseEfficiencyWarning)
         mat.setdiag(val)
@@ -58,7 +58,7 @@ def normalize_binary_features(feature_mat):
     if feature_mat.format == 'csc':
         ind = feature_mat.indices.copy()
         ptr = feature_mat.indptr.copy()
-        norm_data =  1 / np.sqrt(np.take(sqsum, ind))
+        norm_data = 1 / np.sqrt(np.take(sqsum, ind))
         normed = csc_matrix((norm_data, ind, ptr), shape=feature_mat.shape)
     else:
         norm_data = safe_inverse_root(sqsum.astype(np.float64))
@@ -149,10 +149,10 @@ def cosine_tfidf_similarity(F, fill_diagonal=True):
 @jit(nopython=True)
 def _jaccard_similarity_weighted_tri(dat, ind, ptr, shift):
     z = dat[0] #np.float64
-    #need to initialize lists with certain dtype
-    data = [z,]
-    cols = [z,]
-    rows = [z,]
+    # need to initialize lists with certain dtype
+    data = [z]
+    cols = [z]
+    rows = [z]
 
     nrows = len(ptr) - 1
     for i in range(nrows):
@@ -188,7 +188,7 @@ def _jaccard_similarity_weighted_tri(dat, ind, ptr, shift):
                         max_sum += dat[s]
 
                 if min_sum:
-                    wjac = min_sum/max_sum
+                    wjac = min_sum / max_sum
                     data.append(wjac)
                     cols.append(i)
                     rows.append(j)
@@ -297,10 +297,10 @@ def get_features_data(meta_data, ranking=None, deduplicate=True):
         ranking = 'linear'
 
     if isinstance(ranking, str):
-        ranking = [ranking,] * len(features)
+        ranking = [ranking] * len(features)
 
     if not isinstance(ranking, dict):
-        ranking = {k:v for k, v in zip(features, ranking)}
+        ranking = {k: v for k, v in zip(features, ranking)}
 
     for feature in features:
         feature_data = meta_data[feature]
@@ -330,10 +330,10 @@ def get_similarity_data(meta_data, similarity_type='jaccard'):
     features = meta_data.columns
 
     if isinstance(similarity_type, str):
-        similarity_type = [similarity_type,] * len(features)
+        similarity_type = [similarity_type] * len(features)
 
     if not isinstance(similarity_type, dict):
-        similarity_type = {k:v for k, v in zip(features, similarity_type)}
+        similarity_type = {k: v for k, v in zip(features, similarity_type)}
 
     similarity_mats = {}
     for feature in features:
@@ -361,16 +361,16 @@ def combine_similarity_data(meta_data, similarity_type='jaccard', weights=None):
     num_feat = len(features)
 
     if isinstance(similarity_type, str):
-        similarity_type = [similarity_type,] * num_feat
+        similarity_type = [similarity_type] * num_feat
 
     if not isinstance(similarity_type, dict):
-        similarity_type = {k:v for k, v in zip(features, similarity_type)}
+        similarity_type = {k: v for k, v in zip(features, similarity_type)}
 
     if weights is None:
-        weights = [1.0/num_feat,] * num_feat
+        weights = [1.0/num_feat] * num_feat
 
     if not isinstance(weights, dict):
-        weights = {k:v for k, v in zip(features, weights)}
+        weights = {k: v for k, v in zip(features, weights)}
 
     similarity = csc_matrix((meta_data.shape[0],)*2)
     for feature in features:

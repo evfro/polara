@@ -1,5 +1,6 @@
 from timeit import default_timer as timer
 
+
 class Timer():
     def __init__(self, model_name='Model', verbose=True, msg=None):
         self.model_name = model_name

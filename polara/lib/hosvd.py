@@ -8,6 +8,7 @@ except NameError:
 import numpy as np
 from numba import jit
 
+
 @jit(nopython=True, nogil=True)
 def double_tensordot(idx, val, U, V, new_shape1, new_shape2, ten_mode0, ten_mode1, ten_mode2, res):
     I = idx.shape[0]
@@ -42,6 +43,7 @@ def tensordot2(idx, val, shape, U, V, modes):
 
     double_tensordot(idx, val, vU, vV, new_shape[1], new_shape[2], ten_mode0, ten_mode1, ten_mode2, res)
     return res
+
 
 def tucker_als(idx, val, shape, core_shape, iters=25, growth_tol=0.01, batch_run=False):
     '''

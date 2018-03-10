@@ -6,8 +6,9 @@ try:
 except ImportError:
     from zipfile import ZipFile
 
+
 def get_movielens_data(local_file=None, get_ratings=True, get_genres=False,
-                        split_genres=True, mdb_mapping=False):
+                       split_genres=True, mdb_mapping=False):
     '''Downloads movielens data and stores it in pandas dataframe.
     '''
     if not local_file:

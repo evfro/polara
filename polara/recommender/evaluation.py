@@ -94,13 +94,13 @@ def assemble_scoring_matrices(recommendations, eval_data, key, target, is_positi
 def get_hr_score(hits_rank):
     'Hit-Rate score'
     hr = hits_rank.getnnz(axis=1).mean()
-    return namedtuple('Relevance', ['hr',])._make([hr,])
+    return namedtuple('Relevance', ['hr'])._make([hr])
 
 
 def get_mrr_score(hits_rank):
     'Mean Reciprocal Rank score'
     mrr = hits_rank.power(-1, 'f8').max(axis=1).mean()
-    return namedtuple('Ranking', ['mrr',])._make([mrr,])
+    return namedtuple('Ranking', ['mrr'])._make([mrr])
 
 
 def get_ndcr_discounts(rank_matrix, eval_matrix, topn):
@@ -111,8 +111,8 @@ def get_ndcr_discounts(rank_matrix, eval_matrix, topn):
     relevance_per_key = np.array_split(eval_matrix.data, eval_matrix.indptr[1:-1])
     target_id_per_key = np.array_split(eval_matrix.indices, eval_matrix.indptr[1:-1])
 
-    #ideal_indices = [np.argsort(rel)[:-(topn+1):-1] for rel in relevance_per_key]
-    #idx = np.arange(2, topn+2)
+    # ideal_indices = [np.argsort(rel)[:-(topn+1):-1] for rel in relevance_per_key]
+    # idx = np.arange(2, topn+2)
     ideal_indices = [np.argsort(rel)[::-1] for rel in relevance_per_key]
     idx = np.arange(2, eval_matrix.getnnz(axis=1).max()+2)
     data = np.concatenate([np.reciprocal(np.log2(idx[:len(i)], dtype='f8')) for i in ideal_indices])
@@ -183,16 +183,16 @@ def get_hits(rank_matrix, hits_rank, miss_rank, eval_matrix, eval_matrix_hits, e
     hits = namedtuple('Hits', ['true_positive', 'false_positive',
                                'true_negative', 'false_negative'])
     hits = hits._make(get_relevance_data(rank_matrix, hits_rank, miss_rank,
-                                          eval_matrix, eval_matrix_hits, eval_matrix_miss,
-                                          not_rated_penalty, False))
+                                         eval_matrix, eval_matrix_hits, eval_matrix_miss,
+                                         not_rated_penalty, False))
     return hits
 
 
 def get_relevance_scores(rank_matrix, hits_rank, miss_rank, eval_matrix, eval_matrix_hits, eval_matrix_miss, not_rated_penalty=None):
     [true_positive, false_positive,
      true_negative, false_negative] = get_relevance_data(rank_matrix, hits_rank, miss_rank,
-                                                          eval_matrix, eval_matrix_hits, eval_matrix_miss,
-                                                          not_rated_penalty, True)
+                                                         eval_matrix, eval_matrix_hits, eval_matrix_miss,
+                                                         not_rated_penalty, True)
 
     with np.errstate(invalid='ignore'):
         # true positive rate
@@ -210,7 +210,7 @@ def get_relevance_scores(rank_matrix, hits_rank, miss_rank, eval_matrix, eval_ma
             fallout = specifity = None
 
     n_keys = hits_rank.shape[0]
-    #average over all users
+    # average over all users
     precision = np.nansum(precision) / n_keys
     recall = np.nansum(recall) / n_keys
     miss_rate = np.nansum(miss_rate) / n_keys
