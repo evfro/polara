@@ -1,9 +1,15 @@
 # python 2/3 interoperability
 from __future__ import division
+
 try:
     range = xrange
 except NameError:
     pass
+
+try:
+    long
+except NameError:
+    long = int
 
 import math
 import types
