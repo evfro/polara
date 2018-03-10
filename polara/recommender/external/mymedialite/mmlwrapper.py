@@ -76,7 +76,6 @@ class MyMediaLiteWrapper(SVDModel):
     def _save_to_disk(self):
         if self.positive_only:
             feedback = self.data.fields.feedback
-            userid = self.data.fields.userid
             pos_ind = self.data.training[feedback] >= self.switch_positive
             pos_data = self.data.training.loc[pos_ind]
             pos_data.to_csv(self.train_data_path, index=False, header=False)

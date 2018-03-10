@@ -15,7 +15,6 @@ import math
 import types
 from collections import defaultdict, OrderedDict
 import numpy as np
-import pandas as pd
 from numba import jit
 import scipy as sp
 import scipy.sparse
@@ -209,7 +208,7 @@ def jaccard_similarity_weighted(F, fill_diagonal=True):
     shift = 1 if fill_diagonal else 0
     data, rows, cols = _jaccard_similarity_weighted_tri(dat, ind, ptr, shift)
 
-    S = sp.sparse.coo_matrix((data, (rows, cols)), shape=(F.shape[0],)*2).tocsc()
+    S = coo_matrix((data, (rows, cols)), shape=(F.shape[0],)*2).tocsc()
     S += S.T # doubles diagonal values if fill_diagonal is False
 
     if fill_diagonal:

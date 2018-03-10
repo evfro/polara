@@ -6,11 +6,12 @@ except NameError:
 
 import numpy as np
 import scipy as sp
-from scipy import sparse
+import scipy.sparse
 from numba import jit
 
 # matvec implementation is based on
 # http://stackoverflow.com/questions/18595981/improving-performance-of-multiplication-of-scipy-sparse-matrices
+
 
 @jit(nopython=True, nogil=True)
 def matvec2dense(m_ptr, m_ind, m_val, v_nnz, v_val, out):
@@ -63,7 +64,8 @@ def csc_matvec(mat_csc, vec, dense_output=True, dtype=None):
         res.sum_duplicates() # expensive operation
     return res
 
-jit(nopython=True)
+
+@jit(nopython=True)
 def _blockify(ind, ptr, major_dim):
     # convenient function to compute only diagonal
     # elements of the product of 2 matrices;
