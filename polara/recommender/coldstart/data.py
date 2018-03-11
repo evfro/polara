@@ -97,7 +97,7 @@ class ItemColdStartData(RecommenderData):
             item_index = self.index.itemid
 
         new_item_index = (namedtuple('ItemIndex', 'training cold_start')
-                                ._make([item_index, cold_item_index]))
+                          ._make([item_index, cold_item_index]))
         self.index = self.index._replace(itemid=new_item_index)
 
 

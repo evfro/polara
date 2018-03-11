@@ -15,7 +15,7 @@ def _plot_pair(scores, keys, titles=None, errors=None, err_alpha=0.2, figsize=(1
     scores[right].plot(ax=ax[1], legend=False)
 
     if show_legend:
-            plt.legend(loc='center left', bbox_to_anchor=(1.0, 0.5))
+        plt.legend(loc='center left', bbox_to_anchor=(1.0, 0.5))
 
     if errors is not None:
         errG = errors[left]

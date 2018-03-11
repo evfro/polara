@@ -251,8 +251,8 @@ class RecommenderModel(object):
         # conversion is not required for feedback (it's made in *to_coo functions, if needed)
         items_data = item_index.set_index('old').loc[items_data, 'new'].values
         user_data = pd.DataFrame({userid: [0]*len(items_data),
-                                 itemid: items_data,
-                                 feedback: feedback_data})
+                                  itemid: items_data,
+                                  feedback: feedback_data})
         return user_data
 
 

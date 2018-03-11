@@ -217,7 +217,7 @@ class RecommenderData(object):
     def _validate_config(self):
         if self._warm_start and not (self._holdout_size and self._test_ratio):
             raise ValueError('Both holdout_size and test_ratio must be positive when warm_start is set to True')
-        if not self._warm_start and (self._holdout_size==0) and (self._test_ratio>0):
+        if not self._warm_start and (self._holdout_size == 0) and (self._test_ratio > 0):
             raise ValueError('test_ratio cannot be nonzero when holdout_size is 0 and warm_start is set to False')
 
         assert self._test_ratio < 1, 'Value of test_ratio can\'t be greater than or equal to 1'
@@ -512,7 +512,7 @@ class RecommenderData(object):
         holdout_sessions = holdout.groupby(userid, sort=False)
         holdout_sessions_len = holdout_sessions.size()
 
-        invalid_sessions = (holdout_sessions_len!=self.holdout_size)
+        invalid_sessions = (holdout_sessions_len != self.holdout_size)
         if invalid_sessions.any():
             n_invalid_sessions = invalid_sessions.sum()
             invalid_session_index = invalid_sessions.index[invalid_sessions]
