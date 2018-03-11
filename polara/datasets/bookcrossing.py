@@ -26,21 +26,24 @@ def get_bx_data(local_file=None, get_ratings=True, get_users=False, get_books=Fa
         delimiter = ';'
         if get_ratings:
             zdata = zfile.read(zip_file)
-            ratings = pd.read_csv(BytesIO(zdata), sep=delimiter, header=0, engine='c')
+            ratings = pd.read_csv(BytesIO(zdata), sep=delimiter, header=0,
+                                  engine='c', encoding='unicode_escape')
 
         if get_users:
             zip_file = zip_files[zip_files.str.contains('users', flags=2)].iat[0]
             with zfile.open(zip_file) as zdata:
-                users = pd.read_csv(zdata, sep=delimiter, header=0, engine='c',)
+                users = pd.read_csv(zdata, sep=delimiter, header=0, engine='c',
+                                    encoding='unicode_escape')
 
         if get_books:
             zip_file = zip_files[zip_files.str.contains('books', flags=2)].iat[0]
             with zfile.open(zip_file) as zdata:
                 books = pd.read_csv(zdata, sep=delimiter, header=0, engine='c',
-                                    quoting=1, escapechar='\\',
+                                    quoting=1, escapechar='\\', encoding='unicode_escape',
                                     usecols=['ISBN', 'Book-Author', 'Publisher'])
 
     res = [data.rename(columns=lambda x: x.lower().replace('book-', '')
                                                   .replace('-id', 'id'), copy=False)
            for data in [ratings, users, books] if data is not None]
+    if len(res)==1: res = res[0]
     return res

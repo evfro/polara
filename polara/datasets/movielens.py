@@ -26,21 +26,28 @@ def get_movielens_data(local_file=None, get_ratings=True, get_genres=False,
         zip_files = pd.Series(zfile.namelist())
         zip_file = zip_files[zip_files.str.contains('ratings')].iat[0]
         is_latest = 'latest' in zip_file
-        header = 0 if is_latest else None
+        is_20m = '20m' in zip_file
+        delimiter = ','
+        header = 0 if (is_latest or is_20m) else None
         if get_ratings:
             zdata = zfile.read(zip_file)
-            delimiter = ','
-            zdata = zdata.replace(b'::', delimiter.encode()) # makes data compatible with pandas c-engine
+            zdata = zdata.replace(b'::', delimiter.encode())
+            # makes data compatible with pandas c-engine
+            # returns string objects instead of bytes in that case
             ml_data = pd.read_csv(BytesIO(zdata), sep=delimiter, header=header, engine='c',
                                     names=['userid', 'movieid', 'rating', 'timestamp'],
                                     usecols=['userid', 'movieid', 'rating'])
 
         if get_genres:
             zip_file = zip_files[zip_files.str.contains('movies')].iat[0]
-            with zfile.open(zip_file) as zdata:
-                delimiter = ',' if is_latest else '::'
-                genres_data = pd.read_csv(zdata, sep=delimiter, header=header, engine='python',
-                                            names=['movieid', 'movienm', 'genres'])
+            zdata =  zfile.read(zip_file)
+            if not is_latest:
+                # make data compatible with pandas c-engine
+                # pandas returns string objects instead of bytes in that case
+                zdata = zdata.replace(b'::', delimiter.encode())
+            genres_data = pd.read_csv(BytesIO(zdata), sep=delimiter, header=header,
+                                      engine='c', encoding='unicode_escape',
+                                      names=['movieid', 'movienm', 'genres'])
 
             ml_genres = get_split_genres(genres_data) if split_genres else genres_data
 
