@@ -621,7 +621,7 @@ class CooccurrenceModel(RecommenderModel):
         return scores
 
 
-    def slice_recommendations(self, test_data, shape, start, stop, test_user=None):
+    def slice_recommendations(self, test_data, shape, start, stop, test_users=None):
         test_matrix, slice_data = self.get_test_matrix(test_data, shape, (start, stop))
         # NOTE CSR format is mandatory for proper handling of signle user
         # recommendations, as vector of shape (1, N) in CSC format is inefficient
