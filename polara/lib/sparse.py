@@ -5,12 +5,12 @@ except NameError:
     pass
 
 import numpy as np
-import scipy as sp
-from scipy import sparse
+from scipy.sparse import csr_matrix
 from numba import jit
 
 # matvec implementation is based on
 # http://stackoverflow.com/questions/18595981/improving-performance-of-multiplication-of-scipy-sparse-matrices
+
 
 @jit(nopython=True, nogil=True)
 def matvec2dense(m_ptr, m_ind, m_val, v_nnz, v_val, out):
@@ -59,11 +59,12 @@ def csc_matvec(mat_csc, vec, dense_output=True, dtype=None):
         indices = np.empty((n,), dtype=np.intp)
         indptr = np.array([0, n], dtype=np.intp)
         matvec2sparse(m_ptr, m_ind, m_val, v_nnz, v_val, sizes, indices, data)
-        res = sp.sparse.csr_matrix((data, indices, indptr), shape=(1, mat_csc.shape[0]), dtype=res_dtype)
+        res = csr_matrix((data, indices, indptr), shape=(1, mat_csc.shape[0]), dtype=res_dtype)
         res.sum_duplicates() # expensive operation
     return res
 
-jit(nopython=True)
+
+@jit(nopython=True)
 def _blockify(ind, ptr, major_dim):
     # convenient function to compute only diagonal
     # elements of the product of 2 matrices;
@@ -77,16 +78,19 @@ def _blockify(ind, ptr, major_dim):
             shift_ind = i * major_dim
             ind[j] += shift_ind
 
+
 def row_unblockify(mat, block_size):
     # only for CSR matrices
     factor = (mat.indices // block_size) * block_size
     mat.indices -= factor
     mat._shape = (mat.shape[0], block_size)
 
+
 def row_blockify(mat, block_size):
     # only for CSR matrices
     _blockify(mat.indices, mat.indptr, block_size)
     mat._shape = (mat.shape[0], block_size*mat.shape[0])
+
 
 def inverse_permutation(p):
     s = np.empty(p.size, p.dtype)

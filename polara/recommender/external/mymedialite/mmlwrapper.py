@@ -1,9 +1,9 @@
-from polara.recommender.models import SVDModel
 from subprocess import call
 from shlex import split
 import sys
 import pandas as pd
 import numpy as np
+from polara.recommender.models import SVDModel
 
 
 #default settings
@@ -76,7 +76,6 @@ class MyMediaLiteWrapper(SVDModel):
     def _save_to_disk(self):
         if self.positive_only:
             feedback = self.data.fields.feedback
-            userid = self.data.fields.userid
             pos_ind = self.data.training[feedback] >= self.switch_positive
             pos_data = self.data.training.loc[pos_ind]
             pos_data.to_csv(self.train_data_path, index=False, header=False)
@@ -123,8 +122,8 @@ class MyMediaLiteWrapper(SVDModel):
 
     def _parse_factors(self):
         model_data_path = self.saved_model_path
-        model_params = pd.read_csv(model_data_path, skiprows=2, sep=' ',
-                        header=None, names=['col1', 'col2', 'col3'])
+        model_params = pd.read_csv(model_data_path, skiprows=2, header=None,
+                                   sep=' ', names=['col1', 'col2', 'col3'])
         num_users = self.data.index.userid.training.new.max() + 1
         num_items = self.data.index.itemid.new.max() + 1
 
@@ -144,8 +143,8 @@ class MyMediaLiteWrapper(SVDModel):
             NotImplementedError('{} data is not recognized.'.format(model_data_path))
 
         if self.positive_only:
-            user_mapping = pd.read_csv(self.user_mapping_file, sep = '\t', header=None)
-            item_mapping = pd.read_csv(self.item_mapping_file, sep = '\t', header=None)
+            user_mapping = pd.read_csv(self.user_mapping_file, sep='\t', header=None)
+            item_mapping = pd.read_csv(self.item_mapping_file, sep='\t', header=None)
 
             user_factors_full = self._remap_factors(user_mapping, users_factors, num_users, nf)
             item_factors_full = self._remap_factors(item_mapping, items_factors, num_items, nf)

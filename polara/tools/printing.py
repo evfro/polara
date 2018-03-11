@@ -2,6 +2,7 @@ from IPython.display import HTML
 from contextlib import contextmanager
 import sys, os
 
+
 def print_frames(dataframes):
     if not isinstance(dataframes, tuple):
         return dataframes
@@ -17,6 +18,7 @@ def print_frames(dataframes):
     </table>'''
 
     return HTML(table)
+
 
 # from http://thesmithfam.org/blog/2012/10/25/temporarily-suppress-console-output-in-python/#
 @contextmanager

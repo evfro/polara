@@ -1,7 +1,7 @@
 import matplotlib.pyplot as plt
 
 
-def _plot_pair(scores, keys, titles=None, errors=None, err_alpha = 0.2, figsize=(16, 5), ax=None):
+def _plot_pair(scores, keys, titles=None, errors=None, err_alpha=0.2, figsize=(16, 5), ax=None):
     if not ax:
         fig, ax = plt.subplots(1, 2, figsize=figsize)
         show_legend = True
@@ -15,7 +15,7 @@ def _plot_pair(scores, keys, titles=None, errors=None, err_alpha = 0.2, figsize=
     scores[right].plot(ax=ax[1], legend=False)
 
     if show_legend:
-            plt.legend(loc='center left', bbox_to_anchor=(1.0, 0.5))
+        plt.legend(loc='center left', bbox_to_anchor=(1.0, 0.5))
 
     if errors is not None:
         errG = errors[left]
@@ -54,7 +54,7 @@ def show_ranking(all_scores, **kwargs):
     _plot_pair(scores, keys, **kwargs)
 
 
-def _cross_plot(scores, keys, titles=None, errors=None, err_alpha = 0.2, ROC_middle=False, figsize=(8, 5), limit=None, ax=None):
+def _cross_plot(scores, keys, titles=None, errors=None, err_alpha=0.2, ROC_middle=False, figsize=(8, 5), limit=None, ax=None):
     if not ax:
         fig = plt.figure(figsize=figsize)
         ax = fig.gca()

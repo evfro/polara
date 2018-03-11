@@ -1,6 +1,5 @@
 from collections import namedtuple, defaultdict
 import numpy as np
-import pandas as pd
 from polara.recommender.data import RecommenderData
 from polara.lib.similarity import build_indicator_matrix
 
@@ -42,7 +41,6 @@ class ItemColdStartData(RecommenderData):
 
 
     def _split_test_index(self):
-        userid = self.fields.userid
         itemid = self.fields.itemid
 
         item_idx = np.arange(len(self._unique_items))
@@ -99,7 +97,7 @@ class ItemColdStartData(RecommenderData):
             item_index = self.index.itemid
 
         new_item_index = (namedtuple('ItemIndex', 'training cold_start')
-                                ._make([item_index, cold_item_index]))
+                          ._make([item_index, cold_item_index]))
         self.index = self.index._replace(itemid=new_item_index)
 
 

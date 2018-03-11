@@ -37,7 +37,7 @@ def evaluate_models(models, metrics, topk=None):
     for metric in metrics:
         model_scores = []
         for model in models:
-            #print('model {}'.format(model.method))
+            # print('model {}'.format(model.method))
             scores = model.evaluate(method=metric, topk=topk)
             model_scores.append(scores)
         metric_scores.append(pd.DataFrame(model_scores, index=[model.method for model in models]).T)
@@ -62,7 +62,7 @@ def consolidate(scores, params, metrics):
     return res
 
 
-def consolidate_folds(scores, folds, metrics, index_names = ['fold', 'top-n']):
+def consolidate_folds(scores, folds, metrics, index_names=['fold', 'top-n']):
     res = {}
     for metric in metrics:
         data = pd.concat([scores[j][metric] for j in folds], keys=folds)

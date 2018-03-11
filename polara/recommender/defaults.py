@@ -42,5 +42,5 @@ test_chunk_size = 1000 #to split tensor decompositions into smaller pieces in me
 
 def get_config(params):
     this = sys.modules[__name__]
-    config = {param:getattr(this, param) for param in params}
+    config = {param: getattr(this, param) for param in params}
     return config

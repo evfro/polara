@@ -8,21 +8,24 @@ import pandas as pd
 import numpy as np
 from polara.recommender import defaults
 
+
 def random_choice(df, num, random_state):
     n = df.shape[0]
     k = min(num, n)
     return df.iloc[random_state.choice(n, k, replace=False)]
+
 
 def random_sample(df, frac, random_state):
     return df.sample(frac=frac, random_state=random_state)
 
 
 class EventNotifier(object):
-    def __init__(self, events=[]):
+    def __init__(self, events=None):
         self._subscribers = {}
-        assert isinstance(events, list)
-        for event in events:
-            self.register_event(event)
+        if events is not None:
+            assert isinstance(events, list)
+            for event in events:
+                self.register_event(event)
 
     def register_event(self, event):
         self._subscribers[event] = WeakKeyDictionary({})
@@ -35,14 +38,14 @@ class EventNotifier(object):
 
     def subscribe(self, event, callback):
         subscriber = callback.__self__
-        func =  callback.__func__
+        func = callback.__func__
         self._get_subscribers(event).setdefault(subscriber, set()).add(func)
 
     def unsubscribe(self, event, subscriber):
         del self._get_subscribers(event)[subscriber]
 
     def unsubscribe_any(self, subscriber):
-        for event in self._subscribers.iterkeys():
+        for event in self._subscribers:
             subscribers = self._get_subscribers(event)
             if subscriber in subscribers:
                 del subscribers[subscriber]
@@ -99,8 +102,8 @@ class RecommenderData(object):
             self._data = data
 
         if data.duplicated(subset=fields).any():
-            #unstable in pandas v. 17.0, only works in <> v.17.0
-            #rely on deduplicated data in many places - makes data processing more efficient
+            # unstable in pandas v. 17.0, only works in <> v.17.0
+            # rely on deduplicated data in many places - makes data processing more efficient
             raise NotImplementedError('Data has duplicate values')
 
         self._custom_order = custom_order
@@ -110,16 +113,16 @@ class RecommenderData(object):
         self.index = self.index._make([None]*len(self._std_fields))
 
         self._set_defaults()
-        self._change_properties = set() #container for changed properties
+        self._change_properties = set()  # container for changed properties
         # depending on config. For ex., test_fold - full_update,
         # TODO seed may also lead to either full_update or test_update
         # random_holdout - test_update. Need to implement checks
-        self.seed = seed #use with permute_tops, random_choice
+        self.seed = seed  # use with permute_tops, random_choice
         self.verify_sessions_length_distribution = True
-        self.ensure_consistency = True # drop test entities if not present in training
-        self.build_index = True # reindex data, avoid gaps in user and item index
+        self.ensure_consistency = True  # drop test entities if not present in training
+        self.build_index = True  # reindex data, avoid gaps in user and item index
         self._test_selector = None
-        self._state = None # None or 1 of {'_': 1, 'H': 11, '|': 2, 'd': 3, 'T': 4}
+        self._state = None  # None or 1 of {'_': 1, 'H': 11, '|': 2, 'd': 3, 'T': 4}
         self._last_update_rule = None
 
         self.on_change_event = 'on_change'
@@ -138,7 +141,7 @@ class RecommenderData(object):
 
 
     def _set_defaults(self, params=None):
-        #[1:] omits undersacores in properties names
+        # [1:] omits undersacores in properties names
         params = params or [prop[1:] for prop in self._config]
         config_vals = defaults.get_config(params)
         for name, value in config_vals.items():
@@ -147,8 +150,8 @@ class RecommenderData(object):
 
 
     def get_configuration(self):
-        #[1:] omits undersacores in properties names, i.e. uses external name
-        #in that case it prints worning if change is pending
+        # [1:] omits undersacores in properties names, i.e. uses external name
+        # in that case it prints worning if change is pending
         config = {attr[1:]: getattr(self, attr[1:]) for attr in self._config}
         return config
 
@@ -160,7 +163,7 @@ class RecommenderData(object):
 
     @property
     def training(self):
-        self.update() # both _test and _training attributes appear simultaneously
+        self.update()  # both _test and _training attributes appear simultaneously
         return self._training
 
 
@@ -196,33 +199,33 @@ class RecommenderData(object):
             self._try_reindex_training_data()
 
         if update_rule['full_update'] or update_rule['test_update']:
-            self._try_drop_unseen_test_items() # unseen = not present in training data
-            self._try_drop_unseen_test_users() # unseen = not present in training data
-            self._try_drop_invalid_test_users() # with too few items and/or if inconsistent between testset and holdout
-            self._try_reindex_test_data() # either assign known index, or (if testing for unseen users) reindex
+            self._try_drop_unseen_test_items()  # unseen = not present in training data
+            self._try_drop_unseen_test_users()  # unseen = not present in training data
+            self._try_drop_invalid_test_users()  # with too few items and/or if inconsistent between testset and holdout
+            self._try_reindex_test_data()  # either assign known index, or (if testing for unseen users) reindex
             self._try_sort_test_data()
 
         if self.verbose:
             print('Done.')
 
     def prepare_training_only(self):
-        self.holdout_size = 0 # do not form holdout
-        self.test_ratio = 0 # do not form testset
-        self.warm_start = False # required for correct state transition handling
+        self.holdout_size = 0  # do not form holdout
+        self.test_ratio = 0  # do not form testset
+        self.warm_start = False  # required for correct state transition handling
         self.prepare()
 
 
     def _validate_config(self):
         if self._warm_start and not (self._holdout_size and self._test_ratio):
             raise ValueError('Both holdout_size and test_ratio must be positive when warm_start is set to True')
-        if not self._warm_start and (self._holdout_size==0) and (self._test_ratio>0):
+        if not self._warm_start and (self._holdout_size == 0) and (self._test_ratio > 0):
             raise ValueError('test_ratio cannot be nonzero when holdout_size is 0 and warm_start is set to False')
 
         assert self._test_ratio < 1, 'Value of test_ratio can\'t be greater than or equal to 1'
 
         if self._test_ratio:
             max_fold = 1.0 / self._test_ratio
-            if self._test_fold  > max_fold:
+            if self._test_fold > max_fold:
                 raise ValueError('Test fold value cannot be greater than {}'.format(max_fold))
 
 
@@ -244,7 +247,7 @@ class RecommenderData(object):
         update_rule = defaultdict(bool)
         new_state = last_state
 
-        if unseen_usr_change: # unseen_test_users is reserved for state 4 only!
+        if unseen_usr_change:  # unseen_test_users is reserved for state 4 only!
             if test_unseen:
                 new_state = 4
                 if (last_state == 11) and not test_data_change:
@@ -266,73 +269,73 @@ class RecommenderData(object):
                         new_state = 2
                     else:
                         new_state = 3
-        else: # this assumes that warm_start is consistent with current state!
-            if last_state == 1: # hsz = 0, trt = 0, usn = False
-                if holdout_sz_change: # hsz > 0
+        else:  # this assumes that warm_start is consistent with current state!
+            if last_state == 1:  # hsz = 0, trt = 0, usn = False
+                if holdout_sz_change:  # hsz > 0
                     new_state = 3 if test_ratio_change else 2
                     update_rule['full_update'] = True
-                elif test_ratio_change: # hsz = 0,  trt > 0
+                elif test_ratio_change:  # hsz = 0,  trt > 0
                     new_state = 11
                     update_rule['full_update'] = True
 
-            elif last_state == 11: # hsz = 0, trt > 0, usn = False
-                if holdout_sz_change: # hsz > 0
+            elif last_state == 11:  # hsz = 0, trt > 0, usn = False
+                if holdout_sz_change:  # hsz > 0
                     new_state = 2 if empty_testset else 3
                     update_rule['full_update'] = True
-                elif test_data_change: # hsz = 0
-                    if empty_testset: # hsz = 0, trt = 0
+                elif test_data_change:  # hsz = 0
+                    if empty_testset:  # hsz = 0, trt = 0
                         new_state = 1
                     update_rule['full_update'] = True
 
-            elif last_state == 2: # hsz > 0, trt = 0, usn = False
-                if test_ratio_change: # trt > 0
+            elif last_state == 2:  # hsz > 0, trt = 0, usn = False
+                if test_ratio_change:  # trt > 0
                     new_state = 11 if empty_holdout else 3
                     update_rule['full_update'] = True
 
-                elif any_holdout_change: # trt = 0
-                    if empty_holdout: # hsz = 0
+                elif any_holdout_change:  # trt = 0
+                    if empty_holdout:  # hsz = 0
                         new_state = 1
                     update_rule['full_update'] = True
 
-            elif last_state == 3: # hsz > 0, trt > 0, usn = False
+            elif last_state == 3:  # hsz > 0, trt > 0, usn = False
                 if test_data_change or any_holdout_change:
                     if empty_holdout:
                         new_state = 1 if empty_testset else 11
-                    elif empty_testset: # hsz > 0, trt = 0
+                    elif empty_testset:  # hsz > 0, trt = 0
                         new_state = 2
                     update_rule['full_update'] = True
 
-            elif last_state == 4: # hsz > 0, trt > 0, usn = True
+            elif last_state == 4:  # hsz > 0, trt > 0, usn = True
                 if any_holdout_change:
                     if empty_holdout:
                         if test_data_change:
                             new_state = 1 if empty_testset else 11
                             update_rule['full_update'] = True
-                        else: # hsz = 0, trt > 0
+                        else:  # hsz = 0, trt > 0
                             new_state = 11
                             update_rule['test_update'] = True
-                    else: # hsz > 0
+                    else:  # hsz > 0
                         if test_data_change:
-                            if empty_testset: # hsz > 0, trt = 0
+                            if empty_testset:  # hsz > 0, trt = 0
                                 new_state = 2
                             update_rule['full_update'] = True
-                        else: # including test_sample_change
+                        else:  # including test_sample_change
                             update_rule['test_update'] = True
-                else: # hsz > 0
+                else:  # hsz > 0
                     if test_data_change:
-                        if empty_testset: # hsz > 0, trt = 0
+                        if empty_testset:  # hsz > 0, trt = 0
                             new_state = 2
                         update_rule['full_update'] = True
                     elif test_sample_change:
                         update_rule['test_update'] = True
 
-            else: # initial state
+            else:  # initial state
                 if empty_holdout:
                     new_state = 1 if empty_testset else 11
                 else:
-                    if empty_testset: # hsz > 0, trt = 0
+                    if empty_testset:  # hsz > 0, trt = 0
                         new_state = 2
-                    else: # hsz > 0, trt > 0
+                    else:  # hsz > 0, trt > 0
                         new_state = 4 if test_unseen else 3
                 update_rule['full_update'] = True
 
@@ -355,33 +358,33 @@ class RecommenderData(object):
         if self._test_ratio > 0:
             if full_update:
                 test_split = self._split_test_index()
-            else: #test_update
+            else:  # test_update
                 test_split = self._test_split
             if self._holdout_size == 0:  # state 11
                 testset = holdout = None
                 train_split = ~test_split
-            else: # state 3 or state 4
+            else:  # state 3 or state 4
                 # NOTE holdout_size = None is also here; this can be used in
                 # subclasses like ItemColdStartData to preprocess data properly
                 # in that case _sample_holdout must be modified accordingly
                 holdout = self._sample_holdout(test_split)
 
-                if self._warm_start: # state 4
+                if self._warm_start:  # state 4
                     testset = self._sample_testset(test_split, holdout.index)
                     train_split = ~test_split
-                else: # state 3
-                    testset = None # will be computed if test data is requested
+                else:  # state 3
+                    testset = None  # will be computed if test data is requested
                     train_split = ~self._data.index.isin(holdout.index)
-        else: # test_ratio == 0
-            testset = None # will be computed if test data is requested
+        else:  # test_ratio == 0
+            testset = None  # will be computed if test data is requested
             test_split = slice(None)
 
-            if self._holdout_size >= 1: # state 2, sample holdout data per each user
+            if self._holdout_size >= 1:  # state 2, sample holdout data per each user
                 holdout = self._sample_holdout(test_split)
-            elif self._holdout_size > 0: # state 2, special case - sample whole data at once
+            elif self._holdout_size > 0:  # state 2, special case - sample whole data at once
                 random_state = np.random.RandomState(self.seed)
                 holdout = self._data.sample(frac=self._holdout_size, random_state=random_state)
-            else: # state 1
+            else:  # state 1
                 holdout = None
 
             train_split = slice(None) if holdout is None else ~self._data.index.isin(holdout.index)
@@ -410,7 +413,7 @@ class RecommenderData(object):
 
     def _get_sessions_info(self):
         userid = self.fields.userid
-        user_sessions = self._data.groupby(userid, sort=True) #KEEP TRUE HERE!
+        user_sessions = self._data.groupby(userid, sort=True)  # KEEP TRUE HERE!
         # if False than long sessions idx are prevalent in the beginning => non-equal size folds
         # this effect is taken into account with help of is_not_uniform function
         # example (run several times to see a pattern):
@@ -478,8 +481,8 @@ class RecommenderData(object):
     def _try_drop_invalid_test_users(self):
         if self.holdout_size >= 1:
             # TODO remove that, when new evaluation arrives
-            self._filter_short_sessions() # ensure holdout conforms the holdout_size attribute
-        self._align_test_users() # ensure the same users are in both testset and holdout
+            self._filter_short_sessions()  # ensure holdout conforms the holdout_size attribute
+        self._align_test_users()  # ensure the same users are in both testset and holdout
 
     def _try_reindex_test_data(self):
         self._assign_test_items_index()
@@ -510,7 +513,7 @@ class RecommenderData(object):
         holdout_sessions = holdout.groupby(userid, sort=False)
         holdout_sessions_len = holdout_sessions.size()
 
-        invalid_sessions = (holdout_sessions_len!=self.holdout_size)
+        invalid_sessions = (holdout_sessions_len != self.holdout_size)
         if invalid_sessions.any():
             n_invalid_sessions = invalid_sessions.sum()
             invalid_session_index = invalid_sessions.index[invalid_sessions]
@@ -600,8 +603,8 @@ class RecommenderData(object):
         if not seen_data.all():
             n_unseen_entities = dataset.loc[~seen_data, entity].nunique()
             dataset.query('{} in @seen_entities'.format(entity), inplace=True)
-            #unseen_index = dataset.index[unseen_entities]
-            #dataset.drop(unseen_index, inplace=True)
+            # unseen_index = dataset.index[unseen_entities]
+            # dataset.drop(unseen_index, inplace=True)
             if self.verbose:
                 UNSEEN = 'not in the training data'
                 msg = '{} unique {}\'s within {} {} interactions were filtered. Reason: {}.'
@@ -658,19 +661,19 @@ class RecommenderData(object):
         group_id = group_id or self.fields.userid
         grouper = selector.groupby(self._data[group_id], sort=False)
 
-        if self._random_holdout: #randomly sample data for evaluation
+        if self._random_holdout:  # randomly sample data for evaluation
             random_state = np.random.RandomState(self.seed)
-            if self._holdout_size >= 1: # pick at most _holdout_size elements
+            if self._holdout_size >= 1:  # pick at most _holdout_size elements
                 holdout = grouper.apply(random_choice, self._holdout_size, random_state)
             else:
                 holdout = grouper.apply(random_sample, self._holdout_size, random_state)
-        elif self._negative_prediction: #try to holdout negative only examples
-            if self._holdout_size >= 1: # pick at most _holdout_size elements
+        elif self._negative_prediction:  # try to holdout negative only examples
+            if self._holdout_size >= 1:  # pick at most _holdout_size elements
                 holdout = grouper.nsmallest(self._holdout_size, keep='last')
             else:
                 raise NotImplementedError
-        else: #standard top-score prediction mode
-            if self._holdout_size >= 1: # pick at most _holdout_size elements
+        else:  # standard top-score prediction mode
+            if self._holdout_size >= 1:  # pick at most _holdout_size elements
                 holdout = grouper.nlargest(self._holdout_size, keep='last')
             else:
                 raise NotImplementedError
@@ -687,14 +690,14 @@ class RecommenderData(object):
             return data
 
         userid = self.fields.userid
-        if test_sample > 0: # sample at most test_sample items
+        if test_sample > 0:  # sample at most test_sample items
             random_state = np.random.RandomState(self.seed)
             sampled = (data.groupby(userid, sort=False, group_keys=False)
-                            .apply(random_choice, test_sample, random_state))
-        else: # sample at most test_sample items with the worst feedback from user
+                           .apply(random_choice, test_sample, random_state))
+        else:  # sample at most test_sample items with the worst feedback from user
             feedback = self.fields.feedback
             idx = (data.groupby(userid, sort=False)[feedback]
-                        .nsmallest(-test_sample).index.get_level_values(1))
+                       .nsmallest(-test_sample).index.get_level_values(1))
             sampled = data.loc[idx]
         return sampled
 
@@ -730,7 +733,7 @@ class RecommenderData(object):
             testset = self.training
         else:
             testset = (self.training.query('{} in @test_users'.format(userid))
-                             .sort_values(userid))
+                           .sort_values(userid))
         if update_data:
             self._test = self._test._replace(testset=testset)
         return testset
@@ -767,7 +770,7 @@ class RecommenderData(object):
         userid = self.fields.userid
         if self.test.holdout is None:
             num_users = self.test.testset[userid].nunique()
-            #TODO make it a property
+            # TODO make it a property
         else:
             num_users = self.test.holdout[userid].nunique()
 
@@ -817,14 +820,14 @@ class RecommenderData(object):
         self._notify(self.on_update_event)
         self._change_properties.clear()
 
-        if (testset is None) and (holdout is None): return # allows to cleanup data
+        if (testset is None) and (holdout is None): return  # allows to cleanup data
 
-        if ensure_consistency: # allows to disable self.ensure_consistency without actually changing it
-            self._try_drop_unseen_test_items() # unseen = not present in training data
-            self._try_drop_unseen_test_users() # unseen = not present in training data
-        self._try_drop_invalid_test_users() # inconsistent between testset and holdout
+        if ensure_consistency:  # allows to disable self.ensure_consistency without actually changing it
+            self._try_drop_unseen_test_items()  # unseen = not present in training data
+            self._try_drop_unseen_test_users()  # unseen = not present in training data
+        self._try_drop_invalid_test_users()  # inconsistent between testset and holdout
         if reindex:
-            self._try_reindex_test_data() # either assign known index, or reindex (if warm_start)
+            self._try_reindex_test_data()  # either assign known index, or reindex (if warm_start)
         self._try_sort_test_data()
 
 
@@ -896,7 +899,7 @@ class LongTailMixin(object):
         tail_idx = None
 
         if self.head_items_frac:
-            self.head_feedback_frac = None # could in principle calculate real value instead
+            self.head_feedback_frac = None  # could in principle calculate real value instead
             items_frac = np.arange(1, len(popularity)+1) / len(popularity)
             tail_idx = items_frac > self.head_items_frac
 

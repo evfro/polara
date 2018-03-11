@@ -17,14 +17,14 @@ def get_netflix_data(gz_file):
                     movie_data.append(df[movieid])
 
     data = pd.concat(movie_data, keys=movie_name)
-    data = data.reset_index().iloc[:, :3].rename(columns={'level_0':'movieid',
-                                                            'level_1':'userid',
-                                                            'level_2':'rating'})
+    data = data.reset_index().iloc[:, :3].rename(columns={'level_0': 'movieid',
+                                                          'level_1': 'userid',
+                                                          'level_2': 'rating'})
     return data
 
 
 def filter_by_length(data, session_length=20):
     sz = data.groupby('userid', sort=False).size()
     valid_users = sz.index[(sz > session_length)]
-    new_data =  data[data.userid.isin(valid_users)]
+    new_data = data[data.userid.isin(valid_users)]
     return new_data

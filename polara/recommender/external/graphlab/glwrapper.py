@@ -177,7 +177,7 @@ class ColdStartRecommendationsMixin(object):
         unseen_items_idx = np.arange(lower_index, upper_index)
         new_item_data = gl.SFrame(self.item_side_info.loc[cold_items_index]
                                   .reset_index()
-                                  .assign(**{itemid:unseen_items_idx}))
+                                  .assign(**{itemid: unseen_items_idx}))
 
         repr_users = self.data.representative_users.new.values
         observation_idx = [a.flat for a in np.broadcast_arrays(repr_users, unseen_items_idx[:, None])]
