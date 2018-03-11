@@ -1,9 +1,9 @@
-from polara.recommender.models import SVDModel
 from subprocess import call
 from shlex import split
 import sys
 import pandas as pd
 import numpy as np
+from polara.recommender.models import SVDModel
 
 
 #default settings
