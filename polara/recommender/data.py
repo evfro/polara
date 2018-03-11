@@ -20,11 +20,12 @@ def random_sample(df, frac, random_state):
 
 
 class EventNotifier(object):
-    def __init__(self, events=[]):
+    def __init__(self, events=None):
         self._subscribers = {}
-        assert isinstance(events, list)
-        for event in events:
-            self.register_event(event)
+        if events is not None:
+            assert isinstance(events, list)
+            for event in events:
+                self.register_event(event)
 
     def register_event(self, event):
         self._subscribers[event] = WeakKeyDictionary({})
