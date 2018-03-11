@@ -44,7 +44,7 @@ class EventNotifier(object):
         del self._get_subscribers(event)[subscriber]
 
     def unsubscribe_any(self, subscriber):
-        for event in self._subscribers.iterkeys():
+        for event in self._subscribers:
             subscribers = self._get_subscribers(event)
             if subscriber in subscribers:
                 del subscribers[subscriber]
