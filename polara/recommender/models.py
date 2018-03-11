@@ -730,7 +730,7 @@ class CoffeeModel(RecommenderModel):
         elif isinstance(flattener, int):
             slicer = flattener
             matrix_scores = tensor_scores[:, :, slicer]
-        elif isinstance(flattener, list) or isinstance(flattener, slice):
+        elif isinstance(flattener, (list, slice)):
             slicer = flattener
             flatten = np.sum
             matrix_scores = flatten(tensor_scores[:, :, slicer], axis=-1)
