@@ -58,8 +58,8 @@ class MetaModel(type):
     # performs cleaning of the instance when build method is called
     # propagates the action to any subclasses, key idea is borrowed from here:
     # https://stackoverflow.com/questions/18858759/python-decorating-a-class-method-that-is-intended-to-be-overwritten-when-inheri
-    def __new__(meta, name, bases, clsdict):
-        cls = super(MetaModel, meta).__new__(meta, name, bases, clsdict)
+    def __new__(mcs, name, bases, clsdict):
+        cls = super(MetaModel, mcs).__new__(mcs, name, bases, clsdict)
         if 'build' in clsdict:
             setattr(cls, 'build', clean_build_decorator(clsdict['build']))
         return cls
