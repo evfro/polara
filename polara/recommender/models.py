@@ -201,7 +201,8 @@ class RecommenderModel(object):
         return test_data, test_shape, test_users
 
 
-    def _slice_test_data(self, test_data, start, stop):
+    @staticmethod
+    def _slice_test_data(test_data, start, stop):
         user_coo, item_coo, fdbk_coo = test_data
 
         slicer = (user_coo >= start) & (user_coo < stop)
