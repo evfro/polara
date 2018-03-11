@@ -786,10 +786,9 @@ class CoffeeModel(RecommenderModel):
 
         num_users = stop - start
         num_items = shape[1]
-        num_fdbks = shape[2]
 
         # assume that w.shape[1] < v.shape[1] (allows for more efficient calculations)
-        scores = test_tensor_unfolded.dot(w).reshape(num_users, num_items, num_fdbks)
+        scores = test_tensor_unfolded.dot(w).reshape(num_users, num_items, w.shape[1])
         scores = np.tensordot(scores, v, axes=(1, 0))
         scores = np.tensordot(np.tensordot(scores, v, axes=(2, 1)), w, axes=(1, 1))
         scores = self.flatten_scores(scores, self.flattener)
