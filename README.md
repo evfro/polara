@@ -57,22 +57,22 @@ class CooccurrenceModel(RecommenderModel):
         user_item_matrix = self.get_training_matrix()
         # rating matrix product  R^T R  gives cooccurrences count
         i2i_matrix = user_item_matrix.T.dot(user_item_matrix) # gives CSC format
-        i2i_matrix.setdiag(0) # exclude "self-links"
-        i2i_matrix.eliminate_zeros() # ensure only non-zero elements are stored
+        # exclude "self-links" and ensure only non-zero elements are stored
+        i2i_matrix.setdiag(0)
+        i2i_matrix.eliminate_zeros()
         # store matrix for generating recommendations
-        self._i2i_matrix = i2i_matrix
+        self.i2i_matrix = i2i_matrix
 
     def get_recommendations(self):
         # get test users information and generate top-k recommendations
-        test_data, test_shape = self._get_test_data()
-        test_matrix, _ = self.get_test_matrix(test_data, test_shape)
+        test_matrix, test_data = self.get_test_matrix()
         # calculate predicted scores
-        i2i_scores = test_matrix.dot(self._i2i_matrix)
+        i2i_scores = test_matrix.dot(self.i2i_matrix)
+        # prevent seen items from appearing in recommendations
         if self.filter_seen:
-            # prevent seen items from appearing in recommendations
             self.downvote_seen_items(i2i_scores, test_data)
         # generate top-k recommendations for every test user
-        top_recs = self.get_topk_items(i2i_scores)
+        top_recs = self.get_topk_elements(i2i_scores)
         return top_recs
 ```
 And the model is ready for evaluation:
