@@ -113,10 +113,12 @@ class RecommenderData(object):
         self.index = self.index._make([None]*len(self._std_fields))
 
         self._set_defaults()
-        self._change_properties = set()  # container for changed properties
+        self._change_properties = set(['init'])  # container for changed properties
         # depending on config. For ex., test_fold - full_update,
         # TODO seed may also lead to either full_update or test_update
         # random_holdout - test_update. Need to implement checks
+        # non-empty set is used to indicate non-initialized state ->
+        # the data will be updated upon the first access of internal data splits
         self.seed = seed  # use with permute_tops, random_choice
         self.verify_sessions_length_distribution = True
         self.ensure_consistency = True  # drop test entities if not present in training
