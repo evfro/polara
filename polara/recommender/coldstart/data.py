@@ -1,5 +1,7 @@
 from collections import namedtuple, defaultdict
 import numpy as np
+import pandas as pd
+from scipy.sparse import issparse
 from polara.recommender.data import RecommenderData
 from polara.lib.similarity import build_indicator_matrix
 
@@ -203,3 +205,95 @@ class ItemColdStartData(RecommenderData):
         cold_index.sort_values('new', inplace=True)
         holdout = self._test.holdout
         holdout.sort_values(itemid_cold, inplace=True)
+
+
+
+class FeatureSimilarityMixin(object):
+    def __init__(self, sim_mat, sim_idx, *args, **kwargs):
+        super(FeatureSimilarityMixin, self).__init__(*args, **kwargs)
+
+        entities = [self.fields.userid, self.fields.itemid]
+        self._sim_idx = {entity: pd.Series(index=idx, data=np.arange(len(idx)), copy=False)
+                                 if idx is not None else None
+                         for entity, idx in sim_idx.items()
+                         if entity in entities}
+        self._sim_mat = {entity: mat for entity, mat in sim_mat.items() if entity in entities}
+        self._similarity = dict.fromkeys(entities)
+
+        self.subscribe(self.on_change_event, self._clean_similarity)
+
+    def _clean_similarity(self):
+        self._similarity = dict.fromkeys(self._similarity.keys())
+
+    @property
+    def item_similarity(self):
+        entity = self.fields.itemid
+        return self.get_similarity_matrix(entity)
+
+    @property
+    def user_similarity(self):
+        entity = self.fields.userid
+        return self.get_similarity_matrix(entity)
+
+    def get_similarity_matrix(self, entity):
+        similarity = self._similarity.get(entity, None)
+        if similarity is None:
+            self._update_similarity(entity)
+        return self._similarity[entity]
+
+    def _update_similarity(self, entity):
+        sim_mat = self._sim_mat[entity]
+        if sim_mat is None:
+            self._similarity[entity] = None
+        else:
+            if self.verbose:
+                print('Updating {} similarity matrix'.format(entity))
+
+            entity_type = self.fields._fields[self.fields.index(entity)]
+            index_data = getattr(self.index, entity_type)
+
+            try: # check whether custom index is introduced
+                entity_idx = index_data.training['old']
+            except AttributeError: # fall back to standard case
+                entity_idx = index_data['old']
+
+            sim_idx = entity_idx.map(self._sim_idx[entity]).values
+            sim_mat = self._sim_mat[entity][:, sim_idx][sim_idx, :]
+
+            if issparse(sim_mat):
+                sim_mat.setdiag(1)
+            else:
+                np.fill_diagonal(sim_mat, 1)
+            self._similarity[entity] = sim_mat
+
+
+
+class ColdSimilarityMixin(object):
+    @property
+    def cold_items_similarity(self):
+        itemid = self.fields.itemid
+        return self.get_cold_similarity(itemid)
+
+    @property
+    def cold_users_similarity(self):
+        userid = self.fields.userid
+        return self.get_cold_similarity(userid)
+
+    def get_cold_similarity(self, entity):
+        sim_mat = self._sim_mat[entity]
+
+        if sim_mat is None:
+            return None
+
+        fields = self.fields
+        entity_type = fields._fields[fields.index(entity)]
+        index_data = getattr(self.index, entity_type)
+
+        similarity_index = self._sim_idx[entity]
+        seen_idx = index_data.training['old'].map(similarity_index).values
+        cold_idx = index_data.cold_start['old'].map(similarity_index).values
+
+        return sim_mat[:, seen_idx][cold_idx, :]
+
+
+class ColdStartSimilarityDataModel(ColdSimilarityMixin, FeatureSimilarityMixin, ItemColdStartData): pass
