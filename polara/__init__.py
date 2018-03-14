@@ -1,4 +1,5 @@
 # import standard baseline models
+from polara.recommender.models import RecommenderModel
 from polara.recommender.models import SVDModel
 from polara.recommender.models import CooccurrenceModel
 from polara.recommender.models import RandomModel
