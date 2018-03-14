@@ -11,7 +11,7 @@ class ItemColdStartData(RecommenderData):
 
         self._test_ratio = 0.2
         self._warm_start = False
-        self._holdout_size = None  # needed for correct processing of test data
+        self._holdout_size = -1  # needed for correct processing of test data
 
         # build unique items list to split them by folds
         itemid = self.fields.itemid
@@ -65,10 +65,10 @@ class ItemColdStartData(RecommenderData):
         return new_state, update_rule
 
 
-    def _sample_holdout(self, test_split):
+    def _sample_holdout(self, test_split, group_id=None):
         itemid = self.fields.itemid
 
-        if self._holdout_size:
+        if self._holdout_size > 0:
             holdout = super(ItemColdStartData, self)._sample_holdout(test_split, group_id=itemid)
         else:
             holdout = self._data.loc[test_split, list(self.fields)]
@@ -80,6 +80,11 @@ class ItemColdStartData(RecommenderData):
     def _try_drop_unseen_test_items(self):
         # there will be no such items except cold-start items
         pass
+
+
+    def _filter_short_sessions(self, group_id=None):
+        group_id = '{}_cold'.format(self.fields.itemid)
+        super(ItemColdStartData, self)._filter_short_sessions(group_id=group_id)
 
 
     def _assign_test_items_index(self):

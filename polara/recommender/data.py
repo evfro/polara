@@ -508,21 +508,22 @@ class RecommenderData(object):
         if self._test.holdout is not None:
             self._assign_holdout_users_index()
 
-    def _filter_short_sessions(self):
+    def _filter_short_sessions(self, group_id=None):
         userid = self.fields.userid
         holdout = self._test.holdout
+        group_id = group_id or userid
 
-        holdout_sessions = holdout.groupby(userid, sort=False)
+        holdout_sessions = holdout.groupby(group_id, sort=False)
         holdout_sessions_len = holdout_sessions.size()
 
         invalid_sessions = (holdout_sessions_len != self.holdout_size)
         if invalid_sessions.any():
             n_invalid_sessions = invalid_sessions.sum()
             invalid_session_index = invalid_sessions.index[invalid_sessions]
-            holdout.query('{} not in @invalid_session_index'.format(userid), inplace=True)
+            holdout.query('{} not in @invalid_session_index'.format(group_id), inplace=True)
             if self.verbose:
                 msg = '{} of {} {}\'s were filtered out from holdout. Reason: not enough items.'
-                print(msg.format(n_invalid_sessions, len(invalid_sessions), userid))
+                print(msg.format(n_invalid_sessions, len(invalid_sessions), group_id))
 
     def _align_test_users(self):
         if (self._test.testset is None) or (self._test.holdout is None):
