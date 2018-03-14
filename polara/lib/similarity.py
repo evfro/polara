@@ -303,7 +303,7 @@ def get_features_data(meta_data, ranking=None, deduplicate=True):
 
     for feature in features:
         feature_data = meta_data[feature]
-        mat, lbl = feature2sparse(feature_data, ranking=ranking.get(feature, None))
+        mat, lbl = feature2sparse(feature_data, ranking=ranking.get(feature, None), deduplicate=deduplicate)
         feature_mats[feature], feature_lbls[feature] = mat, lbl
     return feature_mats, feature_lbls
 
