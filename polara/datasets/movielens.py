@@ -25,10 +25,9 @@ def get_movielens_data(local_file=None, get_ratings=True, get_genres=False,
     with ZipFile(zip_contents) as zfile:
         zip_files = pd.Series(zfile.namelist())
         zip_file = zip_files[zip_files.str.contains('ratings')].iat[0]
-        is_latest = 'latest' in zip_file
-        is_20m = '20m' in zip_file
+        is_new_format = ('latest' in zip_file) or ('20m' in zip_file)
         delimiter = ','
-        header = 0 if (is_latest or is_20m) else None
+        header = 0 if is_new_format else None
         if get_ratings:
             zdata = zfile.read(zip_file)
             zdata = zdata.replace(b'::', delimiter.encode())
@@ -41,9 +40,10 @@ def get_movielens_data(local_file=None, get_ratings=True, get_genres=False,
         if get_genres:
             zip_file = zip_files[zip_files.str.contains('movies')].iat[0]
             zdata =  zfile.read(zip_file)
-            if not is_latest:
+            if not is_new_format:
                 # make data compatible with pandas c-engine
                 # pandas returns string objects instead of bytes in that case
+                delimiter = '^'
                 zdata = zdata.replace(b'::', delimiter.encode())
             genres_data = pd.read_csv(BytesIO(zdata), sep=delimiter, header=header,
                                       engine='c', encoding='unicode_escape',
@@ -51,8 +51,8 @@ def get_movielens_data(local_file=None, get_ratings=True, get_genres=False,
 
             ml_genres = get_split_genres(genres_data) if split_genres else genres_data
 
-        if is_latest and mdb_mapping:
-            # imdb and tmdb mapping - exists only in ml-latest datasets
+        if mdb_mapping and is_new_format:
+            # imdb and tmdb mapping - exists only in ml-latest or 20m datasets
             zip_file = zip_files[zip_files.str.contains('links')].iat[0]
             with zfile.open(zip_file) as zdata:
                 mapping = pd.read_csv(zdata, sep=',', header=0, engine='c',
