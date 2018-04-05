@@ -93,7 +93,7 @@ def tucker_als(idx, val, shape, core_shape, iters=25, growth_tol=0.01, batch_run
         uu, ss, vv = np.linalg.svd(u2, full_matrices=0)
         u2 = np.ascontiguousarray(uu[:, :r2])
 
-        g_norm_new = np.linalg.norm(np.diag(ss[:r2]))
+        g_norm_new = np.linalg.norm(ss[:r2])
         g_growth = (g_norm_new - g_norm_old) / g_norm_new
         g_norm_old = g_norm_new
         log_status('growth of the core: %f' % g_growth)
@@ -101,7 +101,7 @@ def tucker_als(idx, val, shape, core_shape, iters=25, growth_tol=0.01, batch_run
             log_status('Core is no longer growing. Norm of the core: %f' % g_norm_old)
             break
 
-    g = np.diag(ss[:r2]).dot(vv[:r2, :])
+    g = ss[:r2, np.newaxis] * vv[:r2, :]
     g = g.reshape(r2, r1, r0).transpose(2, 1, 0)
     log_status('Done')
     return u0, u1, u2, g
