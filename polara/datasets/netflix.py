@@ -21,10 +21,3 @@ def get_netflix_data(gz_file):
                                                           'level_1': 'userid',
                                                           'level_2': 'rating'})
     return data
-
-
-def filter_by_length(data, session_length=20):
-    sz = data.groupby('userid', sort=False).size()
-    valid_users = sz.index[(sz > session_length)]
-    new_data = data[data.userid.isin(valid_users)]
-    return new_data

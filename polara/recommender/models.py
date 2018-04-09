@@ -582,7 +582,7 @@ class CooccurrenceModel(RecommenderModel):
     def __init__(self, *args, **kwargs):
         super(CooccurrenceModel, self).__init__(*args, **kwargs)
         self.method = 'item-to-item'  # pick some meaningful name
-        self.implicit = True
+        self.implicit = False
         self.dense_output = False
 
 
