@@ -19,7 +19,7 @@ from polara.recommender import defaults
 from polara.recommender.evaluation import get_hits, get_relevance_scores, get_ranking_scores
 from polara.recommender.evaluation import get_hr_score, get_mrr_score
 from polara.recommender.evaluation import assemble_scoring_matrices
-from polara.recommender.utils import array_split, NNZ_MAX
+from polara.recommender.utils import array_split, get_nnz_max
 from polara.lib.hosvd import tucker_als
 from polara.lib.sparse import csc_matvec
 from polara.tools.timing import Timer
@@ -616,7 +616,7 @@ class CooccurrenceModel(RecommenderModel):
             scores = tst_mat.dot(i2i_mat.T)
             # NOTE even though not neccessary for symmetric i2i matrix,
             # transpose helps to avoid expensive conversion to CSR (performed by scipy)
-            if scores.nnz > NNZ_MAX:
+            if scores.nnz > get_nnz_max():
                 # too many nnz lead to undesired memory overhead in downvote_seen_items
                 scores = scores.toarray(order='C')
         return scores

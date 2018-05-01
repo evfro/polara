@@ -16,7 +16,8 @@ pntrsize = sys.getsizeof(1.0)
 # size of list of tuples of indices - to estimate when to convert sparse matrix to dense
 # based on http://stackoverflow.com/questions/15641344/python-memory-consumption-dict-vs-list-of-tuples
 # and https://code.tutsplus.com/tutorials/understand-how-much-memory-your-python-objects-use--cms-25609
-NNZ_MAX = int(MEMORY_HARD_LIMIT * (1024**3) / (tuplsize + 2*(pntrsize + itemsize)))
+def get_nnz_max():
+    return int(MEMORY_HARD_LIMIT * (1024**3) / (tuplsize + 2*(pntrsize + itemsize)))
 
 
 def range_division(length, fit_size):
