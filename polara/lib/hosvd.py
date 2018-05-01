@@ -45,7 +45,7 @@ def tensordot2(idx, val, shape, U, V, modes):
     return res
 
 
-def tucker_als(idx, val, shape, core_shape, iters=25, growth_tol=0.01, batch_run=False):
+def tucker_als(idx, val, shape, core_shape, iters=25, growth_tol=0.01, batch_run=False, seed=None):
     '''
     The function computes Tucker ALS decomposition of sparse tensor
     provided in COO format. Usage:
@@ -59,16 +59,17 @@ def tucker_als(idx, val, shape, core_shape, iters=25, growth_tol=0.01, batch_run
         raise ValueError('Warning! Imput arrays must be C-contigous.')
 
 
+    random_state = np.random if seed is None else np.random.RandomState(seed)
     #TODO: it's better to implement check for future
     #if np.any(idx[1:, 0]-idx[:-1, 0]) < 0):
     #    print('Warning! Index array must be sorted by first column in ascending order.')
 
     r0, r1, r2 = core_shape
 
-    u1 = np.random.rand(shape[1], r1)
+    u1 = random_state.rand(shape[1], r1)
     u1 = np.linalg.qr(u1, mode='reduced')[0]
 
-    u2 = np.random.rand(shape[2], r2)
+    u2 = random_state.rand(shape[2], r2)
     u2 = np.linalg.qr(u2, mode='reduced')[0]
 
     u1 = np.ascontiguousarray(u1)
