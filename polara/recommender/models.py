@@ -707,6 +707,7 @@ class CoffeeModel(RecommenderModel):
         self.growth_tol = defaults.growth_tol
         self.num_iters = defaults.num_iters
         self.show_output = defaults.show_output
+        self.seed = None
 
 
     @property
@@ -755,7 +756,8 @@ class CoffeeModel(RecommenderModel):
                 tucker_als(idx, val, shp, self.mlrank,
                            growth_tol=self.growth_tol,
                            iters=self.num_iters,
-                           batch_run=not self.show_output)
+                           batch_run=not self.show_output,
+                           seed=self.seed)
 
         self.factors[self.data.fields.userid] = users_factors
         self.factors[self.data.fields.itemid] = items_factors
