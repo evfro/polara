@@ -735,8 +735,9 @@ class RecommenderData(object):
         if self.index.userid.training.new.isin(test_users).all():
             testset = self.training
         else:
-            testset = (self.training.query('{} in @test_users'.format(userid))
-                           .sort_values(userid))
+            testset = self.training.query('{} in @test_users'.format(userid))
+
+        testset = testset.sort_values(userid)
         if update_data:
             self._test = self._test._replace(testset=testset)
         return testset
