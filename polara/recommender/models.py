@@ -323,7 +323,7 @@ class RecommenderModel(object):
         return top_recs
 
 
-    def evaluate(self, method='hits', topk=None, not_rated_penalty=None, on_feedback_level=None):
+    def evaluate(self, method='hits', topk=None, not_rated_penalty=None, on_feedback_level=None, ignore_feedback=False):
         feedback = self.data.fields.feedback
         if int(topk or 0) > self.topk:
             self.topk = topk  # will also flush old recommendations
@@ -348,6 +348,7 @@ class RecommenderModel(object):
             not_rated_penalty = not_rated_penalty or 0
             is_positive = (eval_data[feedback] >= self.switch_positive).values
 
+        feedback = None if ignore_feedback else feedback
         scoring_data = assemble_scoring_matrices(recommendations, eval_data,
                                                  self._key, self._target,
                                                  is_positive, feedback=feedback)
