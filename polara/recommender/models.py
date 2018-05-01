@@ -765,10 +765,10 @@ class CoffeeModel(RecommenderModel):
         self.factors['core'] = core
 
 
-    def get_test_tensor(self, test_data, shape, start, end):
-        slice_idx = self._slice_test_data(test_data, start, end)
+    def get_test_tensor(self, test_data, shape, start, stop):
+        slice_idx = self._slice_test_data(test_data, start, stop)
 
-        num_users = end - start
+        num_users = stop - start
         num_items = shape[1]
         num_fdbks = shape[2]
         slice_shp = (num_users, num_items, num_fdbks)
