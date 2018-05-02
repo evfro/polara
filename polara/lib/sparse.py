@@ -96,3 +96,15 @@ def inverse_permutation(p):
     s = np.empty(p.size, p.dtype)
     s[p] = np.arange(p.size)
     return s
+
+
+def unfold_tensor_coordinates(index, shape, mode):
+    # TODO implement direct calculation w/o intermediate flattening
+    modes = [m for m in [0, 1, 2] if m != mode] + [mode,]
+    mode_shape = tuple(shape[m] for m in modes)
+    mode_index = tuple(index[m] for m in modes)
+    flat_index = np.ravel_multi_index(mode_index, mode_shape)
+
+    unfold_shape = (mode_shape[0]*mode_shape[1], mode_shape[2])
+    unfold_index = np.unravel_index(flat_index, unfold_shape)
+    return unfold_index, unfold_shape
