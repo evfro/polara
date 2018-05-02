@@ -21,7 +21,7 @@ from polara.recommender.evaluation import get_hr_score, get_mrr_score
 from polara.recommender.evaluation import assemble_scoring_matrices
 from polara.recommender.utils import array_split, get_nnz_max
 from polara.lib.hosvd import tucker_als
-from polara.lib.sparse import csc_matvec
+from polara.lib.sparse import csc_matvec, unfold_tensor_coordinates
 from polara.tools.timing import Timer
 
 
@@ -765,7 +765,7 @@ class CoffeeModel(RecommenderModel):
         self.factors['core'] = core
 
 
-    def get_test_tensor(self, test_data, shape, start, stop):
+    def unfold_test_tensor_slice(self, test_data, shape, start, stop, mode):
         slice_idx = self._slice_test_data(test_data, start, stop)
 
         num_users = stop - start
@@ -773,17 +773,15 @@ class CoffeeModel(RecommenderModel):
         num_fdbks = shape[2]
         slice_shp = (num_users, num_items, num_fdbks)
 
-        idx_flat = np.ravel_multi_index(slice_idx, slice_shp)
-        shp_flat = (num_users*num_items, num_fdbks)
-        idx = np.unravel_index(idx_flat, shp_flat)
-        val = np.ones_like(slice_idx[2])
+        idx, shp = unfold_tensor_coordinates(slice_idx, slice_shp, mode)
+        val = np.ones_like(slice_idx[2], dtype=np.uint8)
 
-        test_tensor_unfolded = csr_matrix((val, idx), shape=shp_flat, dtype=val.dtype)
+        test_tensor_unfolded = csr_matrix((val, idx), shape=shp, dtype=val.dtype)
         return test_tensor_unfolded, slice_idx
 
 
     def slice_recommendations(self, test_data, shape, start, stop, test_users=None):
-        test_tensor_unfolded, slice_idx = self.get_test_tensor(test_data, shape, start, stop)
+        test_tensor_unfolded, slice_idx = self.unfold_test_tensor_slice(test_data, shape, start, stop, mode=2)
         v = self.factors[self.data.fields.itemid]
         w = self.factors[self.data.fields.feedback]
 
