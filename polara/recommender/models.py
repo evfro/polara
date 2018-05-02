@@ -728,19 +728,19 @@ class CoffeeModel(RecommenderModel):
         if isinstance(flattener, str):
             slicer = slice(None)
             flatten = getattr(np, flattener)
-            matrix_scores = flatten(tensor_scores[:, :, slicer], axis=-1)
+            matrix_scores = flatten(tensor_scores[..., slicer], axis=-1)
         elif isinstance(flattener, int):
             slicer = flattener
-            matrix_scores = tensor_scores[:, :, slicer]
+            matrix_scores = tensor_scores[..., slicer]
         elif isinstance(flattener, (list, slice)):
             slicer = flattener
             flatten = np.sum
-            matrix_scores = flatten(tensor_scores[:, :, slicer], axis=-1)
+            matrix_scores = flatten(tensor_scores[..., slicer], axis=-1)
         elif isinstance(flattener, tuple):
             slicer, flatten_method = flattener
             slicer = slicer or slice(None)
             flatten = getattr(np, flatten_method)
-            matrix_scores = flatten(tensor_scores[:, :, slicer], axis=-1)
+            matrix_scores = flatten(tensor_scores[..., slicer], axis=-1)
         elif callable(flattener):
             matrix_scores = flattener(tensor_scores)
         else:
@@ -791,8 +791,8 @@ class CoffeeModel(RecommenderModel):
         # assume that w.shape[1] < v.shape[1] (allows for more efficient calculations)
         scores = test_tensor_unfolded.dot(w).reshape(num_users, num_items, w.shape[1])
         scores = np.tensordot(scores, v, axes=(1, 0))
-        scores = np.tensordot(np.tensordot(scores, v, axes=(2, 1)), w, axes=(1, 1))
-        scores = self.flatten_scores(scores, self.flattener)
+        wt_flat = self.flatten_scores(w.T, self.flattener)
+        scores = np.tensordot(scores, wt_flat, axes=(1, 0)).dot(v.T)
         return scores, slice_idx
 
     # additional functionality: rating pediction
