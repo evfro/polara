@@ -6,6 +6,7 @@ except NameError:
     pass
 
 import numpy as np
+from scipy.sparse.linalg import svds
 from numba import jit
 
 
@@ -81,20 +82,20 @@ def tucker_als(idx, val, shape, core_shape, iters=25, growth_tol=0.01, batch_run
         log_status('Step %i of %i' % (i+1, iters))
         u0 = tensordot2(idx, val, shape, u2, u1, ((2, 0), (1, 0)))\
             .reshape(shape[0], r1*r2)
-        uu = np.linalg.svd(u0, full_matrices=0)[0]
-        u0 = np.ascontiguousarray(uu[:, :r0])
+        uu = svds(u0, k=r0, return_singular_vectors='u')[0]
+        u0 = np.ascontiguousarray(uu[:, ::-1])
 
         u1 = tensordot2(idx, val, shape, u2, u0, ((2, 0), (0, 0)))\
             .reshape(shape[1], r0*r2)
-        uu = np.linalg.svd(u1, full_matrices=0)[0]
-        u1 = np.ascontiguousarray(uu[:, :r1])
+        uu = svds(u1, k=r1, return_singular_vectors='u')[0]
+        u1 = np.ascontiguousarray(uu[:, ::-1])
 
         u2 = tensordot2(idx, val, shape, u1, u0, ((1, 0), (0, 0)))\
             .reshape(shape[2], r0*r1)
-        uu, ss, vv = np.linalg.svd(u2, full_matrices=0)
-        u2 = np.ascontiguousarray(uu[:, :r2])
+        uu, ss, vv = svds(u2, k=r2)
+        u2 = np.ascontiguousarray(uu[:, ::-1])
 
-        g_norm_new = np.linalg.norm(ss[:r2])
+        g_norm_new = np.linalg.norm(ss)
         g_growth = (g_norm_new - g_norm_old) / g_norm_new
         g_norm_old = g_norm_new
         log_status('growth of the core: %f' % g_growth)
@@ -102,7 +103,7 @@ def tucker_als(idx, val, shape, core_shape, iters=25, growth_tol=0.01, batch_run
             log_status('Core is no longer growing. Norm of the core: %f' % g_norm_old)
             break
 
-    g = ss[:r2, np.newaxis] * vv[:r2, :]
+    g = np.ascontiguousarray((ss[:, np.newaxis] * vv)[::-1, :])
     g = g.reshape(r2, r1, r0).transpose(2, 1, 0)
     log_status('Done')
     return u0, u1, u2, g
