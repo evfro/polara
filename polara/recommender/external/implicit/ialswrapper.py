@@ -18,6 +18,7 @@ class ImplicitALS(RecommenderModel):
         self.alpha = 1
         self.weight_func = np.log2
         self.regularization = 0.01
+        self.num_threads = 0
         self.num_epochs = 15
         self.method = 'iALS'
         self._model = None
@@ -45,7 +46,8 @@ class ImplicitALS(RecommenderModel):
         # define iALS model instance
         self._model = implicit.als.AlternatingLeastSquares(factors=self.rank,
                                                            regularization=self.regularization,
-                                                           iterations=self.num_epochs)
+                                                           iterations=self.num_epochs,
+                                                           num_threads=self.num_threads)
 
         # prepare input matrix for learning the model
         matrix = self.get_training_matrix() # user_by_item sparse matrix
