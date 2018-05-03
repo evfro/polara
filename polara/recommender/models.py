@@ -168,7 +168,7 @@ class RecommenderModel(object):
         if scores_multiplier is None:
             try:
                 fdbk_dim = self.factors.get(self.data.fields.feedback, None).shape
-                scores_multiplier = fdbk_dim[0] + 2*fdbk_dim[1]
+                scores_multiplier = fdbk_dim[1]
             except AttributeError:
                 scores_multiplier = 1
 
