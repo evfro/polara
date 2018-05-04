@@ -21,7 +21,7 @@ from polara.recommender.evaluation import get_hr_score, get_mrr_score
 from polara.recommender.evaluation import assemble_scoring_matrices
 from polara.recommender.utils import array_split, get_nnz_max
 from polara.lib.hosvd import tucker_als
-from polara.lib.sparse import csc_matvec, unfold_tensor_coordinates
+from polara.lib.sparse import csc_matvec, unfold_tensor_coordinates, inverse_permutation
 from polara.tools.timing import Timer
 
 
@@ -699,7 +699,7 @@ class CoffeeModel(RecommenderModel):
 
     def __init__(self, *args, **kwargs):
         super(CoffeeModel, self).__init__(*args, **kwargs)
-        self.mlrank = defaults.mlrank
+        self._mlrank = defaults.mlrank
         self.factors = {}
         self.chunk = defaults.test_chunk_size
         self.method = 'CoFFee'
@@ -711,6 +711,17 @@ class CoffeeModel(RecommenderModel):
 
 
     @property
+    def mlrank(self):
+        return self._mlrank
+
+    @mlrank.setter
+    def mlrank(self, new_value):
+        if new_value != self._mlrank:
+            self._mlrank = new_value
+            self._check_reduced_rank(new_value)
+            self._recommendations = None
+
+    @property
     def flattener(self):
         return self._flattener
 
@@ -720,6 +731,38 @@ class CoffeeModel(RecommenderModel):
         if new_value != old_value:
             self._flattener = new_value
             self._recommendations = None
+
+
+    def _check_reduced_rank(self, mlrank):
+        for mode, entity in enumerate(self.data.fields):
+            factor = self.factors.get(entity, None)
+            if factor is None:
+                continue
+
+            if factor.shape[-1] < mlrank[mode]:
+                self._is_ready = False
+                self.factors = {}
+                break
+            elif factor.shape[-1] == mlrank[mode]:
+                continue
+            else:
+                rank = mlrank[mode]
+                rfactor, new_core = self.round_core(self.factors['core'], mode, rank)
+                self.factors[entity] = factor.dot(rfactor)
+                self.factors['core'] = new_core
+
+
+    @staticmethod
+    def round_core(core, mode, rank):
+        new_dims = [mode] + [m for m in [0, 1, 2] if m!=mode]
+        mode_dim = core.shape[mode]
+        flat_core = core.transpose(new_dims).reshape((mode_dim, -1), order='F')
+        u, s, vt = np.linalg.svd(flat_core, full_matrices=False)
+        rfactor = u[:, :rank]
+        new_core = (np.ascontiguousarray(s[:rank, np.newaxis]*vt[:rank, :])
+                    .reshape(rank, core.shape[new_dims[1]], core.shape[new_dims[2]], order='F')
+                    .transpose(inverse_permutation(np.array(new_dims))))
+        return rfactor, new_core
 
 
     @staticmethod
