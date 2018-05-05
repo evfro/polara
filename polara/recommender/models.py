@@ -663,7 +663,8 @@ class SVDModel(RecommenderModel):
                 self.factors = dict.fromkeys(self.factors.keys())
                 break
             else:
-                self.factors[entity] = factor[:, :rank]
+                # ellipsis allows to handle 1d array of singular values
+                self.factors[entity] = factor[..., :rank]
 
 
     def build(self, operator=None, return_factors='vh'):
