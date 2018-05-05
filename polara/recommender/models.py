@@ -754,13 +754,13 @@ class CoffeeModel(RecommenderModel):
 
     @staticmethod
     def round_core(core, mode, rank):
-        new_dims = [mode] + [m for m in [0, 1, 2] if m!=mode]
+        new_dims = [mode] + [m for m in range(core.ndim) if m!=mode]
         mode_dim = core.shape[mode]
         flat_core = core.transpose(new_dims).reshape((mode_dim, -1), order='F')
         u, s, vt = np.linalg.svd(flat_core, full_matrices=False)
         rfactor = u[:, :rank]
         new_core = (np.ascontiguousarray(s[:rank, np.newaxis]*vt[:rank, :])
-                    .reshape(rank, core.shape[new_dims[1]], core.shape[new_dims[2]], order='F')
+                    .reshape(rank, *[core.shape[i] for i in new_dims[1:]], order='F')
                     .transpose(inverse_permutation(np.array(new_dims))))
         return rfactor, new_core
 
