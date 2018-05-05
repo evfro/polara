@@ -663,7 +663,7 @@ class SVDModel(RecommenderModel):
                 self.factors = dict.fromkeys(self.factors.keys())
                 break
             else:
-                self.factors[entity] = factor[..., :rank]
+                self.factors[entity] = factor[:, :rank]
 
 
     def build(self, operator=None, return_factors='vh'):
@@ -739,14 +739,14 @@ class CoffeeModel(RecommenderModel):
             if factor is None:
                 continue
 
-            if factor.shape[-1] < mlrank[mode]:
+            rank = mlrank[mode]
+            if factor.shape[1] < rank:
                 self._is_ready = False
                 self.factors = {}
                 break
-            elif factor.shape[-1] == mlrank[mode]:
+            elif factor.shape[1] == rank:
                 continue
             else:
-                rank = mlrank[mode]
                 rfactor, new_core = self.round_core(self.factors['core'], mode, rank)
                 self.factors[entity] = factor.dot(rfactor)
                 self.factors['core'] = new_core
