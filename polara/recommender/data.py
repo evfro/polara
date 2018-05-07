@@ -716,7 +716,6 @@ class RecommenderData(object):
             self.index = self.index._replace(feedback=feedback_transform)
 
             idx = np.hstack((user_item_data, new_feedback[:, np.newaxis]))
-            idx = np.ascontiguousarray(idx)
             val = np.ones(self.training.shape[0],)
         else:
             idx = user_item_data

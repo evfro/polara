@@ -56,28 +56,15 @@ def tucker_als(idx, val, shape, core_shape, iters=25, growth_tol=0.01, batch_run
         if not batch_run:
             print(msg)
 
-    if not (idx.flags.c_contiguous and val.flags.c_contiguous):
-        raise ValueError('Warning! Imput arrays must be C-contigous.')
-
-
     random_state = np.random if seed is None else np.random.RandomState(seed)
-    #TODO: it's better to implement check for future
-    #if np.any(idx[1:, 0]-idx[:-1, 0]) < 0):
-    #    print('Warning! Index array must be sorted by first column in ascending order.')
 
     r0, r1, r2 = core_shape
-
     u1 = random_state.rand(shape[1], r1)
     u1 = np.linalg.qr(u1, mode='reduced')[0]
-
     u2 = random_state.rand(shape[2], r2)
     u2 = np.linalg.qr(u2, mode='reduced')[0]
 
-    u1 = np.ascontiguousarray(u1)
-    u2 = np.ascontiguousarray(u2)
-
     g_norm_old = 0
-
     for i in range(iters):
         log_status('Step %i of %i' % (i+1, iters))
         u0 = tensordot2(idx, val, shape, u2, u1, ((2, 0), (1, 0)))\
