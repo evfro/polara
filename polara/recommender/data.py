@@ -679,7 +679,11 @@ class RecommenderData(object):
             if self._holdout_size >= 1:  # pick at most _holdout_size elements
                 holdout = grouper.nlargest(self._holdout_size, keep='last')
             else:
-                raise NotImplementedError
+                frac = self._holdout_size
+                def sample_largest(x):
+                    size = int(frac*len(x))
+                    return x.iloc[np.argpartition(-x, size)[:size]]
+                holdout = grouper.apply(sample_largest)
 
         holdout_index = holdout.index.get_level_values(1)
         return self._data.loc[holdout_index]
