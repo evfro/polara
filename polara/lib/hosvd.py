@@ -12,16 +12,15 @@ from numba import jit
 
 @jit(nopython=True, nogil=True)
 def double_tensordot(idx, val, U, V, new_shape1, new_shape2, ten_mode0, ten_mode1, ten_mode2, res):
-    I = idx.shape[0]
-    J = new_shape1
-    K = new_shape2
-    for i in range(I):
+    idx_len = idx.shape[0]
+    for i in range(idx_len):
         i0 = idx[i, ten_mode0]
         i1 = idx[i, ten_mode1]
         i2 = idx[i, ten_mode2]
-        for j in range(J):
-            for k in range(K):
-                res[i0, j, k] += val[i] * U[i1, j] * V[i2, k]
+        vi = val[i]
+        for j in range(new_shape1):
+            for k in range(new_shape2):
+                res[i0, j, k] += vi * U[i1, j] * V[i2, k]
 
 
 def tensordot2(idx, val, shape, U, V, modes):
