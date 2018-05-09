@@ -6,13 +6,11 @@ except NameError:
 
 import numpy as np
 from scipy.sparse import csr_matrix
-from numba import jit
+from numba import njit, guvectorize
 
 # matvec implementation is based on
 # http://stackoverflow.com/questions/18595981/improving-performance-of-multiplication-of-scipy-sparse-matrices
-
-
-@jit(nopython=True, nogil=True)
+@njit(nogil=True)
 def matvec2dense(m_ptr, m_ind, m_val, v_nnz, v_val, out):
     l = len(v_nnz)
     for j in range(l):
@@ -24,7 +22,7 @@ def matvec2dense(m_ptr, m_ind, m_val, v_nnz, v_val, out):
             out[m_ind[ind_start:ind_end]] += m_val[ind_start:ind_end] * v_val[j]
 
 
-@jit(nopython=True, nogil=True)
+@njit(nogil=True)
 def matvec2sparse(m_ptr, m_ind, m_val, v_nnz, v_val, sizes, indices, data):
     l = len(sizes) - 1
     for j in range(l):
@@ -64,7 +62,7 @@ def csc_matvec(mat_csc, vec, dense_output=True, dtype=None):
     return res
 
 
-@jit(nopython=True)
+@njit
 def _blockify(ind, ptr, major_dim):
     # convenient function to compute only diagonal
     # elements of the product of 2 matrices;

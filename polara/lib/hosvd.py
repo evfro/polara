@@ -7,41 +7,35 @@ except NameError:
 
 import numpy as np
 from scipy.sparse.linalg import svds
-from numba import jit
+from numba import njit
 
 
-@jit(nopython=True, nogil=True)
-def double_tensordot(idx, val, U, V, new_shape1, new_shape2, ten_mode0, ten_mode1, ten_mode2, res):
-    idx_len = idx.shape[0]
-    for i in range(idx_len):
-        i0 = idx[i, ten_mode0]
-        i1 = idx[i, ten_mode1]
-        i2 = idx[i, ten_mode2]
+@njit(nogil=True)
+def double_tensordot(idx, val, u, v, mode0, mode1, mode2, res):
+    new_shape1 = u.shape[1]
+    new_shape2 = v.shape[1]
+    for i in range(len(val)):
+        i0 = idx[i, mode0]
+        i1 = idx[i, mode1]
+        i2 = idx[i, mode2]
         vi = val[i]
         for j in range(new_shape1):
             for k in range(new_shape2):
-                res[i0, j, k] += vi * U[i1, j] * V[i2, k]
+                res[i0, j, k] += vi * u[i1, j] * v[i2, k]
 
 
-def tensordot2(idx, val, shape, U, V, modes):
-    ten_mode1, mat_mode1 = modes[0]
-    ten_mode2, mat_mode2 = modes[1]
+def tensordot2(idx, val, shape, U, V, modes, dtype=None):
+    mode1, mat_mode1 = modes[0]
+    mode2, mat_mode2 = modes[1]
 
-    ten_mode0, = [x for x in (0, 1, 2) if x not in (ten_mode1, ten_mode2)]
-    new_shape = (shape[ten_mode0], U.shape[1-mat_mode1], V.shape[1-mat_mode2])
-    res = np.zeros(new_shape)
+    u = U.T if mat_mode1 == 1 else U
+    v = V.T if mat_mode2 == 1 else V
 
-    if mat_mode1 == 1:
-        vU = U.T
-    else:
-        vU = U
+    mode0, = [x for x in (0, 1, 2) if x not in (mode1, mode2)]
+    new_shape = (shape[mode0], U.shape[1-mat_mode1], V.shape[1-mat_mode2])
 
-    if mat_mode2 == 1:
-        vV = V.T
-    else:
-        vV = V
-
-    double_tensordot(idx, val, vU, vV, new_shape[1], new_shape[2], ten_mode0, ten_mode1, ten_mode2, res)
+    res = np.zeros(new_shape, dtype=dtype)
+    double_tensordot(idx, val, u, v, mode0, mode1, mode2, res)
     return res
 
 
