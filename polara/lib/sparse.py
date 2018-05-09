@@ -7,6 +7,10 @@ except NameError:
 import numpy as np
 from scipy.sparse import csr_matrix
 from numba import njit, guvectorize
+from numba import float64 as f8
+from numba import intp as ip
+
+from polara.recommender import defaults
 
 # matvec implementation is based on
 # http://stackoverflow.com/questions/18595981/improving-performance-of-multiplication-of-scipy-sparse-matrices
@@ -106,3 +110,14 @@ def unfold_tensor_coordinates(index, shape, mode):
     unfold_shape = (mode_shape[0]*mode_shape[1], mode_shape[2])
     unfold_index = np.unravel_index(flat_index, unfold_shape)
     return unfold_index, unfold_shape
+
+
+@guvectorize([(f8[:], f8[:, :], f8[:, :], ip[:], ip[:], f8[:, :])],
+             '(),(i,m),(j,n),(),()->(m,n)',
+             nopython=True, target=defaults.test_vectorize_target)
+def tensor_outer_at(val, v, w, i, j, res):
+    r1 = v.shape[1]
+    r2 = w.shape[1]
+    for m in range(r1):
+        for n in range(r2):
+            res[m, n] = val[0] * v[i[0], m] * w[j[0], n]

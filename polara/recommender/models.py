@@ -21,9 +21,9 @@ from polara.recommender.evaluation import get_hr_score, get_mrr_score
 from polara.recommender.evaluation import assemble_scoring_matrices
 from polara.recommender.utils import array_split, get_nnz_max
 from polara.lib.hosvd import tucker_als
-from polara.lib.sparse import csc_matvec, unfold_tensor_coordinates, inverse_permutation
+from polara.lib.sparse import csc_matvec, inverse_permutation
+from polara.lib.sparse import unfold_tensor_coordinates, tensor_outer
 from polara.tools.timing import Timer
-
 
 def get_default(name):
     return defaults.get_config([name])[name]
@@ -825,18 +825,17 @@ class CoffeeModel(RecommenderModel):
 
 
     def slice_recommendations(self, test_data, shape, start, stop, test_users=None):
-        test_tensor_unfolded, slice_idx = self.unfold_test_tensor_slice(test_data, shape, start, stop, mode=2)
+        slice_idx = self._slice_test_data(test_data, start, stop)
+
         v = self.factors[self.data.fields.itemid]
         w = self.factors[self.data.fields.feedback]
 
-        num_users = stop - start
-        num_items = shape[1]
+        # use the fact that test data is sorted by users for reduction:
+        scores = tensor_outer_at(1.0, v, w, slice_idx[1], slice_idx[2])
+        scores = np.add.reduceat(scores, np.r_[0, np.where(np.diff(slice_idx[0]))[0]+1])
 
-        # assume that w.shape[1] < v.shape[1] (allows for more efficient calculations)
-        scores = test_tensor_unfolded.dot(w).reshape(num_users, num_items, w.shape[1])
-        scores = np.tensordot(scores, v, axes=(1, 0))
         wt_flat = self.flatten_scores(w.T, self.flattener)
-        scores = np.tensordot(scores, wt_flat, axes=(1, 0)).dot(v.T)
+        scores = np.tensordot(scores, wt_flat, axes=(2, 0)).dot(v.T)
         return scores, slice_idx
 
     # additional functionality: rating pediction
