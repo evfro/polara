@@ -22,7 +22,7 @@ from polara.recommender.evaluation import assemble_scoring_matrices
 from polara.recommender.utils import array_split, get_nnz_max
 from polara.lib.hosvd import tucker_als
 from polara.lib.sparse import csc_matvec, inverse_permutation
-from polara.lib.sparse import unfold_tensor_coordinates, tensor_outer
+from polara.lib.sparse import unfold_tensor_coordinates, tensor_outer_at
 from polara.tools.timing import Timer
 
 def get_default(name):
