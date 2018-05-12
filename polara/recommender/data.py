@@ -799,7 +799,7 @@ class RecommenderData(object):
 
 
     def set_test_data(self, testset=None, holdout=None, warm_start=False, test_users=None,
-                            reindex=True, ensure_consistency=True, copy=True):
+                            reindex=True, ensure_consistency=True, holdout_size=None, copy=True):
         '''Should be used only with custom data.'''
         if warm_start and ((testset is None) and (test_users is None)):
             raise ValueError('When warm_start is True, information about test users must be present. '
@@ -826,7 +826,7 @@ class RecommenderData(object):
         self._state = None
         self._last_update_rule = None
         self._test_ratio = -1
-        self._holdout_size = -1
+        self._holdout_size = holdout_size or -1
         self._notify(self.on_update_event)
         self._change_properties.clear()
 
