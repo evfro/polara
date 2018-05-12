@@ -323,7 +323,7 @@ class RecommenderModel(object):
         return top_recs
 
 
-    def evaluate(self, method='hits', topk=None, not_rated_penalty=None, on_feedback_level=None, ignore_feedback=False):
+    def evaluate(self, method='hits', topk=None, not_rated_penalty=None, on_feedback_level=None, ignore_feedback=False, simple_rates=False):
         feedback = self.data.fields.feedback
         if int(topk or 0) > self.topk:
             self.topk = topk  # will also flush old recommendations
@@ -354,12 +354,12 @@ class RecommenderModel(object):
                                                  is_positive, feedback=feedback)
 
         if method == 'relevance':  # no need for feedback
-            if self.data.holdout_size == 1:
+            if (self.data.holdout_size == 1) or simple_rates:
                 scores = get_hr_score(scoring_data[1])
             else:
                 scores = get_relevance_scores(*scoring_data, not_rated_penalty=not_rated_penalty)
         elif method == 'ranking':
-            if self.data.holdout_size == 1:
+            if (self.data.holdout_size == 1) or simple_rates:
                 scores = get_mrr_score(scoring_data[1])
             else:
                 ndcg_alternative = get_default('ndcg_alternative')
