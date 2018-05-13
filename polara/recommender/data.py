@@ -6,6 +6,7 @@ from collections import namedtuple
 from collections import defaultdict
 import pandas as pd
 import numpy as np
+from polara.lib.sparse import inverse_permutation
 from polara.recommender import defaults
 
 
@@ -17,6 +18,16 @@ def random_choice(df, num, random_state):
 
 def random_sample(df, frac, random_state):
     return df.sample(frac=frac, random_state=random_state)
+
+
+def group_largest_fraction(data, frac, groupid, by):
+    def return_order(a):
+        return np.take(range(1, len(a)+1), inverse_permutation(np.argsort(a)))
+
+    grouper = data.groupby(groupid, sort=False)[by]
+    ordered = grouper.transform(return_order)
+    largest = ordered.groupby(data[groupid], sort=False).transform(lambda x: x>round(frac*x.shape[0]))
+    return largest
 
 
 class EventNotifier(object):
@@ -385,8 +396,16 @@ class RecommenderData(object):
             if self._holdout_size >= 1:  # state 2, sample holdout data per each user
                 holdout = self._sample_holdout(test_split)
             elif self._holdout_size > 0:  # state 2, special case - sample whole data at once
-                random_state = np.random.RandomState(self.seed)
-                holdout = self._data.sample(frac=self._holdout_size, random_state=random_state)
+                if self._random_holdout:
+                    random_state = np.random.RandomState(self.seed)
+                    holdout = self._data.sample(frac=self._holdout_size, random_state=random_state)
+                else:
+                    # TODO custom groupid support, not only userid
+                    group_id = self.fields.userid
+                    order_id = self._custom_order or self.fields.feedback
+                    frac = self._holdout_size
+                    largest = group_largest_fraction(self._data, frac, group_id, order_id)
+                    holdout = self._data.loc[largest].copy()
             else:  # state 1
                 holdout = None
 
