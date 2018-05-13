@@ -684,8 +684,8 @@ class RecommenderData(object):
             else:
                 frac = self._holdout_size
                 def sample_largest(x):
-                    size = int(frac*len(x))
-                    return x.iloc[np.argpartition(-x, size)[:size]]
+                    size = round(frac*len(x))
+                    return x.iloc[np.argpartition(x, -size)[-size:]]
                 holdout = grouper.apply(sample_largest)
 
         holdout_index = holdout.index.get_level_values(1)
