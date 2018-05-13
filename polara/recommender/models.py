@@ -240,8 +240,10 @@ class RecommenderModel(object):
             items_data, feedback_data = zip(*user_info)
         except TypeError:
             items_data = user_info
-            feedback_val = self.data.training[feedback].max()
-            feedback_data = [feedback_val]*len(items_data)
+            feedback_data = {}
+            if feedback is not None:
+                feedback_val = self.data.training[feedback].max()
+                feedback_data = {feedback: [feedback_val]*len(items_data)}
 
         try:
             item_index = self.data.index.itemid.training
@@ -251,10 +253,9 @@ class RecommenderModel(object):
         # need to convert itemid's to internal representation
         # conversion is not required for feedback (it's made in *to_coo functions, if needed)
         items_data = item_index.set_index('old').loc[items_data, 'new'].values
-        user_data = pd.DataFrame({userid: [0]*len(items_data),
-                                  itemid: items_data,
-                                  feedback: feedback_data})
-        return user_data
+        user_data = {userid: [0]*len(items_data), itemid: items_data}
+        user_data.update(feedback_data)
+        return pd.DataFrame(user_data)
 
 
     def show_recommendations(self, user_info, topk=None):
@@ -332,7 +333,7 @@ class RecommenderModel(object):
         recommendations = self.recommendations[:, :topk]  # will recalculate if empty
 
         eval_data = self.data.test.holdout
-        if self.switch_positive is None:
+        if (self.switch_positive is None) or (feedback is None):
             # all recommendations are considered positive predictions
             # this is a proper setting for binary data problems (implicit feedback)
             # in this case all unrated items, recommended by an algorithm

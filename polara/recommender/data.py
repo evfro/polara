@@ -91,17 +91,17 @@ class RecommenderData(object):
                '_warm_start', '_holdout_size', '_test_sample',
                '_permute_tops', '_random_holdout', '_negative_prediction'}
 
-    def __init__(self, data, userid, itemid, feedback, custom_order=None, seed=None):
+    def __init__(self, data, userid, itemid, feedback=None, custom_order=None, seed=None):
         self.name = None
         fields = [userid, itemid, feedback]
 
         if data is None:
-            cols = fields + [custom_order] if custom_order else fields
-            self._data = data = pd.DataFrame(columns=cols)
+            cols = fields + [custom_order]
+            self._data = data = pd.DataFrame(columns=[c for c in cols if c])
         else:
             self._data = data
 
-        if data.duplicated(subset=fields).any():
+        if data.duplicated(subset=[f for f in fields if f]).any():
             # unstable in pandas v. 17.0, only works in <> v.17.0
             # rely on deduplicated data in many places - makes data processing more efficient
             raise NotImplementedError('Data has duplicate values')
@@ -396,7 +396,7 @@ class RecommenderData(object):
         self._test = namedtuple('TestData', 'testset holdout')._make([testset, holdout])
 
         if full_update:
-            fields = list(self.fields)
+            fields = [f for f in list(self.fields) if f is not None]
             if self._custom_order:
                 fields.append(self._custom_order)
             self._training = self._data.loc[train_split, fields]
@@ -726,7 +726,10 @@ class RecommenderData(object):
             val = np.ones(self.training.shape[0],)
         else:
             idx = user_item_data
-            val = self.training[feedback].values
+            if feedback is None:
+                val = np.ones(self.training.shape[0],)
+            else:
+                val = self.training[feedback].values
 
         shp = tuple(idx.max(axis=0) + 1)
         idx = idx.astype(np.intp)
@@ -761,7 +764,10 @@ class RecommenderData(object):
 
         user_idx = testset[userid].values.astype(np.intp)
         item_idx = testset[itemid].values.astype(np.intp)
-        fdbk_val = testset[feedback].values
+        if feedback is None:
+            fdbk_val = np.ones(testset.shape[0],)
+        else:
+            fdbk_val = testset[feedback].values
 
         if tensor_mode:
             fdbk_idx = self.index.feedback.set_index('old').loc[fdbk_val, 'new'].values
@@ -817,7 +823,10 @@ class RecommenderData(object):
             holdout = holdout.copy() if holdout is not None else None
 
         if test_users is not None:
-            testset = self._data.loc[lambda x: x[self.fields.userid].isin(test_users), list(self.fields)]
+            fields = [f for f in list(self.fields) if f is not None]
+            if self._custom_order:
+                fields.append(self._custom_order)
+            testset = self._data.loc[lambda x: x[self.fields.userid].isin(test_users), fields]
 
         self._test = namedtuple('TestData', 'testset holdout')._make([testset, holdout])
         self.index = self.index._replace(userid=self.index.userid._replace(test=None))
