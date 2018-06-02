@@ -9,6 +9,9 @@ from functools import wraps
 from collections import namedtuple
 import warnings
 
+from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import as_completed
+
 import pandas as pd
 import numpy as np
 import scipy as sp
@@ -84,6 +87,7 @@ class RecommenderModel(object):
         # (in contrast to `on_feedback_level` argument of self.evaluate)
         self.switch_positive = switch_positive or get_default('switch_positive')
         self.verify_integrity = get_default('verify_integrity')
+        self.max_test_workers = get_default('max_test_workers')
 
         # TODO sorting in data must be by self._key, also need to change get_test_data
         self._key = self.data.fields.userid
@@ -294,33 +298,52 @@ class RecommenderModel(object):
         return top_recs, seen_items
 
 
+    def _slice_recommender(self, user_slice, test_data, test_shape, test_users):
+        start, stop = user_slice
+        scores, slice_data = self.slice_recommendations(test_data, test_shape, start, stop, test_users)
+        if self.filter_seen:
+            # prevent seen items from appearing in recommendations
+            # NOTE: in case of sparse models (e.g. simple item-to-item)
+            # there's a risk of having seen items in recommendations list
+            # (for topk < i2i_matrix.shape[1]-len(unseen))
+            # this is related to low generalization ability
+            # of the naive cooccurrence method itself, not to the algorithm
+            self.downvote_seen_items(scores, slice_data)
+        top_recs = self.get_topk_elements(scores)
+        return top_recs
+
+
+    def run_parallel_recommender(self, result, user_slices, *args):
+        with ThreadPoolExecutor(max_workers=self.max_test_workers) as executor:
+            recs_futures = {executor.submit(self._slice_recommender,
+                                            user_slice, *args): user_slice
+                            for user_slice in user_slices}
+
+            for future in as_completed(recs_futures):
+                start, stop = recs_futures[future]
+                result[start:stop, :] = future.result()
+
+
+    def run_sequential_recommender(self, result, user_slices, *args):
+        for user_slice in user_slices:
+            start, stop = user_slice
+            result[start:stop, :] = self._slice_recommender(user_slice, *args)
+
+
     def get_recommendations(self):
         if self.verify_integrity:
             self.verify_data_integrity()
 
-        test_data, test_shape, test_users = self._get_test_data()
+        test_data = self._get_test_data()
+        test_shape = test_data[1]
+        user_slices_idx = self._get_slices_idx(test_shape)
+        user_slices = zip(user_slices_idx[:-1], user_slices_idx[1:])
 
-        topk = self.topk
-        top_recs = np.empty((test_shape[0], topk), dtype=np.int64)
-
-        user_slices = self._get_slices_idx(test_shape)
-        start = user_slices[0]
-        for i in user_slices[1:]:
-            stop = i
-            scores, slice_data = self.slice_recommendations(test_data, test_shape, start, stop, test_users)
-
-            if self.filter_seen:
-                # prevent seen items from appearing in recommendations
-                # NOTE: in case of sparse models (e.g. simple item-to-item)
-                # there's a risk of having seen items in recommendations list
-                # (for topk < i2i_matrix.shape[1]-len(unseen))
-                # this is related to low generalization ability
-                # of the naive cooccurrence method itself, not to the algorithm
-                self.downvote_seen_items(scores, slice_data)
-
-            top_recs[start:stop, :] = self.get_topk_elements(scores)
-            start = stop
-
+        top_recs = np.empty((test_shape[0], self.topk), dtype=np.int64)
+        if self.max_test_workers and len(user_slices_idx) > 2:
+            self.run_parallel_recommender(top_recs, user_slices, *test_data)
+        else:
+            self.run_sequential_recommender(top_recs, user_slices, *test_data)
         return top_recs
 
 

@@ -44,7 +44,8 @@ test_vectorize_target = 'parallel'
 #The “parallel” target works well for medium data sizes (approx. less than 1MB).
 #Threading adds a small delay. The “cuda” target works well for big data sizes
 #(approx. greater than 1MB) and high compute intensity algorithms.
-#Transfering memory to and from the GPU adds significant overhead.'''
+#Transfering memory to and from the GPU adds significant overhead.
+max_test_workers = None # to compute recommendations in parallel for groups of test users
 
 
 def get_config(params):
