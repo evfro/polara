@@ -62,25 +62,27 @@ class ImplicitALS(RecommenderModel):
     def get_recommendations(self):
         recalculate = self.data.warm_start # used to force folding-in computation
         if recalculate:
+            if self.filter_seen is False:
+                raise ValueError('The model always filters seen items from results.')
             # prepare test matrix with preferences of unseen users
             matrix, _ = self.get_test_matrix()
             matrix.data = self.confidence(matrix.data, alpha=self.alpha, weight=self.weight_func)
             num_users = matrix.shape[0]
             users_idx = range(num_users)
+
+            top_recs = np.empty((num_users, self.topk), dtype=np.intp)
+            for i, user_row in enumerate(users_idx):
+                recs = self._model.recommend(user_row, matrix, N=self.topk, recalculate_user=recalculate)
+                top_recs[i, :] = [item for item, _ in recs]
         else:
-            # prepare traing matrix and convert test user indices into
-            # corresponding training matrix rows
-            matrix = self.get_training_matrix()
-            userid = self.data.fields.userid
-            users_idx = self.data.test.holdout[userid].drop_duplicates(keep='first').values
-            num_users = len(users_idx)
-
-        top_recs = np.empty((num_users, self.topk), dtype=np.intp)
-
-        if self.filter_seen is False:
-            raise ValueError('The model always filters seen items from results.')
-
-        for i, user_row in enumerate(users_idx):
-            recs = self._model.recommend(user_row, matrix, N=self.topk, recalculate_user=recalculate)
-            top_recs[i, :] = [item for item, _ in recs]
+            top_recs = super(ImplicitALS, self).get_recommendations()
         return top_recs
+
+
+    def slice_recommendations(self, test_data, shape, start, stop, test_users=None):
+        slice_data = self._slice_test_data(test_data, start, stop)
+
+        user_factors = self._model.user_factors[test_users[start:stop], :]
+        item_factors = self._model.item_factors
+        scores = user_factors.dot(item_factors.T)
+        return scores, slice_data
