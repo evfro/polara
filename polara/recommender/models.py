@@ -874,7 +874,7 @@ class CoffeeModel(RecommenderModel):
         scores = self.tensor_outer_at(1.0, v, w, slice_idx[1], slice_idx[2])
         scores = np.add.reduceat(scores, np.r_[0, np.where(np.diff(slice_idx[0]))[0]+1])
 
-        wt_flat = self.flatten_scores(w.T, self.flattener)
+        wt_flat = self.flatten_scores(w.T, self.flattener) # TODO cache result
         scores = np.tensordot(scores, wt_flat, axes=(2, 0)).dot(v.T)
         return scores, slice_idx
 
