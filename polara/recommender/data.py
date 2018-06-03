@@ -6,6 +6,7 @@ from collections import namedtuple
 from collections import defaultdict
 import pandas as pd
 import numpy as np
+from polara.lib.sparse import inverse_permutation
 from polara.recommender import defaults
 
 
@@ -17,6 +18,16 @@ def random_choice(df, num, random_state):
 
 def random_sample(df, frac, random_state):
     return df.sample(frac=frac, random_state=random_state)
+
+
+def group_largest_fraction(data, frac, groupid, by):
+    def return_order(a):
+        return np.take(range(1, len(a)+1), inverse_permutation(np.argsort(a)))
+
+    grouper = data.groupby(groupid, sort=False)[by]
+    ordered = grouper.transform(return_order)
+    largest = ordered.groupby(data[groupid], sort=False).transform(lambda x: x>round(frac*x.shape[0]))
+    return largest
 
 
 class EventNotifier(object):
@@ -91,17 +102,17 @@ class RecommenderData(object):
                '_warm_start', '_holdout_size', '_test_sample',
                '_permute_tops', '_random_holdout', '_negative_prediction'}
 
-    def __init__(self, data, userid, itemid, feedback, custom_order=None, seed=None):
+    def __init__(self, data, userid, itemid, feedback=None, custom_order=None, seed=None):
         self.name = None
         fields = [userid, itemid, feedback]
 
         if data is None:
-            cols = fields + [custom_order] if custom_order else fields
-            self._data = data = pd.DataFrame(columns=cols)
+            cols = fields + [custom_order]
+            self._data = data = pd.DataFrame(columns=[c for c in cols if c])
         else:
             self._data = data
 
-        if data.duplicated(subset=fields).any():
+        if data.duplicated(subset=[f for f in fields if f]).any():
             # unstable in pandas v. 17.0, only works in <> v.17.0
             # rely on deduplicated data in many places - makes data processing more efficient
             raise NotImplementedError('Data has duplicate values')
@@ -208,7 +219,8 @@ class RecommenderData(object):
             self._try_sort_test_data()
 
         if self.verbose:
-            print('Done.')
+            stats_msg = 'Done.\nThere are {} events in the training and {} events in the holdout.'
+            print(stats_msg.format(self.training.shape[0], self.test.holdout.shape[0]))
 
     def prepare_training_only(self):
         self.holdout_size = 0  # do not form holdout
@@ -384,8 +396,16 @@ class RecommenderData(object):
             if self._holdout_size >= 1:  # state 2, sample holdout data per each user
                 holdout = self._sample_holdout(test_split)
             elif self._holdout_size > 0:  # state 2, special case - sample whole data at once
-                random_state = np.random.RandomState(self.seed)
-                holdout = self._data.sample(frac=self._holdout_size, random_state=random_state)
+                if self._random_holdout:
+                    random_state = np.random.RandomState(self.seed)
+                    holdout = self._data.sample(frac=self._holdout_size, random_state=random_state)
+                else:
+                    # TODO custom groupid support, not only userid
+                    group_id = self.fields.userid
+                    order_id = self._custom_order or self.fields.feedback
+                    frac = self._holdout_size
+                    largest = group_largest_fraction(self._data, frac, group_id, order_id)
+                    holdout = self._data.loc[largest].copy()
             else:  # state 1
                 holdout = None
 
@@ -396,7 +416,10 @@ class RecommenderData(object):
         self._test = namedtuple('TestData', 'testset holdout')._make([testset, holdout])
 
         if full_update:
-            self._training = self._data.loc[train_split, list(self.fields)]
+            fields = [f for f in list(self.fields) if f is not None]
+            if self._custom_order:
+                fields.append(self._custom_order)
+            self._training = self._data.loc[train_split, fields]
             self._notify(self.on_change_event)
         elif test_update:
             self._notify(self.on_update_event)
@@ -679,7 +702,11 @@ class RecommenderData(object):
             if self._holdout_size >= 1:  # pick at most _holdout_size elements
                 holdout = grouper.nlargest(self._holdout_size, keep='last')
             else:
-                raise NotImplementedError
+                frac = self._holdout_size
+                def sample_largest(x):
+                    size = round(frac*len(x))
+                    return x.iloc[np.argpartition(x, -size)[-size:]]
+                holdout = grouper.apply(sample_largest)
 
         holdout_index = holdout.index.get_level_values(1)
         return self._data.loc[holdout_index]
@@ -716,11 +743,13 @@ class RecommenderData(object):
             self.index = self.index._replace(feedback=feedback_transform)
 
             idx = np.hstack((user_item_data, new_feedback[:, np.newaxis]))
-            idx = np.ascontiguousarray(idx)
             val = np.ones(self.training.shape[0],)
         else:
             idx = user_item_data
-            val = self.training[feedback].values
+            if feedback is None:
+                val = np.ones(self.training.shape[0],)
+            else:
+                val = self.training[feedback].values
 
         shp = tuple(idx.max(axis=0) + 1)
         idx = idx.astype(np.intp)
@@ -735,8 +764,9 @@ class RecommenderData(object):
         if self.index.userid.training.new.isin(test_users).all():
             testset = self.training
         else:
-            testset = (self.training.query('{} in @test_users'.format(userid))
-                           .sort_values(userid))
+            testset = self.training.query('{} in @test_users'.format(userid))
+
+        testset = testset.sort_values(userid)
         if update_data:
             self._test = self._test._replace(testset=testset)
         return testset
@@ -754,16 +784,19 @@ class RecommenderData(object):
 
         user_idx = testset[userid].values.astype(np.intp)
         item_idx = testset[itemid].values.astype(np.intp)
-        fdbk_val = testset[feedback].values
 
         if tensor_mode:
-            fdbk_idx = self.index.feedback.set_index('old').loc[fdbk_val, 'new'].values
-            if np.isnan(fdbk_idx).any():
+            fdbk_val = testset[feedback]
+            fdbk_idx = fdbk_val.map(self.index.feedback.set_index('old').new)
+            if fdbk_idx.isnull().any():
                 raise NotImplementedError('Not all values of feedback are present in training data')
-            else:
-                fdbk_idx = fdbk_idx.astype(np.intp)
+            fdbk_idx = fdbk_idx.values.astype(np.intp)
             test_coo = (user_idx, item_idx, fdbk_idx)
         else:
+            if feedback is None:
+                fdbk_val = np.ones(testset.shape[0],)
+            else:
+                fdbk_val = testset[feedback].values
             test_coo = (user_idx, item_idx, fdbk_val)
 
         return test_coo
@@ -792,7 +825,7 @@ class RecommenderData(object):
 
 
     def set_test_data(self, testset=None, holdout=None, warm_start=False, test_users=None,
-                            reindex=True, ensure_consistency=True, copy=True):
+                            reindex=True, ensure_consistency=True, holdout_size=None, copy=True):
         '''Should be used only with custom data.'''
         if warm_start and ((testset is None) and (test_users is None)):
             raise ValueError('When warm_start is True, information about test users must be present. '
@@ -810,7 +843,10 @@ class RecommenderData(object):
             holdout = holdout.copy() if holdout is not None else None
 
         if test_users is not None:
-            testset = self._data.loc[lambda x: x[self.fields.userid].isin(test_users), list(self.fields)]
+            fields = [f for f in list(self.fields) if f is not None]
+            if self._custom_order:
+                fields.append(self._custom_order)
+            testset = self._data.loc[lambda x: x[self.fields.userid].isin(test_users), fields]
 
         self._test = namedtuple('TestData', 'testset holdout')._make([testset, holdout])
         self.index = self.index._replace(userid=self.index.userid._replace(test=None))
@@ -819,7 +855,7 @@ class RecommenderData(object):
         self._state = None
         self._last_update_rule = None
         self._test_ratio = -1
-        self._holdout_size = -1
+        self._holdout_size = holdout_size or -1
         self._notify(self.on_update_event)
         self._change_properties.clear()
 

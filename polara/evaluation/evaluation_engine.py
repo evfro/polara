@@ -5,7 +5,21 @@ try:
 except NameError:
     pass
 
+from math import sqrt
 import pandas as pd
+
+
+def sample_ci(df, coef=2.776, level=None): # 95% CI for sample under Student's t-test
+    # http://www.stat.yale.edu/Courses/1997-98/101/confint.htm
+    # example from http://onlinestatbook.com/2/estimation/mean.html
+    nlevels = df.index.nlevels
+    if (nlevels == 1) & (level is None):
+        n = df.shape[0]
+    elif (nlevels==2) & (level is not None):
+        n = df.index.levshape[1-level]
+    else:
+        raise ValueError
+    return coef * df.std(level=level, ddof=1) / sqrt(n)
 
 
 def save_scores(scores, dataset_name, experiment_name, save_folder=None):
@@ -49,9 +63,10 @@ def set_topk(models, topk):
         model.topk = topk
 
 
-def build_models(models):
+def build_models(models, force=True):
     for model in models:
-        model.build()
+        if not model._is_ready or force:
+            model.build()
 
 
 def consolidate(scores, params, metrics):
@@ -90,14 +105,13 @@ def holdout_test_pair(model1, model2, holdout_sizes=[1], metrics=['hits']):
     return consolidate(holdout_scores, holdout_sizes, metrics)
 
 
-def holdout_test(models, holdout_sizes=[1], metrics=['hits']):
+def holdout_test(models, holdout_sizes=[1], metrics=['hits'], force_build=True):
     holdout_scores = []
     data = models[0].data
     assert all([model.data is data for model in models[1:]]) #check that data is shared across models
 
-    build_models(models)
+    build_models(models, force_build)
     for i in holdout_sizes:
-        print(i, end=' ')
         data.holdout_size = i
         data.update()
 
@@ -107,7 +121,7 @@ def holdout_test(models, holdout_sizes=[1], metrics=['hits']):
     return consolidate(holdout_scores, holdout_sizes, metrics)
 
 
-def topk_test(models, topk_list=[10], metrics=['hits']):
+def topk_test(models, topk_list=[10], metrics=['hits'], force_build=True):
     topk_scores = []
     data = models[0].data
     assert all([model.data is data for model in models[1:]]) #check that data is shared across models
@@ -115,9 +129,8 @@ def topk_test(models, topk_list=[10], metrics=['hits']):
     data.update()
     topk_list = list(reversed(sorted(topk_list))) #start from max topk and rollback
 
-    build_models(models)
+    build_models(models, force_build)
     for topk in topk_list:
-        print(topk, end=' ')
         metric_scores = evaluate_models(models, metrics, topk)
         topk_scores.append(metric_scores)
 

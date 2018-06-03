@@ -1,7 +1,7 @@
 import numpy as np
-from numba import jit
+from numba import njit
 
-@jit(nopython=True, nogil=True)
+@njit(nogil=True)
 def sgd_step(users_idx, items_idx, feedbacks, P, Q, eta, lambd):
     cum_error = 0
     for k, a in enumerate(feedbacks):
@@ -22,7 +22,7 @@ def sgd_step(users_idx, items_idx, feedbacks, P, Q, eta, lambd):
         cum_error += e*e
     return cum_error
 
-@jit(nopython=True, nogil=True)
+@njit(nogil=True)
 def sgd_step_biased(users_idx, items_idx, feedbacks, P, Q, b_user, b_item, mu, eta, lambd):
     cum_error = 0
     for k, a in enumerate(feedbacks):

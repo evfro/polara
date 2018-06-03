@@ -6,13 +6,15 @@ except NameError:
 
 import numpy as np
 from scipy.sparse import csr_matrix
-from numba import jit
+from numba import njit, guvectorize
+from numba import float64 as f8
+from numba import intp as ip
+
+from polara.recommender import defaults
 
 # matvec implementation is based on
 # http://stackoverflow.com/questions/18595981/improving-performance-of-multiplication-of-scipy-sparse-matrices
-
-
-@jit(nopython=True, nogil=True)
+@njit(nogil=True)
 def matvec2dense(m_ptr, m_ind, m_val, v_nnz, v_val, out):
     l = len(v_nnz)
     for j in range(l):
@@ -24,7 +26,7 @@ def matvec2dense(m_ptr, m_ind, m_val, v_nnz, v_val, out):
             out[m_ind[ind_start:ind_end]] += m_val[ind_start:ind_end] * v_val[j]
 
 
-@jit(nopython=True, nogil=True)
+@njit(nogil=True)
 def matvec2sparse(m_ptr, m_ind, m_val, v_nnz, v_val, sizes, indices, data):
     l = len(sizes) - 1
     for j in range(l):
@@ -64,7 +66,7 @@ def csc_matvec(mat_csc, vec, dense_output=True, dtype=None):
     return res
 
 
-@jit(nopython=True)
+@njit
 def _blockify(ind, ptr, major_dim):
     # convenient function to compute only diagonal
     # elements of the product of 2 matrices;
@@ -96,3 +98,28 @@ def inverse_permutation(p):
     s = np.empty(p.size, p.dtype)
     s[p] = np.arange(p.size)
     return s
+
+
+def unfold_tensor_coordinates(index, shape, mode):
+    # TODO implement direct calculation w/o intermediate flattening
+    modes = [m for m in [0, 1, 2] if m != mode] + [mode,]
+    mode_shape = tuple(shape[m] for m in modes)
+    mode_index = tuple(index[m] for m in modes)
+    flat_index = np.ravel_multi_index(mode_index, mode_shape)
+
+    unfold_shape = (mode_shape[0]*mode_shape[1], mode_shape[2])
+    unfold_index = np.unravel_index(flat_index, unfold_shape)
+    return unfold_index, unfold_shape
+
+
+def tensor_outer_at(vtarget, **kwargs):
+    @guvectorize(['void(float64[:], float64[:, :], float64[:, :], intp[:], intp[:], float64[:, :])'],
+                 '(),(i,m),(j,n),(),()->(m,n)',
+                 target=vtarget, nopython=True, **kwargs)
+    def tensor_outer_wrapped(val, v, w, i, j, res):
+        r1 = v.shape[1]
+        r2 = w.shape[1]
+        for m in range(r1):
+            for n in range(r2):
+                res[m, n] = val[0] * v[i[0], m] * w[j[0], n]
+    return tensor_outer_wrapped

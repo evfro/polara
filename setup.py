@@ -15,14 +15,17 @@ _packages = ["polara",
 
 
 opts = dict(name="polara",
-            description="Fast and flexible recommender framework",
+            description="Fast and flexible recommender system framework",
             keywords = "recommender system",
-            version = "0.5.3",
+            version = "0.6.0",
             license="MIT",
             author="Evgeny Frolov",
             platforms=["any"],
             packages=_packages)
 
+extras = dict(install_requires=['futures; python_version=="2.7"'])
+
+opts.update(extras)
 
 if __name__ == '__main__':
     setup(**opts)

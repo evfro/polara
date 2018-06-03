@@ -1,4 +1,5 @@
 from io import BytesIO
+import numpy as np
 import pandas as pd
 
 try:
@@ -8,9 +9,14 @@ except ImportError:
 
 
 def get_movielens_data(local_file=None, get_ratings=True, get_genres=False,
-                       split_genres=True, mdb_mapping=False):
+                       split_genres=True, mdb_mapping=False, get_tags=False, include_time=False):
     '''Downloads movielens data and stores it in pandas dataframe.
     '''
+    fields = ['userid', 'movieid', 'rating']
+
+    if include_time:
+        fields.append('timestamp')
+
     if not local_file:
         # downloading data
         from requests import get
@@ -20,7 +26,7 @@ def get_movielens_data(local_file=None, get_ratings=True, get_genres=False,
     else:
         zip_contents = local_file
 
-    ml_data = ml_genres = mapping = None
+    ml_data = ml_genres = ml_tags = mapping = None
     # loading data into memory
     with ZipFile(zip_contents) as zfile:
         zip_files = pd.Series(zfile.namelist())
@@ -33,9 +39,7 @@ def get_movielens_data(local_file=None, get_ratings=True, get_genres=False,
             zdata = zdata.replace(b'::', delimiter.encode())
             # makes data compatible with pandas c-engine
             # returns string objects instead of bytes in that case
-            ml_data = pd.read_csv(BytesIO(zdata), sep=delimiter, header=header, engine='c',
-                                    names=['userid', 'movieid', 'rating', 'timestamp'],
-                                    usecols=['userid', 'movieid', 'rating'])
+            ml_data = pd.read_csv(BytesIO(zdata), sep=delimiter, header=header, engine='c', names=fields, usecols=fields)
 
         if get_genres:
             zip_file = zip_files[zip_files.str.contains('movies')].iat[0]
@@ -51,6 +55,19 @@ def get_movielens_data(local_file=None, get_ratings=True, get_genres=False,
 
             ml_genres = get_split_genres(genres_data) if split_genres else genres_data
 
+        if get_tags:
+            zip_file = zip_files[zip_files.str.contains('/tags')].iat[0] #not genome
+            zdata =  zfile.read(zip_file)
+            if not is_new_format:
+                # make data compatible with pandas c-engine
+                # pandas returns string objects instead of bytes in that case
+                delimiter = '^'
+                zdata = zdata.replace(b'::', delimiter.encode())
+            fields[2] = 'tag'
+            ml_tags = pd.read_csv(BytesIO(zdata), sep=delimiter, header=header,
+                                      engine='c', encoding='latin1',
+                                      names=fields, usecols=range(len(fields)))
+
         if mdb_mapping and is_new_format:
             # imdb and tmdb mapping - exists only in ml-latest or 20m datasets
             zip_file = zip_files[zip_files.str.contains('links')].iat[0]
@@ -58,7 +75,7 @@ def get_movielens_data(local_file=None, get_ratings=True, get_genres=False,
                 mapping = pd.read_csv(zdata, sep=',', header=0, engine='c',
                                         names=['movieid', 'imdbid', 'tmdbid'])
 
-    res = [data for data in [ml_data, ml_genres, mapping] if data is not None]
+    res = [data for data in [ml_data, ml_genres, ml_tags, mapping] if data is not None]
     if len(res)==1: res = res[0]
     return res
 
@@ -75,7 +92,7 @@ def filter_short_head(data, threshold=0.01):
     short_head.sort_values(ascending=False, inplace=True)
 
     ratings_perc = short_head.cumsum()*1.0/short_head.sum()
-    movies_perc = pd.np.arange(1, len(short_head)+1, dtype=pd.np.float64) / len(short_head)
+    movies_perc = np.arange(1, len(short_head)+1, dtype='f8') / len(short_head)
 
     long_tail_movies = ratings_perc[movies_perc > threshold].index
     return long_tail_movies
