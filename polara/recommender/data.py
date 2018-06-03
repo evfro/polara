@@ -784,19 +784,19 @@ class RecommenderData(object):
 
         user_idx = testset[userid].values.astype(np.intp)
         item_idx = testset[itemid].values.astype(np.intp)
-        if feedback is None:
-            fdbk_val = np.ones(testset.shape[0],)
-        else:
-            fdbk_val = testset[feedback].values
 
         if tensor_mode:
-            fdbk_idx = self.index.feedback.set_index('old').loc[fdbk_val, 'new'].values
-            if np.isnan(fdbk_idx).any():
+            fdbk_val = testset[feedback]
+            fdbk_idx = fdbk_val.map(self.index.feedback.set_index('old').new)
+            if fdbk_idx.isnull().any():
                 raise NotImplementedError('Not all values of feedback are present in training data')
-            else:
-                fdbk_idx = fdbk_idx.astype(np.intp)
+            fdbk_idx = fdbk_idx.values.astype(np.intp)
             test_coo = (user_idx, item_idx, fdbk_idx)
         else:
+            if feedback is None:
+                fdbk_val = np.ones(testset.shape[0],)
+            else:
+                fdbk_val = testset[feedback].values
             test_coo = (user_idx, item_idx, fdbk_val)
 
         return test_coo

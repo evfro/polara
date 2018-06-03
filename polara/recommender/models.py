@@ -89,9 +89,9 @@ class RecommenderModel(object):
         self.verify_integrity = get_default('verify_integrity')
         self.max_test_workers = get_default('max_test_workers')
 
-        # TODO sorting in data must be by self._key, also need to change get_test_data
-        self._key = self.data.fields.userid
-        self._target = self.data.fields.itemid
+        # TODO sorting in data must be by self._predition_key, also need to change get_test_data
+        self._predition_key = self.data.fields.userid
+        self._prediction_target = self.data.fields.itemid
 
         self._is_ready = False
         self.verbose = True
@@ -190,7 +190,7 @@ class RecommenderModel(object):
         test_shape = self.data.get_test_shape(tensor_mode=tensor_mode)
 
         idx_diff = np.diff(user_idx)
-        # TODO sorting by self._key
+        # TODO sorting by self._predition_key
         assert (idx_diff >= 0).all()  # calculations assume testset is sorted by users!
 
         # TODO only required when testset consists of known users
@@ -381,7 +381,7 @@ class RecommenderModel(object):
 
         feedback = None if ignore_feedback else feedback
         scoring_data = assemble_scoring_matrices(recommendations, eval_data,
-                                                 self._key, self._target,
+                                                 self._predition_key, self._prediction_target,
                                                  is_positive, feedback=feedback)
 
         if method == 'relevance':  # no need for feedback
@@ -740,6 +740,7 @@ class CoffeeModel(RecommenderModel):
         self.num_iters = defaults.num_iters
         self.show_output = defaults.show_output
         self.seed = None
+        self._vectorize_target = defaults.test_vectorize_target
 
 
     @property
@@ -763,6 +764,14 @@ class CoffeeModel(RecommenderModel):
         if new_value != old_value:
             self._flattener = new_value
             self._recommendations = None
+
+    @property
+    def tensor_outer_at(self):
+        vtarget = self._vectorize_target.lower()
+        if self.max_test_workers and (vtarget == 'parallel'):
+            # force single thread for tensor_outer_at to safely run in parallel
+            vtarget = 'cpu'
+        return tensor_outer_at(vtarget)
 
 
     def _check_reduced_rank(self, mlrank):
@@ -862,10 +871,10 @@ class CoffeeModel(RecommenderModel):
         w = self.factors[self.data.fields.feedback]
 
         # use the fact that test data is sorted by users for reduction:
-        scores = tensor_outer_at(1.0, v, w, slice_idx[1], slice_idx[2])
+        scores = self.tensor_outer_at(1.0, v, w, slice_idx[1], slice_idx[2])
         scores = np.add.reduceat(scores, np.r_[0, np.where(np.diff(slice_idx[0]))[0]+1])
 
-        wt_flat = self.flatten_scores(w.T, self.flattener)
+        wt_flat = self.flatten_scores(w.T, self.flattener) # TODO cache result
         scores = np.tensordot(scores, wt_flat, axes=(2, 0)).dot(v.T)
         return scores, slice_idx
 

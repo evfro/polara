@@ -112,12 +112,14 @@ def unfold_tensor_coordinates(index, shape, mode):
     return unfold_index, unfold_shape
 
 
-@guvectorize([(f8[:], f8[:, :], f8[:, :], ip[:], ip[:], f8[:, :])],
-             '(),(i,m),(j,n),(),()->(m,n)',
-             nopython=True, target=defaults.test_vectorize_target)
-def tensor_outer_at(val, v, w, i, j, res):
-    r1 = v.shape[1]
-    r2 = w.shape[1]
-    for m in range(r1):
-        for n in range(r2):
-            res[m, n] = val[0] * v[i[0], m] * w[j[0], n]
+def tensor_outer_at(vtarget, **kwargs):
+    @guvectorize(['void(float64[:], float64[:, :], float64[:, :], intp[:], intp[:], float64[:, :])'],
+                 '(),(i,m),(j,n),(),()->(m,n)',
+                 target=vtarget, nopython=True, **kwargs)
+    def tensor_outer_wrapped(val, v, w, i, j, res):
+        r1 = v.shape[1]
+        r2 = w.shape[1]
+        for m in range(r1):
+            for n in range(r2):
+                res[m, n] = val[0] * v[i[0], m] * w[j[0], n]
+    return tensor_outer_wrapped
