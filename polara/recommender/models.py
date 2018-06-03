@@ -225,7 +225,14 @@ class RecommenderModel(object):
     def _user_scores(self, i):
         # should not be exposed, designed for use within framework
         # operates on internal itemid's
-        test_data, test_shape, _ = self._get_test_data()
+        if not self._is_ready:
+            if self.verbose:
+                print('{} model is not ready. Rebuilding.'.format(self.method))
+            self.build()
+
+        test_data, test_shape, test_users = self._get_test_data()
+        if not self.data.warm_start:
+            i, = np.where(test_users == i)[0]
         scores, seen_idx = self.slice_recommendations(test_data, test_shape, i, i+1)
 
         if self.filter_seen:
