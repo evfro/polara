@@ -89,9 +89,9 @@ class RecommenderModel(object):
         self.verify_integrity = get_default('verify_integrity')
         self.max_test_workers = get_default('max_test_workers')
 
-        # TODO sorting in data must be by self._key, also need to change get_test_data
-        self._key = self.data.fields.userid
-        self._target = self.data.fields.itemid
+        # TODO sorting in data must be by self._predition_key, also need to change get_test_data
+        self._predition_key = self.data.fields.userid
+        self._prediction_target = self.data.fields.itemid
 
         self._is_ready = False
         self.verbose = True
@@ -190,7 +190,7 @@ class RecommenderModel(object):
         test_shape = self.data.get_test_shape(tensor_mode=tensor_mode)
 
         idx_diff = np.diff(user_idx)
-        # TODO sorting by self._key
+        # TODO sorting by self._predition_key
         assert (idx_diff >= 0).all()  # calculations assume testset is sorted by users!
 
         # TODO only required when testset consists of known users
@@ -381,7 +381,7 @@ class RecommenderModel(object):
 
         feedback = None if ignore_feedback else feedback
         scoring_data = assemble_scoring_matrices(recommendations, eval_data,
-                                                 self._key, self._target,
+                                                 self._predition_key, self._prediction_target,
                                                  is_positive, feedback=feedback)
 
         if method == 'relevance':  # no need for feedback
