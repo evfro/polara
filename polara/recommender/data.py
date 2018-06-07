@@ -221,8 +221,10 @@ class RecommenderData(object):
             self._try_sort_test_data()
 
         if self.verbose:
+            num_train_events = self.training.shape[0] if self.training is not None else 0
+            num_holdout_events = self.test.holdout.shape[0] if self.test.holdout is not None else 0
             stats_msg = 'Done.\nThere are {} events in the training and {} events in the holdout.'
-            print(stats_msg.format(self.training.shape[0], self.test.holdout.shape[0]))
+            print(stats_msg.format(num_train_events, num_holdout_events))
 
     def prepare_training_only(self):
         self.holdout_size = 0  # do not form holdout
