@@ -685,7 +685,7 @@ class RecommenderData(object):
             selector = selector.sample(frac=1, random_state=random_state)
 
         group_id = group_id or self.fields.userid
-        grouper = selector.groupby(self._data[group_id], sort=False)
+        grouper = selector.groupby(self._data[group_id], sort=False, group_keys=False)
 
         if self._random_holdout:  # randomly sample data for evaluation
             random_state = np.random.RandomState(self.seed)
@@ -708,8 +708,7 @@ class RecommenderData(object):
                     return x.iloc[np.argpartition(x, -size)[-size:]]
                 holdout = grouper.apply(sample_largest)
 
-        holdout_index = holdout.index.get_level_values(1)
-        return self._data.loc[holdout_index]
+        return self._data.loc[holdout.index]
 
 
     def _sample_testset(self, test_split, holdout_index):
