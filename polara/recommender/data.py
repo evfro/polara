@@ -12,8 +12,10 @@ from polara.recommender import defaults
 
 def random_choice(df, num, random_state):
     n = df.shape[0]
-    k = min(num, n)
-    return df.iloc[random_state.choice(n, k, replace=False)]
+    if n > num:
+        return df.take(random_state.choice(n, num, replace=False), is_copy=False)
+    else:
+        return df
 
 
 def random_sample(df, frac, random_state):
