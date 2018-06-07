@@ -148,6 +148,11 @@ class RecommenderModel(object):
             self._refresh_model()
 
 
+    def get_base_configuration(self):
+        config = {attr: getattr(self, attr) for attr in self._config}
+        return config
+
+
     def build(self):
         raise NotImplementedError('This must be implemented in subclasses')
 
