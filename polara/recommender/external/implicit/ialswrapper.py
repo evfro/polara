@@ -20,6 +20,7 @@ class ImplicitALS(RecommenderModel):
         self.regularization = 0.01
         self.num_threads = 0
         self.num_epochs = 15
+        self.train_switch_positive = None
         self.method = 'iALS'
         self._model = None
 
@@ -51,6 +52,12 @@ class ImplicitALS(RecommenderModel):
 
         # prepare input matrix for learning the model
         matrix = self.get_training_matrix() # user_by_item sparse matrix
+
+        # filter out negative ratings if appropiate
+        if self.train_switch_positive:
+            matrix.data[matrix.data < self.train_switch_positive] = 0
+            matrix.eliminate_zeros()
+
         matrix.data = self.confidence(matrix.data, alpha=self.alpha, weight=self.weight_func)
 
         with Timer(self.method, verbose=self.verbose):
