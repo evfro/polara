@@ -677,7 +677,7 @@ class RecommenderData(object):
 
     def _sample_holdout(self, test_split, group_id=None):
         # TODO order_field may also change - need to check it as well
-        order_field = self._custom_order or self.fields.feedback
+        order_field = self._custom_order or self.fields.feedback or []
 
         selector = self._data.loc[test_split, order_field]
         # data may have many items with the same top ratings
