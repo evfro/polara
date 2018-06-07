@@ -735,7 +735,24 @@ class RecommenderData(object):
         return sampled
 
 
-    def to_coo(self, tensor_mode=False):
+    @staticmethod
+    def threshold_data(idx, val, threshold, filter_values=True):
+        if threshold is None:
+            return idx, val
+
+        value_filter = val >= threshold
+        if filter_values:
+            val = val[value_filter]
+            if isinstance(idx, tuple):
+                idx = tuple([x[value_filter] for x in idx])
+            else:
+                idx = idx[value_filter, :]
+        else:
+            val[~value_filter] = 0
+        return idx, val
+
+
+    def to_coo(self, tensor_mode=False, feedback_threshold=None):
         userid, itemid, feedback = self.fields
         user_item_data = self.training[[userid, itemid]].values
 
@@ -755,6 +772,7 @@ class RecommenderData(object):
                 val = self.training[feedback].values
 
         shp = tuple(idx.max(axis=0) + 1)
+        idx, val = self.threshold_data(idx, val, feedback_threshold)
         idx = idx.astype(np.intp)
         val = np.ascontiguousarray(val)
         return idx, val, shp
@@ -775,7 +793,7 @@ class RecommenderData(object):
         return testset
 
 
-    def test_to_coo(self, tensor_mode=False):
+    def test_to_coo(self, tensor_mode=False, feedback_threshold=None):
         userid, itemid, feedback = self.fields
         testset = self.test.testset
 
@@ -801,8 +819,8 @@ class RecommenderData(object):
             else:
                 fdbk_val = testset[feedback].values
             test_coo = (user_idx, item_idx, fdbk_val)
-
-        return test_coo
+        test_coo, val = self.threshold_data(test_coo[:-1], test_coo[-1], feedback_threshold, filter_values=False)
+        return test_coo + (val,)
 
 
     def get_test_shape(self, tensor_mode=False):
