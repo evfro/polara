@@ -607,7 +607,7 @@ class PopularityModel(RecommenderModel):
         item_groups = self.data.training.groupby(itemid, sort=True)
         if self.by_feedback_value:
             feedback = self.data.fields.feedback
-            self.items_scores = item_groups[feedback].sum().values
+            self.item_scores = item_groups[feedback].sum().values
         else:
             self.item_scores = item_groups.size().values
 
