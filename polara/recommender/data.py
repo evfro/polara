@@ -495,17 +495,17 @@ class RecommenderData(object):
             self._reindex_train_items()
             self._reindex_feedback()
 
-    def _try_drop_unseen_test_items(self):
+    def _try_drop_unseen_test_items(self, mapping='old'):
         if self.ensure_consistency:
             itemid = self.fields.itemid
-            self._filter_unseen_entity(itemid, self._test.testset, 'testset')
-            self._filter_unseen_entity(itemid, self._test.holdout, 'holdout')
+            self._filter_unseen_entity(itemid, self._test.testset, 'testset', mapping)
+            self._filter_unseen_entity(itemid, self._test.holdout, 'holdout', mapping)
 
-    def _try_drop_unseen_test_users(self):
+    def _try_drop_unseen_test_users(self, mapping='old'):
         if self.ensure_consistency and not self._warm_start:
             # even in state 3 there could be unseen users
             userid = self.fields.userid
-            self._filter_unseen_entity(userid, self._test.holdout, 'holdout')
+            self._filter_unseen_entity(userid, self._test.holdout, 'holdout', mapping)
 
     def _try_drop_invalid_test_users(self):
         if self.holdout_size >= 1:
@@ -613,7 +613,7 @@ class RecommenderData(object):
         entity_index_map = seen_entities_index.set_index('old').new
         dataset.loc[:, entity] = dataset.loc[:, entity].map(entity_index_map)
 
-    def _filter_unseen_entity(self, entity, dataset, label):
+    def _filter_unseen_entity(self, entity, dataset, label, mapping):
         if dataset is None:
             return
 
@@ -625,9 +625,9 @@ class RecommenderData(object):
             raise NotImplementedError
 
         try:
-            seen_entities = index_data.training['old']
+            seen_entities = index_data.training[mapping]
         except AttributeError:
-            seen_entities = index_data['old']
+            seen_entities = index_data[mapping]
 
         seen_data = dataset[entity].isin(seen_entities)
         if not seen_data.all():
@@ -883,52 +883,13 @@ class RecommenderData(object):
         if (testset is None) and (holdout is None): return  # allows to cleanup data
 
         if ensure_consistency:  # allows to disable self.ensure_consistency without actually changing it
-            self._try_drop_unseen_test_items()  # unseen = not present in training data
-            self._try_drop_unseen_test_users()  # unseen = not present in training data
+            index_mapping = 'old' if reindex else 'new'
+            self._try_drop_unseen_test_items(mapping=index_mapping)  # unseen = not present in training data
+            self._try_drop_unseen_test_users(mapping=index_mapping)  # unseen = not present in training data
         self._try_drop_invalid_test_users()  # inconsistent between testset and holdout
         if reindex:
             self._try_reindex_test_data()  # either assign known index, or reindex (if warm_start)
         self._try_sort_test_data()
-
-
-
-class BinaryDataMixin(object):
-    def __init__(self, *args, **kwargs):
-        raise NotImplementedError
-        self.binary_threshold = kwargs.pop('binary_threshold', None)
-        super(BinaryDataMixin, self).__init__(*args, **kwargs)
-
-    def _binarize(self, data, return_filtered_users=False):
-        feedback = self.fields.feedback
-        data = data[data[feedback] >= self.binary_threshold].copy()
-        data[feedback] = np.ones_like(data[feedback])
-        return data
-
-    def _split_test_data(self):
-        super(BinaryDataMixin, self)._split_test_data()
-        if self.binary_threshold is not None:
-            self._training = self._binarize(self._training)
-
-    def _split_eval_data(self):
-        super(BinaryDataMixin, self)._split_eval_data()
-        if self.binary_threshold is not None:
-            userid = self.fields.userid
-            testset = self._binarize(self.test.testset)
-            test_users = testset[userid].unique()
-            user_sel = self.test.holdout[userid].isin(test_users)
-            holdout = self.test.holdout[user_sel].copy()
-            self._test = namedtuple('TestData', 'testset holdout')._make([testset, holdout])
-            if len(test_users) != (testset[userid].max()+1):
-                # remove gaps in test user indices
-                self._update_test_user_index()
-
-    def _update_test_user_index(self):
-        testset, holdout = self._test
-        userid = self.fields.userid
-        new_test_idx = self.reindex(testset, userid, sort=False, inplace=True)
-        holdout.loc[:, userid] = holdout[userid].map(new_test_idx.set_index('old').new)
-        new_test_idx.old = new_test_idx.old.map(self.index.userid.test.set_index('new').old)
-        self.index = self.index._replace(userid=self.index.userid._replace(test=new_test_idx))
 
 
 class LongTailMixin(object):
