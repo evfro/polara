@@ -549,7 +549,7 @@ class RecommenderData(object):
             invalid_session_index = invalid_sessions.index[invalid_sessions]
             holdout.query('{} not in @invalid_session_index'.format(group_id), inplace=True)
             if self.verbose:
-                msg = '{} of {} {}\'s were filtered out from holdout. Reason: not enough items.'
+                msg = '{} of {} {}\'s were filtered out from holdout. Reason: incompatible number of items.'
                 print(msg.format(n_invalid_sessions, len(invalid_sessions), group_id))
 
     def _align_test_users(self):
