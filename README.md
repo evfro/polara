@@ -41,6 +41,7 @@ svd = SVDModel(data_model)
 svd.build()
 svd.evaluate()
 ```
+Several different scenarios and use cases, which cover many practical aspects, can also be found in the [examples directory](/examples).
 
 ## Creating new recommender models
 Basic models can be extended by subclassing `RecommenderModel` class and defining two required methods: `self.build()` and `self.get_recommendations()`. Here's an example of a simple item-to-item recommender model:
