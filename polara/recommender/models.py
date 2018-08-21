@@ -70,27 +70,24 @@ class MetaModel(type):
 
 @with_metaclass(MetaModel)
 class RecommenderModel(object):
-    _config = ('topk', 'filter_seen', 'switch_positive', 'verify_integrity')
+    _config = ('topk', 'filter_seen', 'switch_positive', 'feedback_threshold', 'verify_integrity')
     _pad_const = -1  # used for sparse data
 
-    def __init__(self, recommender_data, switch_positive=None):
+    def __init__(self, recommender_data, feedback_threshold=None):
 
         self.data = recommender_data
         self._recommendations = None
         self.method = 'ABC'
 
         self._topk = get_default('topk')
-        self.filter_seen = get_default('filter_seen')
-        # `switch_positive` can be used by other models during construction process
-        # (e.g. mymedialite wrapper or any other implicit model); hence, it's
-        # better to make it a model attribute, not a simple evaluation argument
-        # (in contrast to `on_feedback_level` argument of self.evaluate)
-        self.switch_positive = switch_positive or get_default('switch_positive')
+        self._filter_seen = get_default('filter_seen')
+        self._feedback_threshold = feedback_threshold or get_default('feedback_threshold')
+        self.switch_positive = get_default('switch_positive')
         self.verify_integrity = get_default('verify_integrity')
         self.max_test_workers = get_default('max_test_workers')
 
-        # TODO sorting in data must be by self._predition_key, also need to change get_test_data
-        self._predition_key = self.data.fields.userid
+        # TODO sorting in data must be by self._prediction_key, also need to change get_test_data
+        self._prediction_key = self.data.fields.userid
         self._prediction_target = self.data.fields.itemid
 
         self._is_ready = False
@@ -130,13 +127,39 @@ class RecommenderModel(object):
             self._recommendations = None  # if topk is too high - recalculate recommendations
         self._topk = new_value
 
+    @property
+    def feedback_threshold(self):
+        return self._feedback_threshold
+
+    @feedback_threshold.setter
+    def feedback_threshold(self, new_value):
+        if self._feedback_threshold != new_value:
+            self._feedback_threshold = new_value
+            self._renew_model()
+
+    @property
+    def filter_seen(self):
+        return self._filter_seen
+
+    @filter_seen.setter
+    def filter_seen(self, new_value):
+        if self._filter_seen != new_value:
+            self._filter_seen = new_value
+            self._refresh_model()
+
+
+    def get_base_configuration(self):
+        config = {attr: getattr(self, attr) for attr in self._config}
+        return config
+
 
     def build(self):
         raise NotImplementedError('This must be implemented in subclasses')
 
 
-    def get_training_matrix(self, dtype=None):
-        idx, val, shp = self.data.to_coo(tensor_mode=False)
+    def get_training_matrix(self, feedback_threshold=None, dtype=None):
+        threshold = feedback_threshold or self.feedback_threshold
+        idx, val, shp = self.data.to_coo(tensor_mode=False, feedback_threshold=threshold)
         dtype = dtype or val.dtype
         matrix = csr_matrix((val, (idx[:, 0], idx[:, 1])),
                             shape=shp, dtype=dtype)
@@ -160,6 +183,12 @@ class RecommenderModel(object):
             coo_data = test_data
 
         user_coo, item_coo, fdbk_coo = coo_data
+        valid_fdbk = fdbk_coo != 0
+        if not valid_fdbk.all():
+            user_coo = user_coo[valid_fdbk]
+            item_coo = item_coo[valid_fdbk]
+            fdbk_coo = fdbk_coo[valid_fdbk]
+
         num_items = shape[1]
         test_matrix = csr_matrix((fdbk_coo, (user_coo, item_coo)),
                                  shape=(num_users, num_items),
@@ -180,17 +209,18 @@ class RecommenderModel(object):
         return slices_idx
 
 
-    def _get_test_data(self):
+    def _get_test_data(self, feedback_threshold=None):
         try:
             tensor_mode = self.factors.get(self.data.fields.feedback, None) is not None
         except AttributeError:
             tensor_mode = False
 
-        user_idx, item_idx, feedback = self.data.test_to_coo(tensor_mode=tensor_mode)
         test_shape = self.data.get_test_shape(tensor_mode=tensor_mode)
+        threshold = feedback_threshold or self.feedback_threshold
+        user_idx, item_idx, feedback = self.data.test_to_coo(tensor_mode=tensor_mode, feedback_threshold=threshold)
 
         idx_diff = np.diff(user_idx)
-        # TODO sorting by self._predition_key
+        # TODO sorting by self._prediction_key
         assert (idx_diff >= 0).all()  # calculations assume testset is sorted by users!
 
         # TODO only required when testset consists of known users
@@ -381,7 +411,7 @@ class RecommenderModel(object):
 
         feedback = None if ignore_feedback else feedback
         scoring_data = assemble_scoring_matrices(recommendations, eval_data,
-                                                 self._predition_key, self._prediction_target,
+                                                 self._prediction_key, self._prediction_target,
                                                  is_positive, feedback=feedback)
 
         if method == 'relevance':  # no need for feedback
@@ -577,7 +607,7 @@ class PopularityModel(RecommenderModel):
         item_groups = self.data.training.groupby(itemid, sort=True)
         if self.by_feedback_value:
             feedback = self.data.fields.feedback
-            self.items_scores = item_groups[feedback].sum().values
+            self.item_scores = item_groups[feedback].sum().values
         else:
             self.item_scores = item_groups.size().values
 

@@ -69,14 +69,14 @@ class MyMediaLiteWrapper(SVDModel):
                         ' --save-item-mapping={{item_mapping}}').format(command_template)
         else:
             command = ('{} --no-id-mapping'
-                        ' --rating-threshold={{switch_positive}}').format(command_template)
+                        ' --rating-threshold={{feedback_threshold}}').format(command_template)
         return command
 
 
     def _save_to_disk(self):
         if self.positive_only:
             feedback = self.data.fields.feedback
-            pos_ind = self.data.training[feedback] >= self.switch_positive
+            pos_ind = self.data.training[feedback] >= self.feedback_threshold
             pos_data = self.data.training.loc[pos_ind]
             pos_data.to_csv(self.train_data_path, index=False, header=False)
         else:
@@ -99,7 +99,7 @@ class MyMediaLiteWrapper(SVDModel):
             program=self.program,
             train_path=self.train_data_path,
             saved_model_path=self.saved_model_path,
-            switch_positive=self.switch_positive,
+            feedback_threshold=self.feedback_threshold,
             topk=self.topk,
             algo=method_name,
             options=self.options,

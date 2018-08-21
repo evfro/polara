@@ -15,6 +15,7 @@ negative_prediction = False #put negative feedback into evaluation set
 
 
 #MODELS
+feedback_threshold = None
 switch_positive = None #feedback values below are treated as negative feedback
 verify_integrity = True
 #svd

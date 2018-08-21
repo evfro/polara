@@ -12,8 +12,10 @@ from polara.recommender import defaults
 
 def random_choice(df, num, random_state):
     n = df.shape[0]
-    k = min(num, n)
-    return df.iloc[random_state.choice(n, k, replace=False)]
+    if n > num:
+        return df.take(random_state.choice(n, num, replace=False), is_copy=False)
+    else:
+        return df
 
 
 def random_sample(df, frac, random_state):
@@ -219,8 +221,10 @@ class RecommenderData(object):
             self._try_sort_test_data()
 
         if self.verbose:
+            num_train_events = self.training.shape[0] if self.training is not None else 0
+            num_holdout_events = self.test.holdout.shape[0] if self.test.holdout is not None else 0
             stats_msg = 'Done.\nThere are {} events in the training and {} events in the holdout.'
-            print(stats_msg.format(self.training.shape[0], self.test.holdout.shape[0]))
+            print(stats_msg.format(num_train_events, num_holdout_events))
 
     def prepare_training_only(self):
         self.holdout_size = 0  # do not form holdout
@@ -491,17 +495,17 @@ class RecommenderData(object):
             self._reindex_train_items()
             self._reindex_feedback()
 
-    def _try_drop_unseen_test_items(self):
+    def _try_drop_unseen_test_items(self, mapping='old'):
         if self.ensure_consistency:
             itemid = self.fields.itemid
-            self._filter_unseen_entity(itemid, self._test.testset, 'testset')
-            self._filter_unseen_entity(itemid, self._test.holdout, 'holdout')
+            self._filter_unseen_entity(itemid, self._test.testset, 'testset', mapping)
+            self._filter_unseen_entity(itemid, self._test.holdout, 'holdout', mapping)
 
-    def _try_drop_unseen_test_users(self):
+    def _try_drop_unseen_test_users(self, mapping='old'):
         if self.ensure_consistency and not self._warm_start:
             # even in state 3 there could be unseen users
             userid = self.fields.userid
-            self._filter_unseen_entity(userid, self._test.holdout, 'holdout')
+            self._filter_unseen_entity(userid, self._test.holdout, 'holdout', mapping)
 
     def _try_drop_invalid_test_users(self):
         if self.holdout_size >= 1:
@@ -545,7 +549,7 @@ class RecommenderData(object):
             invalid_session_index = invalid_sessions.index[invalid_sessions]
             holdout.query('{} not in @invalid_session_index'.format(group_id), inplace=True)
             if self.verbose:
-                msg = '{} of {} {}\'s were filtered out from holdout. Reason: not enough items.'
+                msg = '{} of {} {}\'s were filtered out from holdout. Reason: incompatible number of items.'
                 print(msg.format(n_invalid_sessions, len(invalid_sessions), group_id))
 
     def _align_test_users(self):
@@ -609,7 +613,7 @@ class RecommenderData(object):
         entity_index_map = seen_entities_index.set_index('old').new
         dataset.loc[:, entity] = dataset.loc[:, entity].map(entity_index_map)
 
-    def _filter_unseen_entity(self, entity, dataset, label):
+    def _filter_unseen_entity(self, entity, dataset, label, mapping):
         if dataset is None:
             return
 
@@ -621,9 +625,9 @@ class RecommenderData(object):
             raise NotImplementedError
 
         try:
-            seen_entities = index_data.training['old']
+            seen_entities = index_data.training[mapping]
         except AttributeError:
-            seen_entities = index_data['old']
+            seen_entities = index_data[mapping]
 
         seen_data = dataset[entity].isin(seen_entities)
         if not seen_data.all():
@@ -675,7 +679,7 @@ class RecommenderData(object):
 
     def _sample_holdout(self, test_split, group_id=None):
         # TODO order_field may also change - need to check it as well
-        order_field = self._custom_order or self.fields.feedback
+        order_field = self._custom_order or self.fields.feedback or []
 
         selector = self._data.loc[test_split, order_field]
         # data may have many items with the same top ratings
@@ -685,7 +689,7 @@ class RecommenderData(object):
             selector = selector.sample(frac=1, random_state=random_state)
 
         group_id = group_id or self.fields.userid
-        grouper = selector.groupby(self._data[group_id], sort=False)
+        grouper = selector.groupby(self._data[group_id], sort=False, group_keys=False)
 
         if self._random_holdout:  # randomly sample data for evaluation
             random_state = np.random.RandomState(self.seed)
@@ -708,8 +712,7 @@ class RecommenderData(object):
                     return x.iloc[np.argpartition(x, -size)[-size:]]
                 holdout = grouper.apply(sample_largest)
 
-        holdout_index = holdout.index.get_level_values(1)
-        return self._data.loc[holdout_index]
+        return self._data.loc[holdout.index]
 
 
     def _sample_testset(self, test_split, holdout_index):
@@ -732,7 +735,24 @@ class RecommenderData(object):
         return sampled
 
 
-    def to_coo(self, tensor_mode=False):
+    @staticmethod
+    def threshold_data(idx, val, threshold, filter_values=True):
+        if threshold is None:
+            return idx, val
+
+        value_filter = val >= threshold
+        if filter_values:
+            val = val[value_filter]
+            if isinstance(idx, tuple):
+                idx = tuple([x[value_filter] for x in idx])
+            else:
+                idx = idx[value_filter, :]
+        else:
+            val[~value_filter] = 0
+        return idx, val
+
+
+    def to_coo(self, tensor_mode=False, feedback_threshold=None):
         userid, itemid, feedback = self.fields
         user_item_data = self.training[[userid, itemid]].values
 
@@ -752,6 +772,7 @@ class RecommenderData(object):
                 val = self.training[feedback].values
 
         shp = tuple(idx.max(axis=0) + 1)
+        idx, val = self.threshold_data(idx, val, feedback_threshold)
         idx = idx.astype(np.intp)
         val = np.ascontiguousarray(val)
         return idx, val, shp
@@ -772,7 +793,7 @@ class RecommenderData(object):
         return testset
 
 
-    def test_to_coo(self, tensor_mode=False):
+    def test_to_coo(self, tensor_mode=False, feedback_threshold=None):
         userid, itemid, feedback = self.fields
         testset = self.test.testset
 
@@ -798,8 +819,8 @@ class RecommenderData(object):
             else:
                 fdbk_val = testset[feedback].values
             test_coo = (user_idx, item_idx, fdbk_val)
-
-        return test_coo
+        test_coo, val = self.threshold_data(test_coo[:-1], test_coo[-1], feedback_threshold, filter_values=False)
+        return test_coo + (val,)
 
 
     def get_test_shape(self, tensor_mode=False):
@@ -862,52 +883,13 @@ class RecommenderData(object):
         if (testset is None) and (holdout is None): return  # allows to cleanup data
 
         if ensure_consistency:  # allows to disable self.ensure_consistency without actually changing it
-            self._try_drop_unseen_test_items()  # unseen = not present in training data
-            self._try_drop_unseen_test_users()  # unseen = not present in training data
+            index_mapping = 'old' if reindex else 'new'
+            self._try_drop_unseen_test_items(mapping=index_mapping)  # unseen = not present in training data
+            self._try_drop_unseen_test_users(mapping=index_mapping)  # unseen = not present in training data
         self._try_drop_invalid_test_users()  # inconsistent between testset and holdout
         if reindex:
             self._try_reindex_test_data()  # either assign known index, or reindex (if warm_start)
         self._try_sort_test_data()
-
-
-
-class BinaryDataMixin(object):
-    def __init__(self, *args, **kwargs):
-        raise NotImplementedError
-        self.binary_threshold = kwargs.pop('binary_threshold', None)
-        super(BinaryDataMixin, self).__init__(*args, **kwargs)
-
-    def _binarize(self, data, return_filtered_users=False):
-        feedback = self.fields.feedback
-        data = data[data[feedback] >= self.binary_threshold].copy()
-        data[feedback] = np.ones_like(data[feedback])
-        return data
-
-    def _split_test_data(self):
-        super(BinaryDataMixin, self)._split_test_data()
-        if self.binary_threshold is not None:
-            self._training = self._binarize(self._training)
-
-    def _split_eval_data(self):
-        super(BinaryDataMixin, self)._split_eval_data()
-        if self.binary_threshold is not None:
-            userid = self.fields.userid
-            testset = self._binarize(self.test.testset)
-            test_users = testset[userid].unique()
-            user_sel = self.test.holdout[userid].isin(test_users)
-            holdout = self.test.holdout[user_sel].copy()
-            self._test = namedtuple('TestData', 'testset holdout')._make([testset, holdout])
-            if len(test_users) != (testset[userid].max()+1):
-                # remove gaps in test user indices
-                self._update_test_user_index()
-
-    def _update_test_user_index(self):
-        testset, holdout = self._test
-        userid = self.fields.userid
-        new_test_idx = self.reindex(testset, userid, sort=False, inplace=True)
-        holdout.loc[:, userid] = holdout[userid].map(new_test_idx.set_index('old').new)
-        new_test_idx.old = new_test_idx.old.map(self.index.userid.test.set_index('new').old)
-        self.index = self.index._replace(userid=self.index.userid._replace(test=new_test_idx))
 
 
 class LongTailMixin(object):
