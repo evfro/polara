@@ -19,7 +19,7 @@ from scipy.sparse import coo_matrix, csr_matrix
 from scipy.sparse.linalg import svds
 
 from polara.recommender import defaults
-from polara.recommender.evaluation import get_hits, get_relevance_scores, get_ranking_scores
+from polara.recommender.evaluation import get_hits, get_relevance_scores, get_ranking_scores, get_experience_scores
 from polara.recommender.evaluation import get_hr_score, get_mrr_score
 from polara.recommender.evaluation import assemble_scoring_matrices
 from polara.recommender.utils import array_split, get_nnz_max
@@ -430,6 +430,8 @@ class RecommenderModel(object):
                 scores = get_ranking_scores(*scoring_data, switch_positive=self.switch_positive, topk=topk, alternative=ndcg_alternative)
         elif method == 'hits':  # no need for feedback
             scores = get_hits(*scoring_data, not_rated_penalty=not_rated_penalty)
+        elif method == 'experience':  # no need for feedback
+            scores = get_experience_scores(recommendations, self.data.index.itemid.shape[0])
         else:
             raise NotImplementedError
         return scores

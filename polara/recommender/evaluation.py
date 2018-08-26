@@ -221,3 +221,9 @@ def get_relevance_scores(rank_matrix, hits_rank, miss_rank, eval_matrix, eval_ma
     scores = namedtuple('Relevance', ['precision', 'recall', 'fallout', 'specifity', 'miss_rate'])
     scores = scores._make([precision, recall, fallout, specifity, miss_rate])
     return scores
+
+
+def get_experience_scores(recommendations, total):
+    cov = len(np.unique(recommendations)) / total
+    scores = namedtuple('Experience', ['cov'])._make([cov])
+    return scores
