@@ -32,3 +32,8 @@ def random_grid(params, n=60, grid_cache=None):
     except KeyboardInterrupt:
         print('Interrupted by user. Providing current results.')
     return grid
+
+
+def set_config(model, attributes, values):
+    for name, value in zip(attributes, values):
+        setattr(model, name, value)
