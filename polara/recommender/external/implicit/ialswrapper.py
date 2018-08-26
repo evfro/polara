@@ -16,6 +16,7 @@ class ImplicitALS(RecommenderModel):
         super(ImplicitALS, self).__init__(*args, **kwargs)
         self._rank = 10
         self.alpha = 1
+        self.epsilon = 1
         self.weight_func = np.log2
         self.regularization = 0.01
         self.num_threads = 0
@@ -36,9 +37,9 @@ class ImplicitALS(RecommenderModel):
 
 
     @staticmethod
-    def confidence(values, alpha=1, weight=None, dtype='double'):
+    def confidence(values, alpha=1, weight=None, epsilon=1, dtype='double'):
         '''implementation of a generic confidence-based function'''
-        values = weight(values) if weight is not None else values
+        values = weight(values/epsilon) if weight is not None else values/epsilon
         return (alpha * values).astype(dtype)
 
 
@@ -51,7 +52,8 @@ class ImplicitALS(RecommenderModel):
 
         # prepare input matrix for learning the model
         matrix = self.get_training_matrix() # user_by_item sparse matrix
-        matrix.data = self.confidence(matrix.data, alpha=self.alpha, weight=self.weight_func)
+        matrix.data = self.confidence(matrix.data, alpha=self.alpha,
+                                      weight=self.weight_func, epsilon=self.epsilon)
 
         with Timer(self.method, verbose=self.verbose):
             # build the model
@@ -66,7 +68,8 @@ class ImplicitALS(RecommenderModel):
                 raise ValueError('The model always filters seen items from results.')
             # prepare test matrix with preferences of unseen users
             matrix, _ = self.get_test_matrix()
-            matrix.data = self.confidence(matrix.data, alpha=self.alpha, weight=self.weight_func)
+            matrix.data = self.confidence(matrix.data, alpha=self.alpha,
+                                          weight=self.weight_func, epsilon=self.epsilon)
             num_users = matrix.shape[0]
             users_idx = range(num_users)
 
