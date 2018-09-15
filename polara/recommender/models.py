@@ -217,6 +217,13 @@ class RecommenderModel(object):
 
         test_shape = self.data.get_test_shape(tensor_mode=tensor_mode)
         threshold = feedback_threshold or self.feedback_threshold
+        if self.data.warm_start:
+            if threshold:
+                print('Specifying threshold has no effect in warm start.')
+            threshold = None
+        else:
+            if self.data.test_sample and (threshold is not None):
+                print('Specifying both threshold value and test_sample may change test data.')
         user_idx, item_idx, feedback = self.data.test_to_coo(tensor_mode=tensor_mode, feedback_threshold=threshold)
 
         idx_diff = np.diff(user_idx)
