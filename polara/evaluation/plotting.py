@@ -42,7 +42,7 @@ def show_hits(all_scores, **kwargs):
     scores = all_scores['hits']
     keys = ['true_positive', 'false_positive']
     kwargs['titles'] = ['True Positive Hits @$n$', 'False Positive Hits @$n$']
-    kwargs['errors'] = kwargs['errors']['hits'] if kwargs.get('errors', False) else None
+    kwargs['errors'] = kwargs['errors']['hits'] if kwargs.get('errors', None) is not None else None
     _plot_pair(scores, keys, **kwargs)
 
 
@@ -50,7 +50,7 @@ def show_ranking(all_scores, **kwargs):
     scores = all_scores['ranking']
     keys = ['nDCG', 'nDCL']
     kwargs['titles'] = ['nDCG@$n$', 'nDCL@$n$']
-    kwargs['errors'] = kwargs['errors']['ranking'] if kwargs.get('errors', False) else None
+    kwargs['errors'] = kwargs['errors']['ranking'] if kwargs.get('errors', None) is not None else None
     _plot_pair(scores, keys, **kwargs)
 
 
@@ -100,7 +100,7 @@ def show_hit_rates(all_scores, **kwargs):
     scores = all_scores['relevance']
     keys = ['fallout', 'recall']
     kwargs['titles'] = ['False Positive Rate', 'True Positive Rate']
-    kwargs['errors'] = kwargs['errors']['relevance'] if kwargs.get('errors', False) else None
+    kwargs['errors'] = kwargs['errors']['relevance'] if kwargs.get('errors', None) is not None else None
     kwargs['ROC_middle'] = True
     kwargs['limit'] = max(scores['fallout'].max().max(), scores['recall'].max().max()) + 0.01
     _cross_plot(scores, keys, **kwargs)
@@ -110,7 +110,7 @@ def show_ranking_positivity(all_scores, **kwargs):
     scores = all_scores['ranking']
     keys = ['nDCL', 'nDCG']
     kwargs['titles'] = ['Negative Ranking', 'Positive Ranking']
-    kwargs['errors'] = kwargs['errors']['ranking'] if kwargs.get('errors', False) else None
+    kwargs['errors'] = kwargs['errors']['ranking'] if kwargs.get('errors', None) is not None else None
     kwargs['ROC_middle'] = True
     kwargs['limit'] = max(scores['nDCL'].max().max(), scores['nDCG'].max().max()) + 0.01
     _cross_plot(scores, keys, **kwargs)
@@ -120,7 +120,7 @@ def show_precision_recall(all_scores, limit=False, ignore_field_limit=None, **kw
     scores = all_scores['relevance']
     keys = ['recall', 'precision']
     kwargs['titles'] = ['Recall', 'Precision']
-    kwargs['errors'] = kwargs['errors']['relevance'] if kwargs.get('errors', False) else None
+    kwargs['errors'] = kwargs['errors']['relevance'] if kwargs.get('errors', None) is not None else None
     kwargs['ROC_middle'] = False
     if limit:
         maxx = scores['recall'].drop(ignore_field_limit, axis=1, errors='ignore').max().max()
