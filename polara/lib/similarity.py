@@ -308,6 +308,24 @@ def get_features_data(meta_data, ranking=None, deduplicate=True):
     return feature_mats, feature_lbls
 
 
+def stack_features(features, add_identity=False, normalize=True, dtype=None, **kwargs):
+    feature_mats, feature_lbls = get_features_data(features, **kwargs)
+
+    all_matrices = list(feature_mats.values())
+    if add_identity:
+        identity = sp.sparse.eye(features.shape[0])
+        all_matrices = [identity] + all_matrices
+
+    stacked_features = sp.sparse.hstack(all_matrices, format='csr', dtype=dtype)
+
+    if normalize:
+        norm = stacked_features.getnnz(axis=1)
+        scaling = np.power(norm, -1, where=norm>0, dtype=dtype)
+        stacked_features = sp.sparse.diags(scaling).dot(stacked_features)
+
+    return stacked_features, feature_lbls
+
+
 def _sim_func(func_type):
     if func_type.lower() == 'jaccard':
         return jaccard_similarity
