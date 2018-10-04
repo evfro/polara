@@ -225,5 +225,5 @@ def get_relevance_scores(rank_matrix, hits_rank, miss_rank, eval_matrix, eval_ma
 
 def get_experience_scores(recommendations, total):
     cov = len(np.unique(recommendations)) / total
-    scores = namedtuple('Experience', ['cov'])._make([cov])
+    scores = namedtuple('Experience', ['coverage'])._make([cov])
     return scores
