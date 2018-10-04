@@ -4,9 +4,11 @@ try:
 except NameError:
     pass
 
+from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import as_completed
 import numpy as np
 from scipy.sparse import csr_matrix
-from numba import njit, guvectorize
+from numba import jit, njit, guvectorize, prange
 from numba import float64 as f8
 from numba import intp as ip
 
@@ -123,3 +125,66 @@ def tensor_outer_at(vtarget, **kwargs):
             for n in range(r2):
                 res[m, n] = val[0] * v[i[0], m] * w[j[0], n]
     return tensor_outer_wrapped
+
+
+@njit(nogil=True)
+def dttm_seq(idx, val, u, v, mode0, mode1, mode2, res):
+    new_shape1 = u.shape[1]
+    new_shape2 = v.shape[1]
+    for i in range(len(val)):
+        i0 = idx[i, mode0]
+        i1 = idx[i, mode1]
+        i2 = idx[i, mode2]
+        vv = val[i]
+        for j in range(new_shape1):
+            uij = u[i1, j]
+            for k in range(new_shape2):
+                vik = v[i2, k]
+                res[i0, j, k] += vv * uij * vik
+
+
+@njit(parallel=True)
+def dttm_par(idx, val, mat1, mat2, mode1, mode2, unqs, inds, res):
+    r1 = mat1.shape[1]
+    r2 = mat2.shape[1]
+    n = len(unqs)
+
+    for s in prange(n):
+        i0 = unqs[s]
+        ul = inds[s]
+        for pos in ul:
+            i1 = idx[pos, mode1]
+            i2 = idx[pos, mode2]
+            vp = val[pos]
+            for j1 in range(r1):
+                for j2 in range(r2):
+                    res[i0, j1, j2] += vp * mat1[i1, j1] * mat2[i2, j2]
+
+
+@jit(parallel=True)
+def arrange_index(array):
+    unqs, unq_inv, unq_cnt = np.unique(array, return_inverse=True, return_counts=True)
+    inds = np.split(np.argsort(unq_inv), np.cumsum(unq_cnt[:-1]))
+    return unqs, inds
+
+def arrange_indices(idx, mode_mask=None):
+    n = idx.shape[1]
+    res = [[]]*n
+    if mode_mask is None:
+        mode_mask = [True] * n
+
+    if sum(mode_mask) == 0:
+        return res
+
+    if sum(mode_mask) == 1:
+        mode, = [i for i, x in enumerate(mode_mask) if x]
+        res[mode] = arrange_index(idx[:, mode])
+        return res
+
+    with ThreadPoolExecutor(max_workers=sum(mode_mask)) as executor:
+        arranged_futures = {executor.submit(arrange_index, idx[:, mode]): mode
+                            for mode in range(n) if mode_mask[mode]}
+        for future in as_completed(arranged_futures):
+            mode = arranged_futures[future]
+            res[mode] = future.result()
+    return res

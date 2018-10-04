@@ -23,7 +23,8 @@ from polara.recommender.evaluation import get_hits, get_relevance_scores, get_ra
 from polara.recommender.evaluation import get_hr_score, get_mrr_score
 from polara.recommender.evaluation import assemble_scoring_matrices
 from polara.recommender.utils import array_split, get_nnz_max
-from polara.lib.hosvd import tucker_als
+from polara.lib.tensor import hooi
+
 from polara.lib.sparse import csc_matvec, inverse_permutation
 from polara.lib.sparse import unfold_tensor_coordinates, tensor_outer_at
 from polara.tools.timing import Timer
@@ -780,6 +781,7 @@ class CoffeeModel(RecommenderModel):
         self.show_output = defaults.show_output
         self.seed = None
         self._vectorize_target = defaults.test_vectorize_target
+        self.parallel_ttm = defaults.parallel_ttm
 
 
     @property
@@ -875,12 +877,13 @@ class CoffeeModel(RecommenderModel):
         idx, val, shp = self.data.to_coo(tensor_mode=True)
 
         with Timer(self.method, verbose=self.verbose):
-            users_factors, items_factors, feedback_factors, core = \
-                tucker_als(idx, val, shp, self.mlrank,
-                           growth_tol=self.growth_tol,
-                           iters=self.num_iters,
-                           batch_run=not self.show_output,
-                           seed=self.seed)
+            (users_factors, items_factors,
+            feedback_factors, core) = hooi(idx, val, shp, self.mlrank,
+                                           growth_tol=self.growth_tol,
+                                           num_iters=self.num_iters,
+                                           verbose=self.show_output,
+                                           parallel_ttm=self.parallel_ttm,
+                                           seed=self.seed)
 
         self.factors[self.data.fields.userid] = users_factors
         self.factors[self.data.fields.itemid] = items_factors
