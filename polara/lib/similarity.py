@@ -46,37 +46,37 @@ def set_diagonal_values(mat, val=1):
         mat.setdiag(val)
 
 
-def safe_inverse_root(d):
+def safe_inverse_root(d, dtype=None):
     if (d < 0).any():
         raise ValueError
-    return np.piecewise(d, [d>0, d==0], [lambda x: x**(-0.5), lambda x: x])
+    return np.power(d, -0.5, where=d>0, dtype=dtype)
 
 
-def normalize_binary_features(feature_mat):
+def normalize_binary_features(feature_mat, dtype=None):
     sqsum = feature_mat.getnnz(axis=1)
     if feature_mat.format == 'csc':
         ind = feature_mat.indices.copy()
         ptr = feature_mat.indptr.copy()
         norm_data = 1 / np.sqrt(np.take(sqsum, ind))
-        normed = csc_matrix((norm_data, ind, ptr), shape=feature_mat.shape)
+        normed = csc_matrix((norm_data, ind, ptr), shape=feature_mat.shape, dtype=dtype)
     else:
-        norm_data = safe_inverse_root(sqsum.astype(np.float64))
+        norm_data = safe_inverse_root(sqsum, dtype=dtype)
         normed = sp.sparse.diags(norm_data).dot(feature_mat)
     return normed
 
 
-def normalize_features(feature_mat):
+def normalize_features(feature_mat, dtype=None):
     if feature_mat.format == 'csc':
         ptr = feature_mat.indptr.copy()
         ind = feature_mat.indices.copy()
         sqsum = np.bincount(ind, weights=feature_mat.data**2)
-        # could do np.add.at(sqsum, indices, data**2), but bincount seem faster
+        # could do np.add.at(sqsum, indices, data**2), but bincount seems faster
         norm_data = feature_mat.data / np.sqrt(np.take(sqsum, ind))
-        normed = csc_matrix((norm_data, ind, ptr), shape=feature_mat.shape)
+        normed = csc_matrix((norm_data, ind, ptr), shape=feature_mat.shape, dtype=dtype)
     else:
         sqsum = feature_mat.power(2).sum(axis=1).view(type=np.ndarray).squeeze()
         # avoid zero division
-        norm_data = safe_inverse_root(sqsum.astype(np.float64))
+        norm_data = safe_inverse_root(sqsum, dtype=dtype)
         normed = sp.sparse.diags(norm_data).dot(feature_mat)
     return normed
 
@@ -306,6 +306,24 @@ def get_features_data(meta_data, ranking=None, deduplicate=True):
         mat, lbl = feature2sparse(feature_data, ranking=ranking.get(feature, None), deduplicate=deduplicate)
         feature_mats[feature], feature_lbls[feature] = mat, lbl
     return feature_mats, feature_lbls
+
+
+def stack_features(features, add_identity=False, normalize=True, dtype=None, **kwargs):
+    feature_mats, feature_lbls = get_features_data(features, **kwargs)
+
+    all_matrices = list(feature_mats.values())
+    if add_identity:
+        identity = sp.sparse.eye(features.shape[0])
+        all_matrices = [identity] + all_matrices
+
+    stacked_features = sp.sparse.hstack(all_matrices, format='csr', dtype=dtype)
+
+    if normalize:
+        norm = stacked_features.getnnz(axis=1)
+        scaling = np.power(norm, -1, where=norm>0, dtype=dtype)
+        stacked_features = sp.sparse.diags(scaling).dot(stacked_features)
+
+    return stacked_features, feature_lbls
 
 
 def _sim_func(func_type):

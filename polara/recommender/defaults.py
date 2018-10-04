@@ -26,6 +26,7 @@ growth_tol = 0.0001
 num_iters = 25
 show_output = False
 flattener = slice(0, None)
+parallel_ttm = False # compute tensor-times-matrix products in parallel
 test_vectorize_target = 'parallel'
 # from https://numba.pydata.org/numba-doc/dev/user/vectorize.html
 #The “cpu” target works well for small data sizes (approx. less than 1KB) and

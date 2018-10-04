@@ -19,11 +19,12 @@ from scipy.sparse import coo_matrix, csr_matrix
 from scipy.sparse.linalg import svds
 
 from polara.recommender import defaults
-from polara.recommender.evaluation import get_hits, get_relevance_scores, get_ranking_scores
+from polara.recommender.evaluation import get_hits, get_relevance_scores, get_ranking_scores, get_experience_scores
 from polara.recommender.evaluation import get_hr_score, get_mrr_score
 from polara.recommender.evaluation import assemble_scoring_matrices
 from polara.recommender.utils import array_split, get_nnz_max
-from polara.lib.hosvd import tucker_als
+from polara.lib.tensor import hooi
+
 from polara.lib.sparse import csc_matvec, inverse_permutation
 from polara.lib.sparse import unfold_tensor_coordinates, tensor_outer_at
 from polara.tools.timing import Timer
@@ -217,6 +218,13 @@ class RecommenderModel(object):
 
         test_shape = self.data.get_test_shape(tensor_mode=tensor_mode)
         threshold = feedback_threshold or self.feedback_threshold
+        if self.data.warm_start:
+            if threshold:
+                print('Specifying threshold has no effect in warm start.')
+            threshold = None
+        else:
+            if self.data.test_sample and (threshold is not None):
+                print('Specifying both threshold value and test_sample may change test data.')
         user_idx, item_idx, feedback = self.data.test_to_coo(tensor_mode=tensor_mode, feedback_threshold=threshold)
 
         idx_diff = np.diff(user_idx)
@@ -430,6 +438,8 @@ class RecommenderModel(object):
                 scores = get_ranking_scores(*scoring_data, switch_positive=self.switch_positive, topk=topk, alternative=ndcg_alternative)
         elif method == 'hits':  # no need for feedback
             scores = get_hits(*scoring_data, not_rated_penalty=not_rated_penalty)
+        elif method == 'experience':  # no need for feedback
+            scores = get_experience_scores(recommendations, self.data.index.itemid.shape[0])
         else:
             raise NotImplementedError
         return scores
@@ -771,6 +781,7 @@ class CoffeeModel(RecommenderModel):
         self.show_output = defaults.show_output
         self.seed = None
         self._vectorize_target = defaults.test_vectorize_target
+        self.parallel_ttm = defaults.parallel_ttm
 
 
     @property
@@ -866,12 +877,13 @@ class CoffeeModel(RecommenderModel):
         idx, val, shp = self.data.to_coo(tensor_mode=True)
 
         with Timer(self.method, verbose=self.verbose):
-            users_factors, items_factors, feedback_factors, core = \
-                tucker_als(idx, val, shp, self.mlrank,
-                           growth_tol=self.growth_tol,
-                           iters=self.num_iters,
-                           batch_run=not self.show_output,
-                           seed=self.seed)
+            (users_factors, items_factors,
+            feedback_factors, core) = hooi(idx, val, shp, self.mlrank,
+                                           growth_tol=self.growth_tol,
+                                           num_iters=self.num_iters,
+                                           verbose=self.show_output,
+                                           parallel_ttm=self.parallel_ttm,
+                                           seed=self.seed)
 
         self.factors[self.data.fields.userid] = users_factors
         self.factors[self.data.fields.itemid] = items_factors

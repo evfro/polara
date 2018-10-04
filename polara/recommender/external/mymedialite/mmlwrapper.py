@@ -44,6 +44,7 @@ class MyMediaLiteWrapper(SVDModel):
         self.learn_rate = learn_rate
         self.positive_only = positive_only
         self.orthogonal_factors = True
+        self._items_biases = None
 
 
     @property
@@ -152,28 +153,31 @@ class MyMediaLiteWrapper(SVDModel):
             if items_biases is not None:
                 bias_factors_full = np.zeros(num_items,)
                 np.put(bias_factors_full, item_mapping.loc[:, 1].values, items_biases)
-                self._items_biases = bias_factors_full
-            else:
-                self._items_biases = None
+                items_biases = bias_factors_full
 
-            self._users_factors = user_factors_full
-            self._items_factors = item_factors_full
+            _users_factors = user_factors_full
+            _items_factors = item_factors_full
         else:
-            self._users_factors = users_factors['col3'].values.reshape(nu, nf)
-            self._items_factors = items_factors['col3'].values.reshape(ni, nf)
+            _users_factors = users_factors['col3'].values.reshape(nu, nf)
+            _items_factors = items_factors['col3'].values.reshape(ni, nf)
+
+        self.factors[self.data.fields.userid] = _users_factors
+        self.factors[self.data.fields.itemid] = _items_factors
+        self._items_biases = items_biases
 
 
     def _make_factors_orthogonal(self):
-        if self._items_biases is None:
-            u, v = self._users_factors, self._items_factors
-        else:
-            u, v, b = self._users_factors, self._items_factors, self._items_biases
+        u = self.factors[self.data.fields.userid]
+        v = self.factors[self.data.fields.itemid]
+
+        if self._items_biases is not None:
+            b = self._items_biases
             u = np.hstack((u, np.ones((u.shape[0], 1))))
             v = np.hstack((v, b[:, np.newaxis]))
 
         U, V = self.orthogonalize(u, v)
-        self._users_factors = U
-        self._items_factors = V
+        self.factors[self.data.fields.userid] = U
+        self.factors[self.data.fields.itemid] = V
 
 
     def build(self):
@@ -187,5 +191,16 @@ class MyMediaLiteWrapper(SVDModel):
         self._parse_factors()
 
         #TODO condition on diagonal elements to other elements ratio
-        if self.orthogonal_factors:
+        if self.orthogonal_factors or self.data.warm_start:
             self._make_factors_orthogonal()
+
+
+    def slice_recommendations(self, test_data, shape, start, stop, test_users=None):
+        if self.data.warm_start or self.orthogonal_factors:
+            return super(MyMediaLiteWrapper, self).slice_recommendations(test_data, shape, start, stop, test_users)
+
+        slice_data = self._slice_test_data(test_data, start, stop)
+        user_factors = self.factors[self.data.fields.userid][test_users[start:stop], :]
+        item_factors = self.factors[self.data.fields.itemid]
+        scores = user_factors.dot(item_factors.T)
+        return scores, slice_data
