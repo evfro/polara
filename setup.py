@@ -11,7 +11,8 @@ _packages = ["polara",
             "polara/recommender/external",
             "polara/recommender/external/mymedialite",
             "polara/recommender/external/graphlab",
-            "polara/recommender/external/implicit"]
+            "polara/recommender/external/implicit",
+            "polara/recommender/external/lightfm"]
 
 
 opts = dict(name="polara",
