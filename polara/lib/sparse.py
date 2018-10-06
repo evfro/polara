@@ -161,7 +161,8 @@ def dttm_par(idx, val, mat1, mat2, mode1, mode2, unqs, inds, res):
                     res[i0, j1, j2] += vp * mat1[i1, j1] * mat2[i2, j2]
 
 
-@jit(parallel=True)
+# @jit(parallel=True) # numba up to v0.41.dev only supports the 1st argument
+# https://numba.pydata.org/numba-doc/dev/reference/numpysupported.html
 def arrange_index(array):
     unqs, unq_inv, unq_cnt = np.unique(array, return_inverse=True, return_counts=True)
     inds = np.split(np.argsort(unq_inv), np.cumsum(unq_cnt[:-1]))
