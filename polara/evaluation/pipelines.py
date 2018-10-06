@@ -2,8 +2,8 @@ from __future__ import print_function
 
 from operator import mul as mul_op
 from functools import reduce
-from itertools import product
 from random import choice
+import pandas as pd
 
 
 def random_chooser():
@@ -37,3 +37,21 @@ def random_grid(params, n=60, grid_cache=None):
 def set_config(model, attributes, values):
     for name, value in zip(attributes, values):
         setattr(model, name, value)
+
+
+def evaluate_models(models, target_metric='precision', metric_type='all', **kwargs):
+    if not isinstance(models, (list, tuple)):
+        models = [models]
+
+    model_scores = {}
+    for model in models:
+        scores = model.evaluate(metric_type, **kwargs)
+        scores = [scores] if not isinstance(scores, list) else scores
+        scores_df = pd.concat([pd.DataFrame([s]) for s in scores], axis=1)
+        if isinstance(target_metric, str):
+            model_scores[model.method] = scores_df[target_metric].squeeze()
+        elif callable(target_metric):
+            model_scores[model.method] = scores_df.apply(target_metric, axis=1).squeeze()
+        else:
+            raise NotImplementedError
+    return model_scores
