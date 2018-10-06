@@ -392,16 +392,26 @@ class RecommenderModel(object):
         return top_recs
 
 
-    def evaluate(self, method='hits', topk=None, not_rated_penalty=None, on_feedback_level=None, ignore_feedback=False, simple_rates=False):
-        feedback = self.data.fields.feedback
+    def evaluate(self, metric_type='all', topk=None, not_rated_penalty=None,
+                 switch_positive=None, ignore_feedback=False, simple_rates=False,
+                 on_feedback_level=None):
+        if metric_type == 'all':
+            metric_type = ['hits', 'relevance', 'ranking', 'experience']
+
+        if metric_type == 'main':
+            metric_type = ['relevance', 'ranking']
+
+        if not isinstance(metric_type, (list, tuple)):
+            metric_type = [metric_type]
+
         if int(topk or 0) > self.topk:
             self.topk = topk  # will also flush old recommendations
-
         # support rolling back scenario for @k calculations
         recommendations = self.recommendations[:, :topk]  # will recalculate if empty
-
-        eval_data = self.data.test.holdout
-        if (self.switch_positive is None) or (feedback is None):
+        switch_positive = switch_positive or self.switch_positive
+        feedback = self.data.fields.feedback
+        holdout = self.data.test.holdout
+        if (switch_positive is None) or (feedback is None):
             # all recommendations are considered positive predictions
             # this is a proper setting for binary data problems (implicit feedback)
             # in this case all unrated items, recommended by an algorithm
@@ -415,33 +425,41 @@ class RecommenderModel(object):
             # the defualt setting in this case is to ignore such items at all
             # by setting penalty to 0, however, it is adjustable
             not_rated_penalty = not_rated_penalty or 0
-            is_positive = (eval_data[feedback] >= self.switch_positive).values
+            is_positive = (holdout[feedback] >= switch_positive).values
 
         feedback = None if ignore_feedback else feedback
-        scoring_data = assemble_scoring_matrices(recommendations, eval_data,
+        scoring_data = assemble_scoring_matrices(recommendations, holdout,
                                                  self._prediction_key, self._prediction_target,
                                                  is_positive, feedback=feedback)
 
-        if method == 'relevance':  # no need for feedback
+        scores = []
+        if 'relevance' in metric_type:  # no need for feedback
             if (self.data.holdout_size == 1) or simple_rates:
-                scores = get_hr_score(scoring_data[1])
+                scores.append(get_hr_score(scoring_data[1]))
             else:
-                scores = get_relevance_scores(*scoring_data, not_rated_penalty=not_rated_penalty)
-        elif method == 'ranking':
+                scores.append(get_relevance_scores(*scoring_data, not_rated_penalty=not_rated_penalty))
+
+        if 'ranking' in metric_type:
             if (self.data.holdout_size == 1) or simple_rates:
-                scores = get_mrr_score(scoring_data[1])
+                scores.append(get_mrr_score(scoring_data[1]))
             else:
                 ndcg_alternative = get_default('ndcg_alternative')
                 topk = recommendations.shape[1]  # handle topk=None case
                 # topk has to be passed explicitly, otherwise it's unclear how to
                 # estimate ideal ranking for NDCG and NDCL metrics in get_ndcr_discounts
-                scores = get_ranking_scores(*scoring_data, switch_positive=self.switch_positive, topk=topk, alternative=ndcg_alternative)
-        elif method == 'hits':  # no need for feedback
-            scores = get_hits(*scoring_data, not_rated_penalty=not_rated_penalty)
-        elif method == 'experience':  # no need for feedback
-            scores = get_experience_scores(recommendations, self.data.index.itemid.shape[0])
-        else:
+                scores.append(get_ranking_scores(*scoring_data, switch_positive=switch_positive, topk=topk, alternative=ndcg_alternative))
+
+        if 'experience' in metric_type:  # no need for feedback
+            scores.append(get_experience_scores(recommendations, self.data.index.itemid.shape[0]))
+
+        if 'hits' in metric_type:  # no need for feedback
+            scores.append(get_hits(*scoring_data, not_rated_penalty=not_rated_penalty))
+
+        if not scores:
             raise NotImplementedError
+
+        if len(scores) == 1:
+            scores = scores[0]
         return scores
 
 
