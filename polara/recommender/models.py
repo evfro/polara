@@ -942,11 +942,11 @@ class CoffeeModel(RecommenderModel):
     def get_holdout_slice(self, start, stop):
         userid = self.data.fields.userid
         itemid = self.data.fields.itemid
-        eval_data = self.data.test.holdout
+        holdout = self.data.test.holdout
 
-        user_sel = (eval_data[userid] >= start) & (eval_data[userid] < stop)
-        holdout_users = eval_data.loc[user_sel, userid].values.astype(np.int64) - start
-        holdout_items = eval_data.loc[user_sel, itemid].values.astype(np.int64)
+        user_sel = (holdout[userid] >= start) & (holdout[userid] < stop)
+        holdout_users = holdout.loc[user_sel, userid].values.astype(np.int64) - start
+        holdout_items = holdout.loc[user_sel, itemid].values.astype(np.int64)
         return (holdout_users, holdout_items)
 
 
