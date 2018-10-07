@@ -87,7 +87,7 @@ def find_optimal_svd_rank(model, ranks, target_metric, return_scores=False,
     best_rank = scores.idxmax()
     if return_scores:
         scores.index.name = 'rank'
-        return best_rank, scores
+        return best_rank, scores.loc[ranks]
     return best_rank
 
 
