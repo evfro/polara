@@ -752,6 +752,8 @@ class SVDModel(RecommenderModel):
                 self.factors = dict.fromkeys(self.factors.keys())
                 break
             else:
+                # avoid accidental overwrites if factors backup exists
+                self.factors = dict(**self.factors)
                 # ellipsis allows to handle 1d array of singular values
                 self.factors[entity] = factor[..., :rank]
 
@@ -847,6 +849,8 @@ class CoffeeModel(RecommenderModel):
             elif factor.shape[1] == rank:
                 continue
             else:
+                # avoid accidental overwrites if factors backup exists
+                self.factors = dict(**self.factors)
                 rfactor, new_core = self.round_core(self.factors['core'], mode, rank)
                 self.factors[entity] = factor.dot(rfactor)
                 self.factors['core'] = new_core
