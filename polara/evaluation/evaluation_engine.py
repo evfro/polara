@@ -127,17 +127,19 @@ def holdout_test(models, holdout_sizes=[1], metrics=['hits'], force_build=True):
     return consolidate(holdout_scores, holdout_sizes, metrics)
 
 
-def topk_test(models, topk_list=[10], metrics=['hits'], force_build=True):
+def topk_test(models, topk_list=[10], metrics='all', force_build=False):
     topk_scores = []
     data = models[0].data
-    assert all([model.data is data for model in models[1:]]) #check that data is shared across models
+    assert all([model.data is data for model in models[1:]]) # check that data is shared across models
 
     data.update()
-    topk_list = list(reversed(sorted(topk_list))) #start from max topk and rollback
+    topk_list_sorted = list(reversed(sorted(topk_list))) # start from max topk and rollback
 
     build_models(models, force_build)
-    for topk in topk_list:
-        metric_scores = evaluate_models(models, metrics, topk)
+    for topk in topk_list_sorted:
+        metric_scores = evaluate_models(models, metrics, topk=topk)
         topk_scores.append(metric_scores)
 
-    return consolidate(topk_scores, topk_list, metrics)
+    lvl_names = ['top-n', metric_scores.index.names[0]]
+    res = pd.concat(topk_scores, keys=topk_list_sorted, names=lvl_names)
+    return res.sort_index(level=lvl_names[0], sort_remaining=False)
