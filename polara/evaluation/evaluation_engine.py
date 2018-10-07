@@ -143,3 +143,22 @@ def topk_test(models, topk_list=[10], metrics='all', force_build=False):
     lvl_names = ['top-n', metric_scores.index.names[0]]
     res = pd.concat(topk_scores, keys=topk_list_sorted, names=lvl_names)
     return res.sort_index(level=lvl_names[0], sort_remaining=False)
+
+
+def run_cv_experiment(models, topk_list=[10], folds=None, metrics='all', force_build=False):
+    if not isinstance(models, (list, tuple)):
+        models = [models]
+
+    data = models[0].data
+    assert all([model.data is data for model in models[1:]]) # check that data is shared across models
+
+    if folds is None:
+        folds = range(1, int(1/data.test_ratio) + 1)
+
+    fold_result = {}
+    for fold in folds:
+        data.test_fold = fold
+        fold_result[fold] = topk_test(models, topk_list=topk_list, metrics=metrics, force_build=force_build)
+
+    lvl_names = ['fold'] + fold_result[data.test_fold].index.names
+    return pd.concat(fold_result, names=lvl_names)
