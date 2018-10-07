@@ -96,26 +96,24 @@ def holdout_test(models, holdout_sizes=[1], metrics='all'):
     return consolidate(holdout_scores, level_name='hsize', level_keys=holdout_sizes)
 
 
-
-def topk_test(models, topk_list=[10], metrics='all', force_build=False):
+def topk_test(models, topk_list=[10], metrics='all'):
     topk_scores = []
     data = models[0].data
     assert all([model.data is data for model in models[1:]]) # check that data is shared across models
 
-    data.update()
     topk_list_sorted = list(reversed(sorted(topk_list))) # start from max topk and rollback
 
-    build_models(models, force_build)
     for topk in topk_list_sorted:
         metric_scores = evaluate_models(models, metrics, topk=topk)
         topk_scores.append(metric_scores)
 
-    lvl_names = ['top-n', metric_scores.index.names[0]]
-    res = pd.concat(topk_scores, keys=topk_list_sorted, names=lvl_names)
-    return res.sort_index(level=lvl_names[0], sort_remaining=False)
+    level_name = 'top-n'
+    res = consolidate(topk_scores, level_name=level_name, level_keys=topk_list_sorted)
+    return res.sort_index(level=level_name, sort_remaining=False)
 
 
-def run_cv_experiment(models, topk_list=[10], folds=None, metrics='all', force_build=False):
+def run_cv_experiment(models, folds=None, metrics='all', fold_experiment=evaluate_models,
+                      force_build=True, deferred_update=False, **kwargs):
     if not isinstance(models, (list, tuple)):
         models = [models]
 
@@ -125,10 +123,12 @@ def run_cv_experiment(models, topk_list=[10], folds=None, metrics='all', force_b
     if folds is None:
         folds = range(1, int(1/data.test_ratio) + 1)
 
-    fold_result = {}
+    fold_results = []
     for fold in folds:
         data.test_fold = fold
-        fold_result[fold] = topk_test(models, topk_list=topk_list, metrics=metrics, force_build=force_build)
-
-    lvl_names = ['fold'] + fold_result[data.test_fold].index.names
-    return pd.concat(fold_result, names=lvl_names)
+        build_models(models, force_build)
+        if not deferred_update:
+            data.update() # data configuration is assumed to be fixed during CV
+        fold_result = fold_experiment(models, metrics=metrics, **kwargs)
+        fold_results.append(fold_result)
+    return consolidate(fold_results, level_name='fold', level_keys=folds)
