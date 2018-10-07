@@ -78,56 +78,23 @@ def build_models(models, force=True):
             model.build()
 
 
-def consolidate(scores, params, metrics):
-    res = {}
-    for i, metric in enumerate(metrics):
-        res[metric] = pd.concat([scores[j][i] for j in range(len(params))],
-                                keys=params).unstack().swaplevel(0, 1, 1).sort_index()
-    return res
+def consolidate(scores, level_name=None, level_keys=None):
+    level_names = [level_name] + scores[0].index.names
+    return pd.concat(scores, axis=0, keys=level_keys, names=level_names)
 
 
-def consolidate_folds(scores, folds, metrics, index_names=['fold', 'top-n']):
-    res = {}
-    for metric in metrics:
-        data = pd.concat([scores[j][metric] for j in folds], keys=folds)
-        data.index.names = index_names
-        res[metric] = data
-    return res
-
-
-def holdout_test_pair(model1, model2, holdout_sizes=[1], metrics=['hits']):
-    holdout_scores = []
-    models = [model1, model2]
-
-    data1 = model1.data
-    data2 = model2.data
-    for i in holdout_sizes:
-        print(i, end=' ')
-        data1.holdout_size = i
-        data1.update()
-        data2.holdout_size = i
-        data2.update()
-
-        metric_scores = evaluate_models(models, metrics)
-        holdout_scores.append(metric_scores)
-
-    return consolidate(holdout_scores, holdout_sizes, metrics)
-
-
-def holdout_test(models, holdout_sizes=[1], metrics=['hits'], force_build=True):
+def holdout_test(models, holdout_sizes=[1], metrics='all'):
     holdout_scores = []
     data = models[0].data
     assert all([model.data is data for model in models[1:]]) #check that data is shared across models
 
-    build_models(models, force_build)
     for i in holdout_sizes:
         data.holdout_size = i
         data.update()
-
         metric_scores = evaluate_models(models, metrics)
         holdout_scores.append(metric_scores)
+    return consolidate(holdout_scores, level_name='hsize', level_keys=holdout_sizes)
 
-    return consolidate(holdout_scores, holdout_sizes, metrics)
 
 
 def topk_test(models, topk_list=[10], metrics='all', force_build=False):
