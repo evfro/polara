@@ -46,16 +46,22 @@ def average_results(scores):
     return averaged, errors
 
 
-def evaluate_models(models, metrics, topk=None):
-    metric_scores = []
-    for metric in metrics:
-        model_scores = []
-        for model in models:
-            # print('model {}'.format(model.method))
-            scores = model.evaluate(method=metric, topk=topk)
-            model_scores.append(scores)
-        metric_scores.append(pd.DataFrame(model_scores, index=[model.method for model in models]).T)
-    return metric_scores
+def evaluate_models(models, metrics, **kwargs):
+    scores = []
+    for model in models:
+        model_scores = model.evaluate(metric_type=metrics, **kwargs)
+        # ensure correct format
+        model_scores = model_scores if isinstance(model_scores, list) else [model_scores]
+        # concatenate all scores
+        name = [model.method]
+        metric_types = [s.__class__.__name__.lower() for s in model_scores]
+        scores_df = pd.concat([pd.DataFrame([s], index=name) for s in model_scores],
+                              keys=metric_types, axis=1)
+        scores.append(scores_df)
+    res = pd.concat(scores, axis=0)
+    res.columns.names = ['type', 'metric']
+    res.index.names = ['model']
+    return res
 
 
 def set_topk(models, topk):
