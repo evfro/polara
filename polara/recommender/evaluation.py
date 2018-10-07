@@ -135,13 +135,9 @@ def get_ndcr_score(eval_matrix, discounts_matrix, ideal_discounts, alternative=F
         relevance = eval_matrix._with_data(np.exp2(eval_matrix.data)-1, copy=False)
     else:
         relevance = eval_matrix
-
-    dcr = relevance.multiply(discounts_matrix).sum(axis=1)
-    idcr = relevance.multiply(ideal_discounts).sum(axis=1)
-
-    with np.errstate(invalid='ignore'):
-        score = np.nansum(dcr/idcr) / relevance.shape[0]
-    return score
+    dcr = np.array(relevance.multiply(discounts_matrix).sum(axis=1), copy=False).squeeze()
+    idcr = np.array(relevance.multiply(ideal_discounts).sum(axis=1), copy=False).squeeze()
+    return safe_divide(dcr, idcr).mean()
 
 
 def get_ndcg_score(eval_matrix, discounts_matrix, ideal_discounts, alternative=False):
@@ -200,30 +196,26 @@ def get_relevance_scores(rank_matrix, hits_rank, miss_rank, eval_matrix, eval_ma
      true_negative, false_negative] = get_relevance_data(rank_matrix, hits_rank, miss_rank,
                                                          eval_matrix, eval_matrix_hits, eval_matrix_miss,
                                                          not_rated_penalty, True)
+    # non-zero mask for safe division
+    tpnz = true_positive > 0
+    fnnz = false_negative > 0
+    # true positive rate
+    precision = safe_divide(true_positive, true_positive + false_positive, tpnz).mean()
+    # sensitivity
+    recall = safe_divide(true_positive, true_positive + false_negative, tpnz).mean()
+    # false negative rate
+    miss_rate = safe_divide(false_negative, false_negative + true_positive, fnnz).mean()
 
-    with np.errstate(invalid='ignore'):
-        # true positive rate
-        precision = true_positive / (true_positive + false_positive)
-        # sensitivity
-        recall = true_positive / (true_positive + false_negative)
-        # false negative rate
-        miss_rate = false_negative / (false_negative + true_positive)
-        if true_negative is not None:
-            # false positive rate
-            fallout = false_positive / (false_positive + true_negative)
-            # true negative rate
-            specifity = true_negative / (false_positive + true_negative)
-        else:
-            fallout = specifity = None
-
-    n_keys = hits_rank.shape[0]
-    # average over all users
-    precision = np.nansum(precision) / n_keys
-    recall = np.nansum(recall) / n_keys
-    miss_rate = np.nansum(miss_rate) / n_keys
     if true_negative is not None:
-        specifity = np.nansum(specifity) / n_keys
-        fallout = np.nansum(fallout) / n_keys
+        # non-zero mask for safe division
+        fpnz = false_positive > 0
+        tnnz = true_negative > 0
+        # false positive rate
+        fallout = safe_divide(false_positive, false_positive + true_negative, fpnz).mean()
+        # true negative rate
+        specifity = safe_divide(true_negative, false_positive + true_negative, tnnz).mean()
+    else:
+        fallout = specifity = None
 
     scores = namedtuple('Relevance', ['precision', 'recall', 'fallout', 'specifity', 'miss_rate'])
     scores = scores._make([precision, recall, fallout, specifity, miss_rate])
