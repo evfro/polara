@@ -47,9 +47,10 @@ def set_diagonal_values(mat, val=1):
 
 
 def safe_inverse_root(d, dtype=None):
-    if (d < 0).any():
-        raise ValueError
-    return np.power(d, -0.5, where=d>0, dtype=dtype)
+    pos_d = d > 0
+    res = np.zeros(len(d), dtype=dtype)
+    np.power(d, -0.5, where=pos_d, dtype=dtype, out=res)
+    return res
 
 
 def normalize_binary_features(feature_mat, dtype=None):

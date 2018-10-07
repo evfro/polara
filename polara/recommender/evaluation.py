@@ -14,6 +14,13 @@ def no_copy_csr_matrix(data, indices, indptr, shape, dtype):
     return matrix
 
 
+def safe_divide(a, b, mask=None, dtype=None):
+    pos = mask if mask is not None else a > 0
+    res = np.zeros(len(a), dtype=dtype)
+    np.divide(a, b, where=pos, out=res)
+    return res
+
+
 def build_rank_matrix(recommendations, shape):
     # handle singletone case for a single user
     recommendations = np.array(recommendations, copy=False, ndmin=2)
