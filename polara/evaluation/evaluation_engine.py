@@ -12,6 +12,9 @@ import pandas as pd
 def sample_ci(df, coef=2.776, level=None): # 95% CI for sample under Student's t-test
     # http://www.stat.yale.edu/Courses/1997-98/101/confint.htm
     # example from http://onlinestatbook.com/2/estimation/mean.html
+    if isinstance(level, str):
+        level = df.index.names.index(level)
+
     nlevels = df.index.nlevels
     if (nlevels == 1) & (level is None):
         n = df.shape[0]
