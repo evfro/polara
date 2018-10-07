@@ -58,7 +58,7 @@ def evaluate_models(models, target_metric='precision', metric_type='all', **kwar
 
 
 def find_optimal_svd_rank(model, ranks, target_metric, return_scores=False,
-                          backup_factors=True, config=None, verbose=False,
+                          protect_factors=True, config=None, verbose=False,
                           ranger=lambda x: x, **kwargs):
     model_verbose = model.verbose
     if config:
@@ -69,8 +69,8 @@ def find_optimal_svd_rank(model, ranks, target_metric, return_scores=False,
         model.verbose = verbose
         model.build()
 
-    if backup_factors:
-        svd_factors = dict(**model.factors)
+    if protect_factors:
+        svd_factors = dict(**model.factors) # avoid accidental overwrites
 
     res = {}
     try:
@@ -78,7 +78,7 @@ def find_optimal_svd_rank(model, ranks, target_metric, return_scores=False,
             model.rank = rank
             res[rank] = evaluate_models(model, target_metric, **kwargs)[model.method]
     finally:
-        if backup_factors:
+        if protect_factors:
             model._rank = svd_rank
             model.factors = svd_factors
         model.verbose = model_verbose
