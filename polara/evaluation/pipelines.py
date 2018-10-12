@@ -77,6 +77,8 @@ def find_optimal_svd_rank(model, ranks, target_metric, return_scores=False,
         for rank in ranger(list(reversed(sorted(ranks)))):
             model.rank = rank
             res[rank] = evaluate_models(model, target_metric, **kwargs)[model.method]
+            # prevent previous scores caching when assigning svd_rank
+            model._recommendations = None
     finally:
         if protect_factors:
             model._rank = svd_rank
@@ -118,6 +120,8 @@ def find_optimal_tucker_ranks(model, tucker_ranks, target_metric, return_scores=
                 try:
                     model.mlrank = mlrank = (r1, r2, r3)
                     res_score[mlrank] = evaluate_models(model, target_metric, **kwargs)[model.method]
+                    # prevent previous scores caching when assigning tucker_rank
+                    model._recommendations = None
                 finally:
                     model._mlrank = tucker_rank
                     model.factors = dict(**factors)
