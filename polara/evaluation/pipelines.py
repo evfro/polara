@@ -12,26 +12,37 @@ def random_chooser():
         yield choice(values)
 
 
-def random_grid(params, n=60, grid_cache=None):
+def random_grid(params, n=60, grid_cache=None, skip_config=None):
     if not isinstance(n, int):
         raise TypeError('n must be an integer, not {}'.format(type(n)))
     if n < 0:
         raise ValueError('n should be >= 0')
-
-    grid = grid_cache or set()
-    max_n = reduce(mul_op, [len(vals) for vals in params.values()])
+    # fix names and order of parameters
+    param_names, param_values = zip(*params.items())
+    grid = set(grid_cache) if grid_cache is not None else set()
+    max_n = reduce(mul_op, [len(vals) for vals in param_values])
     n = min(n if n > 0 else max_n, max_n)
+
+    skipped = set()
+    if skip_config is None:
+        def never_skip(config): return False
+        skip_config = never_skip
+
     param_chooser = random_chooser()
     try:
-        while len(grid) < n:
+        while len(grid) < (n-len(skipped)):
             level_choice = []
-            for v in params.values():
+            for param_val in param_values:
                 next(param_chooser)
-                level_choice.append(param_chooser.send(v))
-            grid.add(tuple(level_choice))
+                level_choice.append(param_chooser.send(param_val))
+            level_choice = tuple(level_choice)
+            if skip_config(level_choice):
+                skipped.add(level_choice)
+                continue
+            grid.add(level_choice)
     except KeyboardInterrupt:
         print('Interrupted by user. Providing current results.')
-    return grid
+    return grid, param_names
 
 
 def set_config(model, attributes, values):
