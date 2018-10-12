@@ -151,12 +151,13 @@ def find_optimal_config(model, param_grid, param_names, target_metric, return_sc
             model.build()
         grid_results[params] = evaluate_models(model, target_metric, **kwargs)[model.method]
 
-        if isinstance(reset_config, dict):
-            set_config(model, *zip(*reset_config.items()))
-        elif callable(reset_config):
-            reset_config(model)
-        else:
-            raise NotImplementedError
+        if reset_config is not None:
+            if isinstance(reset_config, dict):
+                set_config(model, *zip(*reset_config.items()))
+            elif callable(reset_config):
+                reset_config(model)
+            else:
+                raise NotImplementedError
 
     model.verbose = model_verbose
     # workaround non-orderable configs (otherwise pandas raises error)
