@@ -156,19 +156,19 @@ def find_optimal_config(model, param_grid, param_names, target_metric, return_sc
     model.verbose = verbose
     grid_results = {}
     for params in ranger(param_grid):
-        set_config(model, param_names, params)
-
-        if not model._is_ready or force_build:
-            model.build()
-        grid_results[params] = evaluate_models(model, target_metric, **kwargs)[model.method]
-
-        if reset_config is not None:
-            if isinstance(reset_config, dict):
-                set_config(model, *zip(*reset_config.items()))
-            elif callable(reset_config):
-                reset_config(model)
-            else:
-                raise NotImplementedError
+        try:
+            set_config(model, param_names, params)
+            if not model._is_ready or force_build:
+                model.build()
+            grid_results[params] = evaluate_models(model, target_metric, **kwargs)[model.method]
+        finally:
+            if reset_config is not None:
+                if isinstance(reset_config, dict):
+                    set_config(model, *zip(*reset_config.items()))
+                elif callable(reset_config):
+                    reset_config(model)
+                else:
+                    raise NotImplementedError
 
     model.verbose = model_verbose
     # workaround non-orderable configs (otherwise pandas raises error)
