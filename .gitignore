@@ -1,3 +1,4 @@
 *.pyc
 polara.egg-info/
 examples/.ipynb_checkpoints/
+tests/.ipynb_checkpoints/
