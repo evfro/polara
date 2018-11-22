@@ -6,7 +6,7 @@ from scipy.sparse import csr_matrix
 
 def no_copy_csr_matrix(data, indices, indptr, shape, dtype):
     # set data and indices manually to avoid index dtype checks
-    # and thus prevent possible unnecesssary copies of indices
+    # and thus prevent possible unnecessary copies of indices
     matrix = csr_matrix(shape, dtype=dtype)
     matrix.data = data
     matrix.indices = indices
@@ -15,7 +15,7 @@ def no_copy_csr_matrix(data, indices, indptr, shape, dtype):
 
 
 def build_rank_matrix(recommendations, shape):
-    # handle singletone case for a single user
+    # handle singleton case for a single user
     recommendations = np.array(recommendations, copy=False, ndmin=2)
     n_keys, topn = recommendations.shape
     rank_arr = np.arange(1, topn + 1, dtype=np.min_scalar_type(topn))
@@ -47,7 +47,7 @@ def matrix_from_observations(observations, key, target, shape, feedback=None):
         dtype = np.bool
         data = np.ones(n_observations, dtype=dtype)
     # set data and indices manually to avoid index dtype checks
-    # and thus prevent possible unnecesssary copies of indices
+    # and thus prevent possible unnecessary copies of indices
     indices = observations[target].values
     indptr = np.r_[0, np.where(np.diff(observations[key].values))[0] + 1, n_observations]
     matrix = no_copy_csr_matrix(data, indices, indptr, shape, dtype)
@@ -81,7 +81,7 @@ def generate_hits_data(rank_matrix, eval_matrix_hits, eval_matrix_miss=None):
 
 
 def assemble_scoring_matrices(recommendations, eval_data, key, target, is_positive, feedback=None):
-    # handle singletone case for a single user
+    # handle singleton case for a single user
     recommendations = np.array(recommendations, copy=False, ndmin=2)
     shape = (recommendations.shape[0], max(recommendations.max(), eval_data[target].max()) + 1)
     eval_matrix = matrix_from_observations(eval_data, key, target, shape, feedback=feedback)
