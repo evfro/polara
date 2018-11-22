@@ -1,6 +1,3 @@
-# python 2/3 interoperability
-from __future__ import print_function
-
 import numpy as np
 from lightfm import LightFM
 from numpy.lib.stride_tricks import as_strided
@@ -12,7 +9,7 @@ from polara.tools.timing import Timer
 
 class LightFMWrapper(RecommenderModel):
     def __init__(self, *args, item_features=None, user_features=None, **kwargs):
-        super(LightFMWrapper, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         self.method = 'LightFM'
         self.rank = 10
         self.fit_method = 'fit'

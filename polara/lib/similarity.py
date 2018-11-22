@@ -1,24 +1,13 @@
-# python 2/3 interoperability
-from __future__ import division
-
-try:
-    range = xrange
-except NameError:
-    pass
-
-try:
-    long
-except NameError:
-    long = int
-
 import math
 import types
-from collections import defaultdict, OrderedDict
-import numpy as np
-from numba import jit
-import scipy as sp
-from scipy.sparse import csc_matrix, csr_matrix, coo_matrix, SparseEfficiencyWarning
 import warnings
+from collections import defaultdict, OrderedDict
+from numba import jit
+
+import numpy as np
+import scipy as sp
+from scipy.sparse import (csc_matrix, csr_matrix, coo_matrix,
+                          SparseEfficiencyWarning)
 
 
 def _fix_empty_features(feature_mat):
@@ -29,7 +18,7 @@ def _fix_empty_features(feature_mat):
     if zf.any():
         # add +1 dummy feature for every zero row
         # to avoid zeros on diagonal of similarity matrix
-        nnz = zf.sum(dtype=long)  # long is required to avoid overflow with int32 dtype
+        nnz = zf.sum(dtype=int)  # long is required to avoid overflow with int32 dtype
         nnz_ind = np.where(zf)[0]
         feature_mat.indptr = np.hstack([feature_mat.indptr[:-1], feature_mat.indptr[-1] + np.arange(nnz + 1)])
         feature_mat.indices = np.hstack([feature_mat.indices, nnz_ind])

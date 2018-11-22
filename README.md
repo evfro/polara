@@ -50,7 +50,7 @@ from polara.recommender.models import RecommenderModel
 
 class CooccurrenceModel(RecommenderModel):
     def __init__(self, *args, **kwargs):
-        super(CooccurrenceModel, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         self.method = 'item-to-item' # pick some meaningful name
 
     def build(self):

@@ -1,14 +1,8 @@
-# python 2/3 interoperability
-try:
-    range = xrange
-except NameError:
-    pass
-
 from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import as_completed
+from numba import njit, guvectorize, prange
 
 import numpy as np
-from numba import njit, guvectorize, prange
 from scipy.sparse import csr_matrix
 
 

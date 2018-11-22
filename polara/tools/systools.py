@@ -1,7 +1,3 @@
-# python 2/3 interoperability
-from __future__ import division
-from __future__ import print_function
-
 import ctypes
 import os
 import sys
@@ -25,7 +21,7 @@ class MemoryStatus(ctypes.Structure):
 
     def __init__(self):
         self.dwLength = ctypes.sizeof(self)
-        super(MemoryStatus, self).__init__()
+        super().__init__()
 
 
 def platform_free_memory():
