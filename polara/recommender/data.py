@@ -24,11 +24,11 @@ def random_sample(df, frac, random_state):
 
 def group_largest_fraction(data, frac, groupid, by):
     def return_order(a):
-        return np.take(range(1, len(a)+1), inverse_permutation(np.argsort(a)))
+        return np.take(range(1, len(a) + 1), inverse_permutation(np.argsort(a)))
 
     grouper = data.groupby(groupid, sort=False)[by]
     ordered = grouper.transform(return_order)
-    largest = ordered.groupby(data[groupid], sort=False).transform(lambda x: x>round(frac*x.shape[0]))
+    largest = ordered.groupby(data[groupid], sort=False).transform(lambda x: x > round(frac * x.shape[0]))
     return largest
 
 
@@ -74,7 +74,6 @@ class EventNotifier(object):
                 callbacks = subscribers.get(subscriber)
                 for callback in list(callbacks):
                     callback(subscriber)
-
 
 
 def property_factory(cls):
@@ -123,7 +122,7 @@ class RecommenderData(object):
         self.fields = namedtuple('Fields', self._std_fields)
         self.fields = self.fields(**dict(zip(self._std_fields, fields)))
         self.index = namedtuple('DataIndex', self._std_fields)
-        self.index = self.index._make([None]*len(self._std_fields))
+        self.index = self.index._make([None] * len(self._std_fields))
 
         self._set_defaults()
         self._change_properties = set(['init'])  # container for changed properties
@@ -147,13 +146,11 @@ class RecommenderData(object):
         # on_update indicates whether only test data has been changed -> renew recommendations
         self.verbose = True
 
-
     def subscribe(self, event, model_callback):
         self._notify.subscribe(event, model_callback)
 
     def unsubscribe(self, event, model):
         self._notify.unsubscribe(event, model)
-
 
     def _set_defaults(self, params=None):
         # [1:] omits undersacores in properties names
@@ -163,13 +160,11 @@ class RecommenderData(object):
             internal_name = '_{}'.format(name)
             setattr(self, internal_name, value)
 
-
     def get_configuration(self):
         # [1:] omits undersacores in properties names, i.e. uses external name
         # in that case it prints worning if change is pending
         config = {attr[1:]: getattr(self, attr[1:]) for attr in self._config}
         return config
-
 
     @property
     def test(self):
@@ -181,10 +176,8 @@ class RecommenderData(object):
         self.update()  # both _test and _training attributes appear simultaneously
         return self._training
 
-
     def _lazy_data_update(self, data_property):
         self._change_properties.add(data_property)
-
 
     def _update_data_property(self, data_property, new_value):
         old_value = getattr(self, data_property)
@@ -192,17 +185,14 @@ class RecommenderData(object):
             setattr(self, data_property, new_value)
             self._lazy_data_update(data_property)
 
-
     def _verified_data_property(self, data_property):
         if data_property in self._change_properties:
             print('The value of {} might be not effective yet.'.format(data_property[1:]))
         return getattr(self, data_property)
 
-
     def update(self):
         if self._change_properties:
             self.prepare()
-
 
     def prepare(self):
         if self.verbose:
@@ -232,7 +222,6 @@ class RecommenderData(object):
         self.warm_start = False  # required for correct state transition handling
         self.prepare()
 
-
     def _validate_config(self):
         if self._warm_start and not (self._holdout_size and self._test_ratio):
             raise ValueError('Both holdout_size and test_ratio must be positive when warm_start is set to True')
@@ -245,7 +234,6 @@ class RecommenderData(object):
             max_fold = 1.0 / self._test_ratio
             if self._test_fold > max_fold:
                 raise ValueError('Test fold value cannot be greater than {}'.format(max_fold))
-
 
     def _check_state_transition(self):
         test_ratio_change = '_test_ratio' in self._change_properties
@@ -359,7 +347,6 @@ class RecommenderData(object):
 
         return new_state, update_rule
 
-
     def _split_data(self):
         self._validate_config()
         new_state, update_rule = self._check_state_transition()
@@ -432,13 +419,11 @@ class RecommenderData(object):
         self._change_properties.clear()
         return update_rule
 
-
     def _split_test_index(self):
         sessions_size, sess_idx = self._get_sessions_info()
         n_sessions = len(sessions_size)
         test_split = self._split_fold_index(sess_idx, n_sessions, self._test_fold, self._test_ratio)
         return test_split
-
 
     def _get_sessions_info(self):
         userid = self.fields.userid
@@ -468,7 +453,6 @@ class RecommenderData(object):
         user_sessions_len = user_sessions.size()
         return user_sessions_len, user_idx
 
-
     @staticmethod
     def is_not_uniform(idx, nbins=10, allowed_gap=0.75):
         idx_bins = pd.cut(idx, bins=nbins, labels=False)
@@ -476,18 +460,16 @@ class RecommenderData(object):
 
         diff = idx_bin_size[:-1] - idx_bin_size[1:]
         monotonic = (diff < 0).all() or (diff > 0).all()
-        huge_gap = (idx_bin_size.min()*1.0 / idx_bin_size.max()) < allowed_gap
+        huge_gap = (idx_bin_size.min() * 1.0 / idx_bin_size.max()) < allowed_gap
         return monotonic or huge_gap
-
 
     @staticmethod
     def _split_fold_index(idx, n_unique, fold, ratio):
         # supports both [0, 1, 2, 3] and [0, 0, 1, 1, 1, 2, 3, 3] types of idx
         # if idx contains only unique elements (1 case) then n_unique = len(idx)
         num = n_unique * ratio
-        selection = (idx >= round((fold-1) * num)) & (idx < round(fold * num))
+        selection = (idx >= round((fold - 1) * num)) & (idx < round(fold * num))
         return selection
-
 
     def _try_reindex_training_data(self):
         if self.build_index:
@@ -660,7 +642,6 @@ class RecommenderData(object):
         if holdout is not None:
             holdout.sort_values(userid, inplace=True)
 
-
     @staticmethod
     def reindex(data, col, sort=True, inplace=True):
         grouper = data.groupby(col, sort=sort).grouper
@@ -675,7 +656,6 @@ class RecommenderData(object):
         else:
             result = (new_data, val_transform)
         return result
-
 
     def _sample_holdout(self, test_split, group_id=None):
         # TODO order_field may also change - need to check it as well
@@ -707,13 +687,13 @@ class RecommenderData(object):
                 holdout = grouper.nlargest(self._holdout_size, keep='last')
             else:
                 frac = self._holdout_size
+
                 def sample_largest(x):
-                    size = round(frac*len(x))
+                    size = round(frac * len(x))
                     return x.iloc[np.argpartition(x, -size)[-size:]]
                 holdout = grouper.apply(sample_largest)
 
         return self._data.loc[holdout.index]
-
 
     def _sample_testset(self, test_split, holdout_index):
         data = self._data[test_split].drop(holdout_index)
@@ -734,7 +714,6 @@ class RecommenderData(object):
             sampled = data.loc[idx]
         return sampled
 
-
     @staticmethod
     def threshold_data(idx, val, threshold, filter_values=True):
         if threshold is None:
@@ -750,7 +729,6 @@ class RecommenderData(object):
         else:
             val[~value_filter] = 0
         return idx, val
-
 
     def to_coo(self, tensor_mode=False, feedback_threshold=None):
         userid, itemid, feedback = self.fields
@@ -777,7 +755,6 @@ class RecommenderData(object):
         val = np.ascontiguousarray(val)
         return idx, val, shp
 
-
     def _recover_testset(self, update_data=False):
         userid = self.fields.userid
         holdout = self.test.holdout
@@ -791,7 +768,6 @@ class RecommenderData(object):
         if update_data:
             self._test = self._test._replace(testset=testset)
         return testset
-
 
     def test_to_coo(self, tensor_mode=False, feedback_threshold=None):
         userid, itemid, feedback = self.fields
@@ -822,7 +798,6 @@ class RecommenderData(object):
         test_coo, val = self.threshold_data(test_coo[:-1], test_coo[-1], feedback_threshold, filter_values=False)
         return test_coo + (val,)
 
-
     def get_test_shape(self, tensor_mode=False):
         userid = self.fields.userid
         if self.test.holdout is None:
@@ -844,9 +819,8 @@ class RecommenderData(object):
 
         return shape
 
-
     def set_test_data(self, testset=None, holdout=None, warm_start=False, test_users=None,
-                            reindex=True, ensure_consistency=True, holdout_size=None, copy=True):
+                      reindex=True, ensure_consistency=True, holdout_size=None, copy=True):
         '''Should be used only with custom data.'''
         if warm_start and ((testset is None) and (test_users is None)):
             raise ValueError('When warm_start is True, information about test users must be present. '
@@ -880,7 +854,8 @@ class RecommenderData(object):
         self._notify(self.on_update_event)
         self._change_properties.clear()
 
-        if (testset is None) and (holdout is None): return  # allows to cleanup data
+        if (testset is None) and (holdout is None):
+            return  # allows to cleanup data
 
         if ensure_consistency:  # allows to disable self.ensure_consistency without actually changing it
             index_mapping = 'old' if reindex else 'new'
@@ -921,7 +896,7 @@ class LongTailMixin(object):
 
         if self.head_items_frac:
             self.head_feedback_frac = None  # could in principle calculate real value instead
-            items_frac = np.arange(1, len(popularity)+1) / len(popularity)
+            items_frac = np.arange(1, len(popularity) + 1) / len(popularity)
             tail_idx = items_frac > self.head_items_frac
 
         if self.head_feedback_frac:

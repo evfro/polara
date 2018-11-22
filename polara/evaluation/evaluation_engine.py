@@ -9,7 +9,7 @@ from math import sqrt
 import pandas as pd
 
 
-def sample_ci(df, coef=2.776, level=None): # 95% CI for sample under Student's t-test
+def sample_ci(df, coef=2.776, level=None):  # 95% CI for sample under Student's t-test
     # http://www.stat.yale.edu/Courses/1997-98/101/confint.htm
     # example from http://onlinestatbook.com/2/estimation/mean.html
     if isinstance(level, str):
@@ -18,8 +18,8 @@ def sample_ci(df, coef=2.776, level=None): # 95% CI for sample under Student's t
     nlevels = df.index.nlevels
     if (nlevels == 1) & (level is None):
         n = df.shape[0]
-    elif (nlevels==2) & (level is not None):
-        n = df.index.levshape[1-level]
+    elif (nlevels == 2) & (level is not None):
+        n = df.index.levshape[1 - level]
     else:
         raise ValueError
     return coef * df.std(level=level, ddof=1) / sqrt(n)
@@ -86,7 +86,7 @@ def consolidate(scores, level_name=None, level_keys=None):
 def holdout_test(models, holdout_sizes=[1], metrics='all'):
     holdout_scores = []
     data = models[0].data
-    assert all([model.data is data for model in models[1:]]) #check that data is shared across models
+    assert all([model.data is data for model in models[1:]])  # check that data is shared across models
 
     for i in holdout_sizes:
         data.holdout_size = i
@@ -99,9 +99,9 @@ def holdout_test(models, holdout_sizes=[1], metrics='all'):
 def topk_test(models, topk_list=[10], metrics='all'):
     topk_scores = []
     data = models[0].data
-    assert all([model.data is data for model in models[1:]]) # check that data is shared across models
+    assert all([model.data is data for model in models[1:]])  # check that data is shared across models
 
-    topk_list_sorted = list(reversed(sorted(topk_list))) # start from max topk and rollback
+    topk_list_sorted = list(reversed(sorted(topk_list)))  # start from max topk and rollback
 
     for topk in topk_list_sorted:
         metric_scores = evaluate_models(models, metrics, topk=topk)
@@ -118,17 +118,17 @@ def run_cv_experiment(models, folds=None, metrics='all', fold_experiment=evaluat
         models = [models]
 
     data = models[0].data
-    assert all([model.data is data for model in models[1:]]) # check that data is shared across models
+    assert all([model.data is data for model in models[1:]])  # check that data is shared across models
 
     if folds is None:
-        folds = range(1, int(1/data.test_ratio) + 1)
+        folds = range(1, int(1 / data.test_ratio) + 1)
 
     fold_results = []
     for fold in folds:
         data.test_fold = fold
         build_models(models, force_build)
         if not deferred_update:
-            data.update() # data configuration is assumed to be fixed during CV
+            data.update()  # data configuration is assumed to be fixed during CV
         fold_result = fold_experiment(models, metrics=metrics, **kwargs)
         fold_results.append(fold_result)
     return consolidate(fold_results, level_name='fold', level_keys=folds)

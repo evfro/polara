@@ -45,5 +45,6 @@ def get_bx_data(local_file=None, get_ratings=True, get_users=False, get_books=Fa
     res = [data.rename(columns=lambda x: x.lower().replace('book-', '')
                                                   .replace('-id', 'id'), copy=False)
            for data in [ratings, users, books] if data is not None]
-    if len(res)==1: res = res[0]
+    if len(res) == 1:
+        res = res[0]
     return res

@@ -51,7 +51,7 @@ class GraphlabFactorization(RecommenderModel):
             self._is_ready = False
             self._recommendations = None
 
-    num_factors = rank # convenience
+    num_factors = rank  # convenience
 
     @property
     def item_data(self):
@@ -157,7 +157,6 @@ class GraphlabFactorization(RecommenderModel):
         feedback = self.data.fields.feedback
         holdout = gl.SFrame(self.data.test.holdout)
         return self.gl_model.evaluate_rmse(holdout, feedback)['rmse_overall']
-
 
 
 class WarmStartRecommendationsMixin(object):

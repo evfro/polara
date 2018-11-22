@@ -12,7 +12,7 @@ from polara.tools.timing import Timer
 class LightFMWrapper(RecommenderModel):
     def __init__(self, *args, item_features=None, user_features=None, **kwargs):
         super(LightFMWrapper, self).__init__(*args, **kwargs)
-        self.method='LightFM'
+        self.method = 'LightFM'
         self.rank = 10
         self.fit_method = 'fit'
 
@@ -36,7 +36,6 @@ class LightFMWrapper(RecommenderModel):
         self.seed = 0
         self._model = None
 
-
     def build(self):
         self._model = LightFM(no_components=self.rank,
                               item_alpha=self.item_alpha,
@@ -59,13 +58,12 @@ class LightFMWrapper(RecommenderModel):
         if self.user_features is not None:
             user_features = self.user_features.reindex(self.data.index.userid.training.old.values, fill_value=[])
             self._user_features_csr, self.user_feature_labels = stack_features(user_features,
-                                                                                add_identity=self.user_identity,
-                                                                                normalize=True,
-                                                                                dtype='f4')
+                                                                               add_identity=self.user_identity,
+                                                                               normalize=True,
+                                                                               dtype='f4')
 
         with Timer(self.method, verbose=self.verbose):
             fit(matrix, item_features=self._item_features_csr, user_features=self._user_features_csr)
-
 
     def slice_recommendations(self, test_data, shape, start, stop, test_users=None):
         if self.data.warm_start:

@@ -12,7 +12,7 @@ def ttm3d_seq(idx, val, shape, U, V, modes, dtype=None):
     v = V.T if mat_mode2 == 1 else V
 
     mode0, = [x for x in (0, 1, 2) if x not in (mode1, mode2)]
-    new_shape = (shape[mode0], U.shape[1-mat_mode1], V.shape[1-mat_mode2])
+    new_shape = (shape[mode0], U.shape[1 - mat_mode1], V.shape[1 - mat_mode2])
 
     res = np.zeros(new_shape, dtype=dtype)
     dttm_seq(idx, val, u, v, mode0, mode1, mode2, res)
@@ -27,7 +27,7 @@ def ttm3d_par(idx, val, shape, U, V, modes, unqs, inds, dtype=None):
     v = V.T if mat_mode2 == 1 else V
 
     mode0, = [x for x in (0, 1, 2) if x not in (mode1, mode2)]
-    new_shape = (shape[mode0], U.shape[1-mat_mode1], V.shape[1-mat_mode2])
+    new_shape = (shape[mode0], U.shape[1 - mat_mode1], V.shape[1 - mat_mode2])
 
     res = np.zeros(new_shape, dtype=dtype)
     dttm_par(idx, val, u, v, mode1, mode2, unqs, inds, res)
@@ -63,17 +63,17 @@ def hooi(idx, val, shape, core_shape, num_iters=25, parallel_ttm=False, growth_t
 
     g_norm_old = 0
     for i in range(num_iters):
-        log_status('Step %i of %i' % (i+1, num_iters))
+        log_status('Step %i of %i' % (i + 1, num_iters))
 
-        u0 = ttm[0](*tensor_data, u2, u1, ((2, 0), (1, 0)), *index_data[0]).reshape(shape[0], r1*r2)
+        u0 = ttm[0](*tensor_data, u2, u1, ((2, 0), (1, 0)), *index_data[0]).reshape(shape[0], r1 * r2)
         uu = svds(u0, k=r0, return_singular_vectors='u')[0]
         u0 = np.ascontiguousarray(uu[:, ::-1])
 
-        u1 = ttm[1](*tensor_data, u2, u0, ((2, 0), (0, 0)), *index_data[1]).reshape(shape[1], r0*r2)
+        u1 = ttm[1](*tensor_data, u2, u0, ((2, 0), (0, 0)), *index_data[1]).reshape(shape[1], r0 * r2)
         uu = svds(u1, k=r1, return_singular_vectors='u')[0]
         u1 = np.ascontiguousarray(uu[:, ::-1])
 
-        u2 = ttm[2](*tensor_data, u1, u0, ((1, 0), (0, 0)), *index_data[2]).reshape(shape[2], r0*r1)
+        u2 = ttm[2](*tensor_data, u1, u0, ((1, 0), (0, 0)), *index_data[2]).reshape(shape[2], r0 * r1)
         uu, ss, vv = svds(u2, k=r2)
         u2 = np.ascontiguousarray(uu[:, ::-1])
 

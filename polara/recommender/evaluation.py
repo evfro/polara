@@ -25,7 +25,7 @@ def build_rank_matrix(recommendations, shape):
     # handle singletone case for a single user
     recommendations = np.array(recommendations, copy=False, ndmin=2)
     n_keys, topn = recommendations.shape
-    rank_arr = np.arange(1, topn+1, dtype=np.min_scalar_type(topn))
+    rank_arr = np.arange(1, topn + 1, dtype=np.min_scalar_type(topn))
     recs_rnk = np.lib.stride_tricks.as_strided(rank_arr, (n_keys, topn), (0, rank_arr.itemsize))
     # support models that may generate < top-n recommendations
     # such models generate self._pad_const, which is negative by convention
@@ -37,7 +37,7 @@ def build_rank_matrix(recommendations, shape):
     else:
         data = recs_rnk.ravel()
         indices = recommendations.ravel()
-        indptr = np.arange(0, n_keys*topn+1, topn)
+        indptr = np.arange(0, n_keys * topn + 1, topn)
 
     rank_matrix = no_copy_csr_matrix(data, indices, indptr, shape, rank_arr.dtype)
     return rank_matrix
@@ -56,7 +56,7 @@ def matrix_from_observations(observations, key, target, shape, feedback=None):
     # set data and indices manually to avoid index dtype checks
     # and thus prevent possible unnecesssary copies of indices
     indices = observations[target].values
-    indptr = np.r_[0, np.where(np.diff(observations[key].values))[0]+1, n_observations]
+    indptr = np.r_[0, np.where(np.diff(observations[key].values))[0] + 1, n_observations]
     matrix = no_copy_csr_matrix(data, indices, indptr, shape, dtype)
     return matrix
 
@@ -90,7 +90,7 @@ def generate_hits_data(rank_matrix, eval_matrix_hits, eval_matrix_miss=None):
 def assemble_scoring_matrices(recommendations, eval_data, key, target, is_positive, feedback=None):
     # handle singletone case for a single user
     recommendations = np.array(recommendations, copy=False, ndmin=2)
-    shape = (recommendations.shape[0], max(recommendations.max(), eval_data[target].max())+1)
+    shape = (recommendations.shape[0], max(recommendations.max(), eval_data[target].max()) + 1)
     eval_matrix = matrix_from_observations(eval_data, key, target, shape, feedback=feedback)
     eval_matrix_hits, eval_matrix_miss = split_positive(eval_matrix, is_positive)
     rank_matrix = build_rank_matrix(recommendations, shape)
@@ -111,7 +111,7 @@ def get_mrr_score(hits_rank):
 
 
 def get_ndcr_discounts(rank_matrix, eval_matrix, topn):
-    discounts = np.reciprocal(np.log2(1+rank_matrix.data, dtype='f8'))
+    discounts = np.reciprocal(np.log2(1 + rank_matrix.data, dtype='f8'))
     discounts_matrix = rank_matrix._with_data(discounts, copy=False)
     # circumventing problem in ideal_discounts = eval_matrix.tolil()
     # related to incompatible indices dtype
@@ -121,7 +121,7 @@ def get_ndcr_discounts(rank_matrix, eval_matrix, topn):
     # ideal_indices = [np.argsort(rel)[:-(topn+1):-1] for rel in relevance_per_key]
     # idx = np.arange(2, topn+2)
     ideal_indices = [np.argsort(rel)[::-1] for rel in relevance_per_key]
-    idx = np.arange(2, eval_matrix.getnnz(axis=1).max()+2)
+    idx = np.arange(2, eval_matrix.getnnz(axis=1).max() + 2)
     data = np.concatenate([np.reciprocal(np.log2(idx[:len(i)], dtype='f8')) for i in ideal_indices])
     inds = np.concatenate([np.take(r, i) for r, i in zip(target_id_per_key, ideal_indices)])
     ptrs = np.r_[0, np.cumsum([len(i) for i in ideal_indices])]
@@ -132,7 +132,7 @@ def get_ndcr_discounts(rank_matrix, eval_matrix, topn):
 def get_ndcr_score(eval_matrix, discounts_matrix, ideal_discounts, alternative=False):
     '''Normalized Discounted Cumulative Ranking'''
     if alternative:
-        relevance = eval_matrix._with_data(np.exp2(eval_matrix.data)-1, copy=False)
+        relevance = eval_matrix._with_data(np.exp2(eval_matrix.data) - 1, copy=False)
     else:
         relevance = eval_matrix
     dcr = np.array(relevance.multiply(discounts_matrix).sum(axis=1), copy=False).squeeze()
@@ -147,7 +147,7 @@ def get_ndcg_score(eval_matrix, discounts_matrix, ideal_discounts, alternative=F
 
 def get_ndcl_score(eval_matrix, discounts_matrix, ideal_discounts, switch_positive, alternative=False):
     '''Normalized Discounted Cumulative Loss'''
-    eval_matrix = eval_matrix._with_data(eval_matrix.data-switch_positive, copy=False)
+    eval_matrix = eval_matrix._with_data(eval_matrix.data - switch_positive, copy=False)
     return get_ndcr_score(eval_matrix, -discounts_matrix, -ideal_discounts, alternative=alternative)
 
 
@@ -167,7 +167,7 @@ def get_relevance_data(rank_matrix, hits_rank, miss_rank, eval_matrix, eval_matr
     true_positive = hits_rank.getnnz(axis=axis)
     if miss_rank is None:
         if not_rated_penalty > 0:
-            false_positive = not_rated_penalty * (rank_matrix.getnnz(axis=axis)-true_positive)
+            false_positive = not_rated_penalty * (rank_matrix.getnnz(axis=axis) - true_positive)
         else:
             false_positive = 0
         false_negative = eval_matrix.getnnz(axis=axis) - true_positive
@@ -177,7 +177,7 @@ def get_relevance_data(rank_matrix, hits_rank, miss_rank, eval_matrix, eval_matr
         true_negative = eval_matrix_miss.getnnz(axis=axis) - false_positive
         false_negative = eval_matrix_hits.getnnz(axis=axis) - true_positive
         if not_rated_penalty > 0:
-            not_rated = rank_matrix.getnnz(axis=axis)-true_positive-false_positive
+            not_rated = rank_matrix.getnnz(axis=axis) - true_positive - false_positive
             false_positive = false_positive + not_rated_penalty * not_rated
     return [true_positive, false_positive, true_negative, false_negative]
 

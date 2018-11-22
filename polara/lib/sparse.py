@@ -16,6 +16,8 @@ from polara.recommender import defaults
 
 # matvec implementation is based on
 # http://stackoverflow.com/questions/18595981/improving-performance-of-multiplication-of-scipy-sparse-matrices
+
+
 @njit(nogil=True)
 def matvec2dense(m_ptr, m_ind, m_val, v_nnz, v_val, out):
     l = len(v_nnz)
@@ -37,7 +39,7 @@ def matvec2sparse(m_ptr, m_ind, m_val, v_nnz, v_val, sizes, indices, data):
         ind_start = m_ptr[col_start]
         ind_end = m_ptr[col_end]
         data_start = sizes[j]
-        data_end = sizes[j+1]
+        data_end = sizes[j + 1]
         if ind_start != ind_end:
             indices[data_start:data_end] = m_ind[ind_start:ind_end]
             data[data_start:data_end] = m_val[ind_start:ind_end] * v_val[j]
@@ -56,7 +58,7 @@ def csc_matvec(mat_csc, vec, dense_output=True, dtype=None):
         res = np.zeros((mat_csc.shape[0],), dtype=res_dtype)
         matvec2dense(m_ptr, m_ind, m_val, v_nnz, v_val, res)
     else:
-        sizes = m_ptr.take(v_nnz+1) - m_ptr.take(v_nnz)
+        sizes = m_ptr.take(v_nnz + 1) - m_ptr.take(v_nnz)
         sizes = np.concatenate(([0], np.cumsum(sizes)))
         n = sizes[-1]
         data = np.empty((n,), dtype=res_dtype)
@@ -64,7 +66,7 @@ def csc_matvec(mat_csc, vec, dense_output=True, dtype=None):
         indptr = np.array([0, n], dtype=np.intp)
         matvec2sparse(m_ptr, m_ind, m_val, v_nnz, v_val, sizes, indices, data)
         res = csr_matrix((data, indices, indptr), shape=(1, mat_csc.shape[0]), dtype=res_dtype)
-        res.sum_duplicates() # expensive operation
+        res.sum_duplicates()  # expensive operation
     return res
 
 
@@ -75,9 +77,9 @@ def _blockify(ind, ptr, major_dim):
     # indices must be intp in order to avoid overflow
     # major_dim is shape[0] for csc format and shape[1] for csr format
     n = len(ptr) - 1
-    for i in range(1, n): #first row/col is unchanged
+    for i in range(1, n):  # first row/col is unchanged
         lind = ptr[i]
-        rind = ptr[i+1]
+        rind = ptr[i + 1]
         for j in range(lind, rind):
             shift_ind = i * major_dim
             ind[j] += shift_ind
@@ -93,7 +95,7 @@ def row_unblockify(mat, block_size):
 def row_blockify(mat, block_size):
     # only for CSR matrices
     _blockify(mat.indices, mat.indptr, block_size)
-    mat._shape = (mat.shape[0], block_size*mat.shape[0])
+    mat._shape = (mat.shape[0], block_size * mat.shape[0])
 
 
 def inverse_permutation(p):
@@ -104,12 +106,12 @@ def inverse_permutation(p):
 
 def unfold_tensor_coordinates(index, shape, mode):
     # TODO implement direct calculation w/o intermediate flattening
-    modes = [m for m in [0, 1, 2] if m != mode] + [mode,]
+    modes = [m for m in [0, 1, 2] if m != mode] + [mode, ]
     mode_shape = tuple(shape[m] for m in modes)
     mode_index = tuple(index[m] for m in modes)
     flat_index = np.ravel_multi_index(mode_index, mode_shape)
 
-    unfold_shape = (mode_shape[0]*mode_shape[1], mode_shape[2])
+    unfold_shape = (mode_shape[0] * mode_shape[1], mode_shape[2])
     unfold_index = np.unravel_index(flat_index, unfold_shape)
     return unfold_index, unfold_shape
 
@@ -168,9 +170,10 @@ def arrange_index(array):
     inds = np.split(np.argsort(unq_inv), np.cumsum(unq_cnt[:-1]))
     return unqs, inds
 
+
 def arrange_indices(idx, mode_mask=None):
     n = idx.shape[1]
-    res = [[]]*n
+    res = [[]] * n
     if mode_mask is None:
         mode_mask = [True] * n
 

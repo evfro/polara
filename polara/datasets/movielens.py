@@ -43,7 +43,7 @@ def get_movielens_data(local_file=None, get_ratings=True, get_genres=False,
 
         if get_genres:
             zip_file = zip_files[zip_files.str.contains('movies')].iat[0]
-            zdata =  zfile.read(zip_file)
+            zdata = zfile.read(zip_file)
             if not is_new_format:
                 # make data compatible with pandas c-engine
                 # pandas returns string objects instead of bytes in that case
@@ -56,8 +56,8 @@ def get_movielens_data(local_file=None, get_ratings=True, get_genres=False,
             ml_genres = get_split_genres(genres_data) if split_genres else genres_data
 
         if get_tags:
-            zip_file = zip_files[zip_files.str.contains('/tags')].iat[0] #not genome
-            zdata =  zfile.read(zip_file)
+            zip_file = zip_files[zip_files.str.contains('/tags')].iat[0]  # not genome
+            zdata = zfile.read(zip_file)
             if not is_new_format:
                 # make data compatible with pandas c-engine
                 # pandas returns string objects instead of bytes in that case
@@ -65,18 +65,19 @@ def get_movielens_data(local_file=None, get_ratings=True, get_genres=False,
                 zdata = zdata.replace(b'::', delimiter.encode())
             fields[2] = 'tag'
             ml_tags = pd.read_csv(BytesIO(zdata), sep=delimiter, header=header,
-                                      engine='c', encoding='latin1',
-                                      names=fields, usecols=range(len(fields)))
+                                  engine='c', encoding='latin1',
+                                  names=fields, usecols=range(len(fields)))
 
         if mdb_mapping and is_new_format:
             # imdb and tmdb mapping - exists only in ml-latest or 20m datasets
             zip_file = zip_files[zip_files.str.contains('links')].iat[0]
             with zfile.open(zip_file) as zdata:
                 mapping = pd.read_csv(zdata, sep=',', header=0, engine='c',
-                                        names=['movieid', 'imdbid', 'tmdbid'])
+                                      names=['movieid', 'imdbid', 'tmdbid'])
 
     res = [data for data in [ml_data, ml_genres, ml_tags, mapping] if data is not None]
-    if len(res)==1: res = res[0]
+    if len(res) == 1:
+        res = res[0]
     return res
 
 
@@ -91,8 +92,8 @@ def filter_short_head(data, threshold=0.01):
     short_head = data.groupby('movieid', sort=False)['userid'].nunique()
     short_head.sort_values(ascending=False, inplace=True)
 
-    ratings_perc = short_head.cumsum()*1.0/short_head.sum()
-    movies_perc = np.arange(1, len(short_head)+1, dtype='f8') / len(short_head)
+    ratings_perc = short_head.cumsum() * 1.0 / short_head.sum()
+    movies_perc = np.arange(1, len(short_head) + 1, dtype='f8') / len(short_head)
 
     long_tail_movies = ratings_perc[movies_perc > threshold].index
     return long_tail_movies

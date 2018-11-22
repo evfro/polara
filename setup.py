@@ -2,23 +2,23 @@ import os
 from setuptools import setup
 
 _packages = ["polara",
-            "polara/recommender",
-            "polara/recommender/coldstart",
-            "polara/evaluation",
-            "polara/datasets",
-            "polara/lib",
-            "polara/tools",
-            "polara/recommender/external",
-            "polara/recommender/external/mymedialite",
-            "polara/recommender/external/graphlab",
-            "polara/recommender/external/implicit",
-            "polara/recommender/external/lightfm"]
+             "polara/recommender",
+             "polara/recommender/coldstart",
+             "polara/evaluation",
+             "polara/datasets",
+             "polara/lib",
+             "polara/tools",
+             "polara/recommender/external",
+             "polara/recommender/external/mymedialite",
+             "polara/recommender/external/graphlab",
+             "polara/recommender/external/implicit",
+             "polara/recommender/external/lightfm"]
 
 
 opts = dict(name="polara",
             description="Fast and flexible recommender system framework",
-            keywords = "recommender system",
-            version = "0.6.3.dev",
+            keywords="recommender system",
+            version="0.6.3.dev",
             license="MIT",
             author="Evgeny Frolov",
             platforms=["any"],

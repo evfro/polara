@@ -29,12 +29,12 @@ def _fix_empty_features(feature_mat):
     if zf.any():
         # add +1 dummy feature for every zero row
         # to avoid zeros on diagonal of similarity matrix
-        nnz = zf.sum(dtype=long) #long is required to avoid overflow with int32 dtype
+        nnz = zf.sum(dtype=long)  # long is required to avoid overflow with int32 dtype
         nnz_ind = np.where(zf)[0]
-        feature_mat.indptr = np.hstack([feature_mat.indptr[:-1], feature_mat.indptr[-1]+np.arange(nnz+1)])
+        feature_mat.indptr = np.hstack([feature_mat.indptr[:-1], feature_mat.indptr[-1] + np.arange(nnz + 1)])
         feature_mat.indices = np.hstack([feature_mat.indices, nnz_ind])
         feature_mat.data = np.hstack([feature_mat.data, np.ones((nnz,), dtype=feature_mat.data.dtype)])
-        feature_mat._shape = (feature_mat.shape[0], feature_mat.shape[1]+nnz)
+        feature_mat._shape = (feature_mat.shape[0], feature_mat.shape[1] + nnz)
         nf[nnz_ind] = 1
     return nf
 
@@ -85,7 +85,7 @@ def normalize_features(feature_mat, dtype=None):
 def tfidf_transform(feature_mat):
     itemfreq = 1 + feature_mat.getnnz(axis=0)
     N = 1 + feature_mat.shape[0]
-    idf = np.log(N/itemfreq)
+    idf = np.log(N / itemfreq)
 
     if feature_mat.format == 'csr':
         ind = feature_mat.indices
@@ -94,7 +94,7 @@ def tfidf_transform(feature_mat):
         transformed = csr_matrix((data, ind, ptr), shape=feature_mat.shape)
     else:
         # safe multiplicationin in case data is not binary
-        transformed = (feature_mat!=0).dot(sp.sparse.diags(idf))
+        transformed = (feature_mat != 0).dot(sp.sparse.diags(idf))
     return transformed
 
 
@@ -106,7 +106,7 @@ def _jaccard_similarity_inplace(sdata, indcs, pntrs, nf):
     ncols = len(pntrs) - 1
     for col in range(ncols):
         lind = pntrs[col]
-        rind = pntrs[col+1]
+        rind = pntrs[col + 1]
         nf_col = nf[col]
         for j in range(lind, rind):
             row = indcs[j]
@@ -115,10 +115,10 @@ def _jaccard_similarity_inplace(sdata, indcs, pntrs, nf):
 
 
 def jaccard_similarity(F, fill_diagonal=True):
-    F = (F!=0)
+    F = (F != 0)
     nf = F.getnnz(axis=1)
 
-    S = F.dot(F.T).astype(np.float64) # dtype needed for inplace jaccard index computation
+    S = F.dot(F.T).astype(np.float64)  # dtype needed for inplace jaccard index computation
     _jaccard_similarity_inplace(S.data, S.indices, S.indptr, nf)
     if fill_diagonal:
         # eigenvalues computation is very sensitive to roundoff errors in
@@ -148,7 +148,7 @@ def cosine_tfidf_similarity(F, fill_diagonal=True):
 
 @jit(nopython=True)
 def _jaccard_similarity_weighted_tri(dat, ind, ptr, shift):
-    z = dat[0] #np.float64
+    z = dat[0]  # np.float64
     # need to initialize lists with certain dtype
     data = [z]
     cols = [z]
@@ -157,12 +157,12 @@ def _jaccard_similarity_weighted_tri(dat, ind, ptr, shift):
     nrows = len(ptr) - 1
     for i in range(nrows):
         lind_i = ptr[i]
-        rind_i = ptr[i+1]
+        rind_i = ptr[i + 1]
         if lind_i != rind_i:
             ish = i + shift
             for j in range(ish, nrows):
                 lind_j = ptr[j]
-                rind_j = ptr[j+1]
+                rind_j = ptr[j + 1]
                 min_sum = 0
                 max_sum = 0
                 for k in range(lind_j, rind_j):
@@ -193,7 +193,7 @@ def _jaccard_similarity_weighted_tri(dat, ind, ptr, shift):
                     cols.append(i)
                     rows.append(j)
 
-    return data[1:], rows[1:], cols[1:] #ignore initialization element
+    return data[1:], rows[1:], cols[1:]  # ignore initialization element
 
 
 def jaccard_similarity_weighted(F, fill_diagonal=True):
@@ -203,18 +203,18 @@ def jaccard_similarity_weighted(F, fill_diagonal=True):
 
     ind = F.indices
     ptr = F.indptr
-    dat = F.data.astype(np.float64, copy=False) # dtype needed for jaccard computation
+    dat = F.data.astype(np.float64, copy=False)  # dtype needed for jaccard computation
 
     shift = 1 if fill_diagonal else 0
     data, rows, cols = _jaccard_similarity_weighted_tri(dat, ind, ptr, shift)
 
-    S = coo_matrix((data, (rows, cols)), shape=(F.shape[0],)*2).tocsc()
-    S += S.T # doubles diagonal values if fill_diagonal is False
+    S = coo_matrix((data, (rows, cols)), shape=(F.shape[0],) * 2).tocsc()
+    S += S.T  # doubles diagonal values if fill_diagonal is False
 
     if fill_diagonal:
         set_diagonal_values(S, 1)
     else:
-        set_diagonal_values(S, np.sign(S.diagonal())) # set to 1, preserve zeros
+        set_diagonal_values(S, np.sign(S.diagonal()))  # set to 1, preserve zeros
     return S
 
 
@@ -248,7 +248,7 @@ def build_indicator_matrix(labels, max_items=None):
     indices = [i for x in labels for i in x]
     indprt = np.r_[0, labels.apply(len).cumsum().values]
     data = np.ones_like(indices, dtype=np.bool)
-    shape = [len(labels), max_items or indices.max()+1]
+    shape = [len(labels), max_items or indices.max() + 1]
     return csr_matrix((data, indices, indprt), shape=shape)
 
 
@@ -266,7 +266,7 @@ def feature2sparse(feature_data, ranking=None, deduplicate=True):
 
         if isinstance(ranking, str):
             if ranking.lower() == 'linear':
-                data = [1/(n+1) for items in feature_data for n, item in enumerate(items)]
+                data = [1 / (n + 1) for items in feature_data for n, item in enumerate(items)]
             elif ranking.lower() == 'exponential':
                 data = [math.exp(-n) for items in feature_data for n, item in enumerate(items)]
             elif ranking.lower() == 'bag-of-features':
@@ -321,7 +321,7 @@ def stack_features(features, add_identity=False, normalize=True, dtype=None, **k
 
     if normalize:
         norm = stacked_features.getnnz(axis=1)
-        scaling = np.power(norm, -1, where=norm>0, dtype=dtype)
+        scaling = np.power(norm, -1, where=norm > 0, dtype=dtype)
         stacked_features = sp.sparse.diags(scaling).dot(stacked_features)
 
     return stacked_features, feature_lbls
@@ -385,12 +385,12 @@ def combine_similarity_data(meta_data, similarity_type='jaccard', weights=None):
         similarity_type = {k: v for k, v in zip(features, similarity_type)}
 
     if weights is None:
-        weights = [1.0/num_feat] * num_feat
+        weights = [1.0 / num_feat] * num_feat
 
     if not isinstance(weights, dict):
         weights = {k: v for k, v in zip(features, weights)}
 
-    similarity = csc_matrix((meta_data.shape[0],)*2)
+    similarity = csc_matrix((meta_data.shape[0],) * 2)
     for feature in features:
         feature_data = meta_data[feature]
         sim_type = similarity_type[feature]
@@ -403,5 +403,5 @@ def combine_similarity_data(meta_data, similarity_type='jaccard', weights=None):
 
     # remove round off errors
     similarity.setdiag(1)
-    similarity.data[similarity.data>1] = 1
+    similarity.data[similarity.data > 1] = 1
     return similarity

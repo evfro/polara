@@ -1,6 +1,7 @@
 from IPython.display import HTML
 from contextlib import contextmanager
-import sys, os
+import sys
+import os
 
 
 def print_frames(dataframes):
@@ -12,8 +13,8 @@ def print_frames(dataframes):
 
     table = '''<table style={}>
     <tr style={}>'''.format(border_style, border_style) +\
-    '\n'.join(cells)+\
-    '''
+        '\n'.join(cells) +\
+        '''
     </tr>
     </table>'''
 

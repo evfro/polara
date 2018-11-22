@@ -30,7 +30,7 @@ def random_grid(params, n=60, grid_cache=None, skip_config=None):
 
     param_chooser = random_chooser()
     try:
-        while len(grid) < (n-len(skipped)):
+        while len(grid) < (n - len(skipped)):
             level_choice = []
             for param_val in param_values:
                 next(param_chooser)
@@ -81,7 +81,7 @@ def find_optimal_svd_rank(model, ranks, target_metric, return_scores=False,
         model.build()
 
     if protect_factors:
-        svd_factors = dict(**model.factors) # avoid accidental overwrites
+        svd_factors = dict(**model.factors)  # avoid accidental overwrites
 
     res = {}
     try:
@@ -126,7 +126,7 @@ def find_optimal_tucker_ranks(model, tucker_ranks, target_metric, return_scores=
             if same_space and (r2 != r1):
                 continue
             for r3 in tucker_ranks[2]:
-                if (r1*r2 < r3) or (r1*r3 < r2) or (r2*r3 < r1):
+                if (r1 * r2 < r3) or (r1 * r3 < r2) or (r2 * r3 < r1):
                     continue
                 try:
                     model.mlrank = mlrank = (r1, r2, r3)
