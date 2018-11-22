@@ -1,9 +1,11 @@
 from collections import namedtuple, defaultdict
+
 import numpy as np
 import pandas as pd
 from scipy.sparse import issparse
-from polara.recommender.data import RecommenderData
+
 from polara.lib.similarity import build_indicator_matrix
+from polara.recommender.data import RecommenderData
 
 
 class ItemColdStartData(RecommenderData):

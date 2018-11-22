@@ -1,8 +1,8 @@
 from __future__ import print_function
 
-from operator import mul as mul_op
 from functools import reduce
 from random import choice
+
 import pandas as pd
 
 

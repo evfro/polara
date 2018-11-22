@@ -1,9 +1,10 @@
 # python 2/3 interoperability
 from __future__ import print_function
 
-import numpy as np
-from polara.recommender.models import RecommenderModel
 import graphlab as gl
+import numpy as np
+
+from polara.recommender.models import RecommenderModel
 
 
 class GraphlabFactorization(RecommenderModel):

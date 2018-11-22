@@ -1,5 +1,6 @@
-import pandas as pd
 import tarfile
+
+import pandas as pd
 
 
 def get_netflix_data(gz_file, get_ratings=True, get_probe=False):

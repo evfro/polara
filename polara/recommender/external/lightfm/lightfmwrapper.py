@@ -2,10 +2,11 @@
 from __future__ import print_function
 
 import numpy as np
-from numpy.lib.stride_tricks import as_strided
 from lightfm import LightFM
-from polara.recommender.models import RecommenderModel
+from numpy.lib.stride_tricks import as_strided
+
 from polara.lib.similarity import stack_features
+from polara.recommender.models import RecommenderModel
 from polara.tools.timing import Timer
 
 

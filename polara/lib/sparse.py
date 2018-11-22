@@ -6,13 +6,11 @@ except NameError:
 
 from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import as_completed
-import numpy as np
-from scipy.sparse import csr_matrix
-from numba import jit, njit, guvectorize, prange
-from numba import float64 as f8
-from numba import intp as ip
 
-from polara.recommender import defaults
+import numpy as np
+from numba import njit, guvectorize, prange
+from scipy.sparse import csr_matrix
+
 
 # matvec implementation is based on
 # http://stackoverflow.com/questions/18595981/improving-performance-of-multiplication-of-scipy-sparse-matrices
