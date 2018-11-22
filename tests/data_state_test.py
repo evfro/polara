@@ -5,7 +5,7 @@ from polara.recommender.data import RecommenderData
 
 def define_state(usn, hsz, trt):
     if usn:
-        if (hsz>0) and (trt>0):
+        if (hsz > 0) and (trt > 0):
             state = 4
         else:
             raise ValueError('Invalid parameters')
@@ -15,12 +15,13 @@ def define_state(usn, hsz, trt):
                 state = 1
             else:
                 state = 11
-        else: #hsz > 0
+        else:  # hsz > 0
             if trt == 0:
                 state = 2
-            else: # trt > 0
+            else:  # trt > 0
                 state = 3
     return state
+
 
 def assign_config(usn, hsz, trt, state):
     data_model._test_ratio = trt
@@ -59,7 +60,7 @@ for usn in [False, True]:
                             new_stt, upd = data_model._check_state_transition()
                             print('new state: {:3}, update rule: {}     '.format(new_stt, upd),)
                             print(list(data_model._change_properties))
-                            
+
                         assign_config(usn, hsz, trt, state)
                         data_model._change_properties.clear()
             print()

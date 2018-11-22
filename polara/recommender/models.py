@@ -29,6 +29,7 @@ from polara.lib.sparse import csc_matvec, inverse_permutation
 from polara.lib.sparse import unfold_tensor_coordinates, tensor_outer_at
 from polara.tools.timing import Timer
 
+
 def get_default(name):
     return defaults.get_config([name])[name]
 
@@ -97,7 +98,6 @@ class RecommenderModel(object):
         self.data.subscribe(self.data.on_change_event, self._renew_model)
         self.data.subscribe(self.data.on_update_event, self._refresh_model)
 
-
     @property
     def recommendations(self):
         if self._recommendations is None:
@@ -108,14 +108,12 @@ class RecommenderModel(object):
             self._recommendations = self.get_recommendations()
         return self._recommendations
 
-
     def _renew_model(self):
         self._recommendations = None
         self._is_ready = False
 
     def _refresh_model(self):
         self._recommendations = None
-
 
     @property
     def topk(self):
@@ -148,15 +146,12 @@ class RecommenderModel(object):
             self._filter_seen = new_value
             self._refresh_model()
 
-
     def get_base_configuration(self):
         config = {attr: getattr(self, attr) for attr in self._config}
         return config
 
-
     def build(self):
         raise NotImplementedError('This must be implemented in subclasses')
-
 
     def get_training_matrix(self, feedback_threshold=None, dtype=None):
         threshold = feedback_threshold or self.feedback_threshold
@@ -165,7 +160,6 @@ class RecommenderModel(object):
         matrix = csr_matrix((val, (idx[:, 0], idx[:, 1])),
                             shape=shp, dtype=dtype)
         return matrix
-
 
     def get_test_matrix(self, test_data=None, shape=None, user_slice=None):
         if test_data is None:
@@ -196,7 +190,6 @@ class RecommenderModel(object):
                                  dtype=fdbk_coo.dtype)
         return test_matrix, coo_data
 
-
     def _get_slices_idx(self, shape, result_width=None, scores_multiplier=None, dtypes=None):
         result_width = result_width or self.topk
         if scores_multiplier is None:
@@ -208,7 +201,6 @@ class RecommenderModel(object):
 
         slices_idx = array_split(shape, result_width, scores_multiplier, dtypes=dtypes)
         return slices_idx
-
 
     def _get_test_data(self, feedback_threshold=None):
         try:
@@ -233,7 +225,7 @@ class RecommenderModel(object):
 
         # TODO only required when testset consists of known users
         if (idx_diff > 1).any() or (user_idx.min() != 0):  # check index monotonicity
-            test_users = user_idx[np.r_[0, np.where(idx_diff)[0]+1]]
+            test_users = user_idx[np.r_[0, np.where(idx_diff)[0] + 1]]
             user_idx = np.r_[0, np.cumsum(idx_diff > 0)].astype(user_idx.dtype)
         else:
             test_users = np.arange(test_shape[0])
@@ -241,7 +233,6 @@ class RecommenderModel(object):
         test_data = (user_idx, item_idx, feedback)
 
         return test_data, test_shape, test_users
-
 
     @staticmethod
     def _slice_test_data(test_data, start, stop):
@@ -255,10 +246,8 @@ class RecommenderModel(object):
 
         return (user_slice_coo, item_slice_coo, fdbk_slice_coo)
 
-
     def slice_recommendations(self, test_data, shape, start, stop, test_users=None):
         raise NotImplementedError('This must be implemented in subclasses')
-
 
     def _user_scores(self, i):
         # should not be exposed, designed for use within framework
@@ -271,13 +260,12 @@ class RecommenderModel(object):
         test_data, test_shape, test_users = self._get_test_data()
         if not self.data.warm_start:
             i, = np.where(test_users == i)[0]
-        scores, seen_idx = self.slice_recommendations(test_data, test_shape, i, i+1)
+        scores, seen_idx = self.slice_recommendations(test_data, test_shape, i, i + 1)
 
         if self.filter_seen:
             self.downvote_seen_items(scores, seen_idx)
 
         return scores, seen_idx
-
 
     def _make_user(self, user_info):
         # converts external user info into internal representation
@@ -292,7 +280,7 @@ class RecommenderModel(object):
             feedback_data = {}
             if feedback is not None:
                 feedback_val = self.data.training[feedback].max()
-                feedback_data = {feedback: [feedback_val]*len(items_data)}
+                feedback_data = {feedback: [feedback_val] * len(items_data)}
 
         try:
             item_index = self.data.index.itemid.training
@@ -302,10 +290,9 @@ class RecommenderModel(object):
         # need to convert itemid's to internal representation
         # conversion is not required for feedback (it's made in *to_coo functions, if needed)
         items_data = item_index.set_index('old').loc[items_data, 'new'].values
-        user_data = {userid: [0]*len(items_data), itemid: items_data}
+        user_data = {userid: [0] * len(items_data), itemid: items_data}
         user_data.update(feedback_data)
         return pd.DataFrame(user_data)
-
 
     def show_recommendations(self, user_info, topk=None):
         # convenience function to model users and get recs
@@ -342,7 +329,6 @@ class RecommenderModel(object):
         seen_items = item_idx_map.loc[seen_idx, 'old'].values
         return top_recs, seen_items
 
-
     def _slice_recommender(self, user_slice, test_data, test_shape, test_users):
         start, stop = user_slice
         scores, slice_data = self.slice_recommendations(test_data, test_shape, start, stop, test_users)
@@ -357,7 +343,6 @@ class RecommenderModel(object):
         top_recs = self.get_topk_elements(scores)
         return top_recs
 
-
     def run_parallel_recommender(self, result, user_slices, *args):
         with ThreadPoolExecutor(max_workers=self.max_test_workers) as executor:
             recs_futures = {executor.submit(self._slice_recommender,
@@ -368,12 +353,10 @@ class RecommenderModel(object):
                 start, stop = recs_futures[future]
                 result[start:stop, :] = future.result()
 
-
     def run_sequential_recommender(self, result, user_slices, *args):
         for user_slice in user_slices:
             start, stop = user_slice
             result[start:stop, :] = self._slice_recommender(user_slice, *args)
-
 
     def get_recommendations(self):
         if self.verify_integrity:
@@ -390,7 +373,6 @@ class RecommenderModel(object):
         else:
             self.run_sequential_recommender(top_recs, user_slices, *test_data)
         return top_recs
-
 
     def evaluate(self, method='hits', topk=None, not_rated_penalty=None, on_feedback_level=None, ignore_feedback=False, simple_rates=False):
         feedback = self.data.fields.feedback
@@ -444,12 +426,10 @@ class RecommenderModel(object):
             raise NotImplementedError
         return scores
 
-
     @staticmethod
     def topsort(a, topk):
         parted = np.argpartition(a, -topk)[-topk:]
         return parted[np.argsort(-a[parted])]
-
 
     @staticmethod
     def downvote_seen_items(recs, idx_seen):
@@ -478,7 +458,6 @@ class RecommenderModel(object):
             lowered = recs.min() - (seen_data.max() - seen_data) - 1
             recs.flat[idx_seen_flat] = lowered
 
-
     def get_topk_elements(self, scores):
         topk = self.topk
         if sp.sparse.issparse(scores):
@@ -496,7 +475,7 @@ class RecommenderModel(object):
                 if k >= nnz:
                     cols_sorted = cols[np.argsort(-data)]
                     # need to pad values to conform with evaluation matrix shape
-                    res = np.pad(cols_sorted, (0, k-nnz),
+                    res = np.pad(cols_sorted, (0, k - nnz),
                                  'constant', constant_values=self._pad_const)
                 else:
                     # TODO verify, that even if k is relatively small, then
@@ -523,7 +502,6 @@ class RecommenderModel(object):
             recs = np.apply_along_axis(self.topsort, 1, scores, topk)
         return recs
 
-
     @staticmethod
     def orthogonalize(u, v, complete=False):
         Qu, Ru = np.linalg.qr(u)
@@ -536,7 +514,6 @@ class RecommenderModel(object):
         else:
             U, V = Qu, Qv
         return U, V
-
 
     def verify_data_integrity(self):
         data = self.data
@@ -573,10 +550,8 @@ class NonPersonalized(RecommenderModel):
         super(NonPersonalized, self).__init__(*args, **kwargs)
         self.method = kind
 
-
     def build(self):
         pass
-
 
     def get_recommendations(self):
         userid, itemid, feedback = self.data.fields
@@ -657,7 +632,6 @@ class CooccurrenceModel(RecommenderModel):
         self.implicit = False
         self.dense_output = False
 
-
     def build(self):
         user_item_matrix = self.get_training_matrix()
         if self.implicit:
@@ -670,7 +644,6 @@ class CooccurrenceModel(RecommenderModel):
             i2i_matrix.eliminate_zeros()
 
         self._i2i_matrix = i2i_matrix
-
 
     def _sparse_dot(self, tst_mat, i2i_mat):
         # scipy always returns sparse result, even if dot product is dense
@@ -691,7 +664,6 @@ class CooccurrenceModel(RecommenderModel):
                 # too many nnz lead to undesired memory overhead in downvote_seen_items
                 scores = scores.toarray(order='C')
         return scores
-
 
     def slice_recommendations(self, test_data, shape, start, stop, test_users=None):
         test_matrix, slice_data = self.get_test_matrix(test_data, shape, (start, stop))
@@ -736,7 +708,6 @@ class SVDModel(RecommenderModel):
             else:
                 # ellipsis allows to handle 1d array of singular values
                 self.factors[entity] = factor[..., :rank]
-
 
     def build(self, operator=None, return_factors='vh'):
         if operator is not None:
@@ -783,7 +754,6 @@ class CoffeeModel(RecommenderModel):
         self._vectorize_target = defaults.test_vectorize_target
         self.parallel_ttm = defaults.parallel_ttm
 
-
     @property
     def mlrank(self):
         return self._mlrank
@@ -814,7 +784,6 @@ class CoffeeModel(RecommenderModel):
             vtarget = 'cpu'
         return tensor_outer_at(vtarget)
 
-
     def _check_reduced_rank(self, mlrank):
         for mode, entity in enumerate(self.data.fields):
             factor = self.factors.get(entity, None)
@@ -833,19 +802,17 @@ class CoffeeModel(RecommenderModel):
                 self.factors[entity] = factor.dot(rfactor)
                 self.factors['core'] = new_core
 
-
     @staticmethod
     def round_core(core, mode, rank):
-        new_dims = [mode] + [m for m in range(core.ndim) if m!=mode]
+        new_dims = [mode] + [m for m in range(core.ndim) if m != mode]
         mode_dim = core.shape[mode]
         flat_core = core.transpose(new_dims).reshape((mode_dim, -1), order='F')
         u, s, vt = np.linalg.svd(flat_core, full_matrices=False)
         rfactor = u[:, :rank]
-        new_core = (np.ascontiguousarray(s[:rank, np.newaxis]*vt[:rank, :])
+        new_core = (np.ascontiguousarray(s[:rank, np.newaxis] * vt[:rank, :])
                     .reshape(rank, *[core.shape[i] for i in new_dims[1:]], order='F')
                     .transpose(inverse_permutation(np.array(new_dims))))
         return rfactor, new_core
-
 
     @staticmethod
     def flatten_scores(tensor_scores, flattener=None):
@@ -872,24 +839,22 @@ class CoffeeModel(RecommenderModel):
             raise ValueError('Unrecognized value for flattener attribute')
         return matrix_scores
 
-
     def build(self):
         idx, val, shp = self.data.to_coo(tensor_mode=True)
 
         with Timer(self.method, verbose=self.verbose):
             (users_factors, items_factors,
-            feedback_factors, core) = hooi(idx, val, shp, self.mlrank,
-                                           growth_tol=self.growth_tol,
-                                           num_iters=self.num_iters,
-                                           verbose=self.show_output,
-                                           parallel_ttm=self.parallel_ttm,
-                                           seed=self.seed)
+             feedback_factors, core) = hooi(idx, val, shp, self.mlrank,
+                                            growth_tol=self.growth_tol,
+                                            num_iters=self.num_iters,
+                                            verbose=self.show_output,
+                                            parallel_ttm=self.parallel_ttm,
+                                            seed=self.seed)
 
         self.factors[self.data.fields.userid] = users_factors
         self.factors[self.data.fields.itemid] = items_factors
         self.factors[self.data.fields.feedback] = feedback_factors
         self.factors['core'] = core
-
 
     def unfold_test_tensor_slice(self, test_data, shape, start, stop, mode):
         slice_idx = self._slice_test_data(test_data, start, stop)
@@ -905,7 +870,6 @@ class CoffeeModel(RecommenderModel):
         test_tensor_unfolded = csr_matrix((val, idx), shape=shp, dtype=val.dtype)
         return test_tensor_unfolded, slice_idx
 
-
     def slice_recommendations(self, test_data, shape, start, stop, test_users=None):
         slice_idx = self._slice_test_data(test_data, start, stop)
 
@@ -914,9 +878,9 @@ class CoffeeModel(RecommenderModel):
 
         # use the fact that test data is sorted by users for reduction:
         scores = self.tensor_outer_at(1.0, v, w, slice_idx[1], slice_idx[2])
-        scores = np.add.reduceat(scores, np.r_[0, np.where(np.diff(slice_idx[0]))[0]+1])
+        scores = np.add.reduceat(scores, np.r_[0, np.where(np.diff(slice_idx[0]))[0] + 1])
 
-        wt_flat = self.flatten_scores(w.T, self.flattener) # TODO cache result
+        wt_flat = self.flatten_scores(w.T, self.flattener)  # TODO cache result
         scores = np.tensordot(scores, wt_flat, axes=(2, 0)).dot(v.T)
         return scores, slice_idx
 
@@ -930,7 +894,6 @@ class CoffeeModel(RecommenderModel):
         holdout_users = eval_data.loc[user_sel, userid].values.astype(np.int64) - start
         holdout_items = eval_data.loc[user_sel, itemid].values.astype(np.int64)
         return (holdout_users, holdout_items)
-
 
     def predict_feedback(self):
         flattener_old = self.flattener

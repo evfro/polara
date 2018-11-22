@@ -35,13 +35,11 @@ class ImplicitALS(RecommenderModel):
             self._is_ready = False
             self._recommendations = None
 
-
     @staticmethod
     def confidence(values, alpha=1, weight=None, epsilon=1, dtype='double'):
         '''implementation of a generic confidence-based function'''
-        values = weight(values/epsilon) if weight is not None else values/epsilon
+        values = weight(values / epsilon) if weight is not None else values / epsilon
         return (alpha * values).astype(dtype)
-
 
     def build(self):
         # define iALS model instance
@@ -51,7 +49,7 @@ class ImplicitALS(RecommenderModel):
                                                            num_threads=self.num_threads)
 
         # prepare input matrix for learning the model
-        matrix = self.get_training_matrix() # user_by_item sparse matrix
+        matrix = self.get_training_matrix()  # user_by_item sparse matrix
         matrix.data = self.confidence(matrix.data, alpha=self.alpha,
                                       weight=self.weight_func, epsilon=self.epsilon)
 
@@ -60,9 +58,8 @@ class ImplicitALS(RecommenderModel):
             # implicit takes item_by_user matrix as input, need to transpose
             self._model.fit(matrix.T)
 
-
     def get_recommendations(self):
-        recalculate = self.data.warm_start # used to force folding-in computation
+        recalculate = self.data.warm_start  # used to force folding-in computation
         if recalculate:
             if self.filter_seen is False:
                 raise ValueError('The model always filters seen items from results.')
@@ -80,7 +77,6 @@ class ImplicitALS(RecommenderModel):
         else:
             top_recs = super(ImplicitALS, self).get_recommendations()
         return top_recs
-
 
     def slice_recommendations(self, test_data, shape, start, stop, test_users=None):
         slice_data = self._slice_test_data(test_data, start, stop)

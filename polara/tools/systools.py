@@ -32,18 +32,18 @@ def platform_free_memory():
     if sys.platform == 'win32':
         memory_status = MemoryStatus()
         ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(memory_status))
-        mem = memory_status.ullAvailPhys / (1024**3) # return in gigabytes
+        mem = memory_status.ullAvailPhys / (1024**3)  # return in gigabytes
     elif sys.platform == 'darwin':
         try:
             import psutil
         except ImportError:
             print('Please, install psutil.')
         memory_status = psutil.virtual_memory
-        mem = memory_status.free / (1024**3) # return in gigabytes
+        mem = memory_status.free / (1024**3)  # return in gigabytes
     else:
         memory_status = os.popen("free -m").readlines()
         if memory_status[0].split()[2].lower() == 'free':
-            mem = int(memory_status[1].split()[3]) / 1024 # return in gigabytes
+            mem = int(memory_status[1].split()[3]) / 1024  # return in gigabytes
         else:
             raise ValueError('Unrecognized memory info')
     return mem
@@ -51,7 +51,7 @@ def platform_free_memory():
 
 def get_available_memory():
     try:
-        import psutil # preferred way
+        import psutil  # preferred way
         res = psutil.virtual_memory().available
     except ImportError:
         res = platform_free_memory()
