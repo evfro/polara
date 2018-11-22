@@ -11,7 +11,7 @@ from polara.recommender.data import RecommenderData
 class ItemColdStartData(RecommenderData):
     def __init__(self, *args, **kwargs):
         self.meta_data = kwargs.pop('meta_data', None)
-        super(ItemColdStartData, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
         self._test_ratio = 0.2
         self._warm_start = False
@@ -37,7 +37,7 @@ class ItemColdStartData(RecommenderData):
         return self._repr_users
 
     def prepare(self):
-        super(ItemColdStartData, self).prepare()
+        super().prepare()
 
         if any(self._last_update_rule.values()):
             self._post_process_cold_items()
@@ -56,7 +56,7 @@ class ItemColdStartData(RecommenderData):
         assert not self._warm_start
         assert self._holdout_size != 0  # needed for correct processing of test data
         assert self._test_ratio > 0
-        new_state, update_rule = super(ItemColdStartData, self)._check_state_transition()
+        new_state, update_rule = super()._check_state_transition()
 
         # handle change of test_sample value which is not handled
         # in standard state 3 scenario (as there's no testset)
@@ -69,7 +69,7 @@ class ItemColdStartData(RecommenderData):
         itemid = self.fields.itemid
 
         if self._holdout_size > 0:
-            holdout = super(ItemColdStartData, self)._sample_holdout(test_split, group_id=itemid)
+            holdout = super()._sample_holdout(test_split, group_id=itemid)
         else:
             holdout = self._data.loc[test_split, list(self.fields)]
 
@@ -82,7 +82,7 @@ class ItemColdStartData(RecommenderData):
 
     def _filter_short_sessions(self, group_id=None):
         group_id = '{}_cold'.format(self.fields.itemid)
-        super(ItemColdStartData, self)._filter_short_sessions(group_id=group_id)
+        super()._filter_short_sessions(group_id=group_id)
 
     def _assign_test_items_index(self):
         if self.build_index:
@@ -194,9 +194,9 @@ class ItemColdStartData(RecommenderData):
         holdout.sort_values(itemid_cold, inplace=True)
 
 
-class FeatureSimilarityMixin(object):
+class FeatureSimilarityMixin:
     def __init__(self, sim_mat, sim_idx, *args, **kwargs):
-        super(FeatureSimilarityMixin, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
         entities = [self.fields.userid, self.fields.itemid]
         self._sim_idx = {entity: pd.Series(index=idx, data=np.arange(len(idx)), copy=False)
@@ -253,7 +253,7 @@ class FeatureSimilarityMixin(object):
             self._similarity[entity] = sim_mat
 
 
-class ColdSimilarityMixin(object):
+class ColdSimilarityMixin:
     @property
     def cold_items_similarity(self):
         itemid = self.fields.itemid

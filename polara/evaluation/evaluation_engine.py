@@ -1,11 +1,5 @@
-# python 2/3 interoperability
-from __future__ import print_function
-try:
-    range = xrange
-except NameError:
-    pass
-
 from math import sqrt
+
 import pandas as pd
 
 

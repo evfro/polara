@@ -1,6 +1,3 @@
-# python 2/3 interoperability
-from __future__ import print_function
-
 import graphlab as gl
 import numpy as np
 
@@ -11,7 +8,7 @@ class GraphlabFactorization(RecommenderModel):
     def __init__(self, *args, **kwargs):
         self.item_side_info = kwargs.pop('item_side_info', None)
         self.user_side_info = kwargs.pop('user_side_info', None)
-        super(GraphlabFactorization, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         self._rank = 10
         self.method = 'GLF'
         # side data
@@ -37,7 +34,7 @@ class GraphlabFactorization(RecommenderModel):
         self.other_gl_params = {}
 
     def _on_change(self):
-        super(GraphlabFactorization, self)._on_change()
+        super()._on_change()
         self._item_data = None
         self._user_data = None
 
@@ -160,12 +157,12 @@ class GraphlabFactorization(RecommenderModel):
         return self.gl_model.evaluate_rmse(holdout, feedback)['rmse_overall']
 
 
-class WarmStartRecommendationsMixin(object):
+class WarmStartRecommendationsMixin:
     def get_recommendations(self):
         pass
 
 
-class ColdStartRecommendationsMixin(object):
+class ColdStartRecommendationsMixin:
     def get_recommendations(self):
         userid = self.data.fields.userid
         itemid = self.data.fields.itemid

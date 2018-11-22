@@ -5,7 +5,7 @@ from polara.recommender.models import RecommenderModel
 
 class ContentBasedColdStart(RecommenderModel):
     def __init__(self, *args, **kwargs):
-        super(ContentBasedColdStart, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         self.method = 'CB'
         self._prediction_key = '{}_cold'.format(self.data.fields.itemid)
         self._prediction_target = self.data.fields.userid

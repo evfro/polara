@@ -1,13 +1,7 @@
-# python 2/3 interoperability
-from __future__ import print_function
-try:
-    range = xrange
-except NameError:
-    pass
+from numba import njit
 
 import numpy as np
 from scipy.sparse.linalg import svds
-from numba import njit
 
 
 @njit(nogil=True)

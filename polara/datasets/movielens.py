@@ -93,7 +93,7 @@ def filter_short_head(data, threshold=0.01):
     short_head = data.groupby('movieid', sort=False)['userid'].nunique()
     short_head.sort_values(ascending=False, inplace=True)
 
-    ratings_perc = short_head.cumsum() * 1.0 / short_head.sum()
+    ratings_perc = short_head.cumsum() / short_head.sum()
     movies_perc = np.arange(1, len(short_head) + 1, dtype='f8') / len(short_head)
 
     long_tail_movies = ratings_perc[movies_perc > threshold].index

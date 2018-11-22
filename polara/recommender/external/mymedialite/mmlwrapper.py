@@ -36,7 +36,7 @@ def join_path(*paths):
 class MyMediaLiteWrapper(SVDModel):
 
     def __init__(self, library_path, data_folder, method_name, *args, **kwargs):
-        super(MyMediaLiteWrapper, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         self.path = library_path
         self.program = join_path(library_path, program)
         self.method = method_name
@@ -191,7 +191,7 @@ class MyMediaLiteWrapper(SVDModel):
 
     def slice_recommendations(self, test_data, shape, start, stop, test_users=None):
         if self.data.warm_start or self.orthogonal_factors:
-            return super(MyMediaLiteWrapper, self).slice_recommendations(test_data, shape, start, stop, test_users)
+            return super().slice_recommendations(test_data, shape, start, stop, test_users)
 
         slice_data = self._slice_test_data(test_data, start, stop)
         user_factors = self.factors[self.data.fields.userid][test_users[start:stop], :]

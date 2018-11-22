@@ -1,7 +1,7 @@
 from timeit import default_timer as timer
 
 
-class Timer(object):
+class Timer:
     def __init__(self, model_name='Model', verbose=True, msg=None):
         self.model_name = model_name
         self.message = msg or '{} training time: {}s'

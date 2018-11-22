@@ -1,7 +1,3 @@
-# python 2/3 interoperability
-from __future__ import print_function
-
-
 def filter_sessions_by_length(data, session_label='userid', min_session_length=3):
     """Filters users with insufficient number of items"""
     if data.duplicated().any():

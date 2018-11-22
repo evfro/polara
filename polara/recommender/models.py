@@ -1,32 +1,27 @@
-# python 2/3 interoperability
-from __future__ import print_function
-try:
-    range = xrange
-except NameError:
-    pass
-
-from functools import wraps
-from collections import namedtuple
 import warnings
-
+from collections import namedtuple
 from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import as_completed
+from functools import wraps
 
-import pandas as pd
 import numpy as np
+import pandas as pd
 import scipy as sp
 from scipy.sparse import coo_matrix, csr_matrix
 from scipy.sparse.linalg import svds
 
-from polara.recommender import defaults
-from polara.recommender.evaluation import get_hits, get_relevance_scores, get_ranking_scores, get_experience_scores
-from polara.recommender.evaluation import get_hr_score, get_mrr_score
-from polara.recommender.evaluation import assemble_scoring_matrices
-from polara.recommender.utils import array_split, get_nnz_max
-from polara.lib.tensor import hooi
-
 from polara.lib.sparse import csc_matvec, inverse_permutation
-from polara.lib.sparse import unfold_tensor_coordinates, tensor_outer_at
+from polara.lib.sparse import (unfold_tensor_coordinates,
+                               tensor_outer_at)
+from polara.lib.tensor import hooi
+from polara.recommender import defaults
+from polara.recommender.evaluation import assemble_scoring_matrices
+from polara.recommender.evaluation import (get_hits,
+                                           get_relevance_scores,
+                                           get_ranking_scores,
+                                           get_experience_scores)
+from polara.recommender.evaluation import get_hr_score, get_mrr_score
+from polara.recommender.utils import array_split, get_nnz_max
 from polara.tools.timing import Timer
 
 
@@ -47,31 +42,18 @@ def clean_build_decorator(build_func):
     return wrapper
 
 
-def with_metaclass(mcls):
-    # this is used to ensure python 2/3 interoperablity, taken from:
-    # https://stackoverflow.com/questions/22409430/portable-meta-class-between-python2-and-python3
-    def decorator(cls):
-        body = vars(cls).copy()
-        # clean out class body
-        body.pop('__dict__', None)
-        body.pop('__weakref__', None)
-        return mcls(cls.__name__, cls.__bases__, body)
-    return decorator
-
-
 class MetaModel(type):
     # performs cleaning of the instance when build method is called
     # propagates the action to any subclasses, key idea is borrowed from here:
     # https://stackoverflow.com/questions/18858759/python-decorating-a-class-method-that-is-intended-to-be-overwritten-when-inheri
     def __new__(mcs, name, bases, clsdict):
-        cls = super(MetaModel, mcs).__new__(mcs, name, bases, clsdict)
+        cls = super().__new__(mcs, name, bases, clsdict)
         if 'build' in clsdict:
             setattr(cls, 'build', clean_build_decorator(clsdict['build']))
         return cls
 
 
-@with_metaclass(MetaModel)
-class RecommenderModel(object):
+class RecommenderModel(metaclass=MetaModel):
     _config = ('topk', 'filter_seen', 'switch_positive', 'feedback_threshold', 'verify_integrity')
     _pad_const = -1  # used for sparse data
 
@@ -547,7 +529,7 @@ class NonPersonalized(RecommenderModel):
         deprecation_msg = '''This is a deprecated method.
         Use either PopularityModel or RandomModel instead.'''
         warnings.warn(deprecation_msg, DeprecationWarning)
-        super(NonPersonalized, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         self.method = kind
 
     def build(self):
@@ -583,7 +565,7 @@ class NonPersonalized(RecommenderModel):
 
 class PopularityModel(RecommenderModel):
     def __init__(self, *args, **kwargs):
-        super(PopularityModel, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         self.method = 'MP'
         self.by_feedback_value = False
 
@@ -606,7 +588,7 @@ class PopularityModel(RecommenderModel):
 class RandomModel(RecommenderModel):
     def __init__(self, *args, **kwargs):
         self.seed = kwargs.pop('seed', None)
-        super(RandomModel, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         self.method = 'RND'
 
     def build(self):
@@ -627,7 +609,7 @@ class RandomModel(RecommenderModel):
 class CooccurrenceModel(RecommenderModel):
 
     def __init__(self, *args, **kwargs):
-        super(CooccurrenceModel, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         self.method = 'item-to-item'  # pick some meaningful name
         self.implicit = False
         self.dense_output = False
@@ -680,7 +662,7 @@ class CooccurrenceModel(RecommenderModel):
 class SVDModel(RecommenderModel):
 
     def __init__(self, *args, **kwargs):
-        super(SVDModel, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         self._rank = defaults.svd_rank
         self.method = 'PureSVD'
         self.factors = {}
@@ -741,7 +723,7 @@ class SVDModel(RecommenderModel):
 class CoffeeModel(RecommenderModel):
 
     def __init__(self, *args, **kwargs):
-        super(CoffeeModel, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         self._mlrank = defaults.mlrank
         self.factors = {}
         self.chunk = defaults.test_chunk_size

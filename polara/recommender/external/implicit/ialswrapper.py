@@ -1,9 +1,3 @@
-# python 2/3 interoperability
-try:
-    range = xrange
-except NameError:
-    pass
-
 import implicit
 import numpy as np
 
@@ -14,7 +8,7 @@ from polara.tools.timing import Timer
 class ImplicitALS(RecommenderModel):
 
     def __init__(self, *args, **kwargs):
-        super(ImplicitALS, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         self._rank = 10
         self.alpha = 1
         self.epsilon = 1
@@ -76,7 +70,7 @@ class ImplicitALS(RecommenderModel):
                 recs = self._model.recommend(user_row, matrix, N=self.topk, recalculate_user=recalculate)
                 top_recs[i, :] = [item for item, _ in recs]
         else:
-            top_recs = super(ImplicitALS, self).get_recommendations()
+            top_recs = super().get_recommendations()
         return top_recs
 
     def slice_recommendations(self, test_data, shape, start, stop, test_users=None):

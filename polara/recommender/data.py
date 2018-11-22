@@ -1,6 +1,3 @@
-# python 2/3 interoperability
-from __future__ import print_function
-
 from collections import defaultdict
 from collections import namedtuple
 from weakref import WeakKeyDictionary
@@ -34,7 +31,7 @@ def group_largest_fraction(data, frac, groupid, by):
     return largest
 
 
-class EventNotifier(object):
+class EventNotifier:
     def __init__(self, events=None):
         self._subscribers = {}
         if events is not None:
@@ -98,7 +95,7 @@ def property_factory(cls):
 
 
 @property_factory
-class RecommenderData(object):
+class RecommenderData:
     _std_fields = ('userid', 'itemid', 'feedback')
 
     _config = {'_shuffle_data', '_test_ratio', '_test_fold',
@@ -462,7 +459,7 @@ class RecommenderData(object):
 
         diff = idx_bin_size[:-1] - idx_bin_size[1:]
         monotonic = (diff < 0).all() or (diff > 0).all()
-        huge_gap = (idx_bin_size.min() * 1.0 / idx_bin_size.max()) < allowed_gap
+        huge_gap = (idx_bin_size.min() / idx_bin_size.max()) < allowed_gap
         return monotonic or huge_gap
 
     @staticmethod
@@ -869,7 +866,7 @@ class RecommenderData(object):
         self._try_sort_test_data()
 
 
-class LongTailMixin(object):
+class LongTailMixin:
     def __init__(self, *args, **kwargs):
         raise NotImplementedError
         self.long_tail_holdout = kwargs.pop('long_tail_holdout', False)
@@ -880,7 +877,7 @@ class LongTailMixin(object):
         # fraction of popular items considered as short head
         self.head_items_frac = kwargs.pop('head_items_frac', None)
         self._long_tail_items = None
-        super(LongTailMixin, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
     @property
     def long_tail_items(self):
@@ -918,10 +915,10 @@ class LongTailMixin(object):
             long_tail_sel = data[itemid].isin(self.long_tail_items)
             self.__head_data = data[~long_tail_sel]
             data = data[long_tail_sel]
-        return super(LongTailMixin, self)._sample_holdout(data)
+        return super()._sample_holdout(data)
 
     def _sample_test_data(self, data):
         if self.long_tail_holdout:
             data = pd.concat([self.__head_data, data], copy=True)
             del self.__head_data
-        return super(LongTailMixin, self)._sample_test_data(data)
+        return super()._sample_test_data(data)

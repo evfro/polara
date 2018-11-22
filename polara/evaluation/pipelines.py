@@ -1,5 +1,3 @@
-from __future__ import print_function
-
 from functools import reduce
 from operator import mul as mul_op
 from random import choice
