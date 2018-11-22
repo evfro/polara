@@ -1,7 +1,8 @@
 import numpy as np
 from scipy.sparse.linalg import svds
-from polara.lib.sparse import dttm_seq, dttm_par
+
 from polara.lib.sparse import arrange_indices
+from polara.lib.sparse import dttm_seq, dttm_par
 
 
 def ttm3d_seq(idx, val, shape, U, V, modes, dtype=None):

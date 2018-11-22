@@ -2,9 +2,9 @@
 from __future__ import division
 from __future__ import print_function
 
+import ctypes
 import os
 import sys
-import ctypes
 
 
 # Getting memory info, based on

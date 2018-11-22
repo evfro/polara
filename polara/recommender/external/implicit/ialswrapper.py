@@ -4,8 +4,9 @@ try:
 except NameError:
     pass
 
-import numpy as np
 import implicit
+import numpy as np
+
 from polara.recommender.models import RecommenderModel
 from polara.tools.timing import Timer
 

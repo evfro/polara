@@ -1,7 +1,9 @@
 from __future__ import division
+
+from collections import namedtuple
+
 import numpy as np
 from scipy.sparse import csr_matrix
-from collections import namedtuple
 
 
 def no_copy_csr_matrix(data, indices, indptr, shape, dtype):

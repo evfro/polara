@@ -1,7 +1,8 @@
-from IPython.display import HTML
-from contextlib import contextmanager
-import sys
 import os
+import sys
+from contextlib import contextmanager
+
+from IPython.display import HTML
 
 
 def print_frames(dataframes):

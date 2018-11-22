@@ -1,8 +1,7 @@
 from __future__ import print_function
 
-from operator import mul as mul_op
 from functools import reduce
-from itertools import product
+from operator import mul as mul_op
 from random import choice
 
 

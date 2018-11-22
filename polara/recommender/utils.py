@@ -1,8 +1,10 @@
 from __future__ import division
-import sys
-import numpy as np
-from polara.tools.systools import get_available_memory
 
+import sys
+
+import numpy as np
+
+from polara.tools.systools import get_available_memory
 
 MEMORY_HARD_LIMIT = 1  # in gigbytes, default=1, depends on hardware
 # varying this value may significantly impact performance

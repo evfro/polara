@@ -1,11 +1,13 @@
 # python 2/3 interoperability
 from __future__ import print_function
 
-from weakref import WeakKeyDictionary
-from collections import namedtuple
 from collections import defaultdict
-import pandas as pd
+from collections import namedtuple
+from weakref import WeakKeyDictionary
+
 import numpy as np
+import pandas as pd
+
 from polara.lib.sparse import inverse_permutation
 from polara.recommender import defaults
 
