@@ -669,7 +669,8 @@ class RandomModel(RecommenderModel):
         except AttributeError:
             index_data = self.data.index.itemid
         self.n_items = index_data.shape[0]
-        self._random_state = np.random.RandomState(self.seed) if self.seed else np.random
+        seed = self.seed
+        self._random_state = np.random.RandomState(seed) if seed is not None else np.random
 
     def slice_recommendations(self, test_data, shape, start, stop, test_users=None):
         slice_data = self._slice_test_data(test_data, start, stop)
