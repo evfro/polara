@@ -101,6 +101,7 @@ def find_optimal_svd_rank(model, ranks, target_metric, return_scores=False,
     best_rank = scores.idxmax()
     if return_scores:
         scores.index.name = 'rank'
+        scores.name = model.method
         return best_rank, scores.loc[ranks]
     return best_rank
 
@@ -144,6 +145,7 @@ def find_optimal_tucker_ranks(model, tucker_ranks, target_metric, return_scores=
     best_mlrank = scores.idxmax()
     if return_scores:
         scores.index.names = ['r1', 'r2', 'r3']
+        scores.name = model.method
         return best_mlrank, scores
     return best_mlrank
 
@@ -180,5 +182,6 @@ def find_optimal_config(model, param_grid, param_names, target_metric, return_sc
     best_config = scores.idxmax()
     if return_scores:
         scores.index.names = param_names
+        scores.name = model.method
         return best_config, scores
     return best_config
