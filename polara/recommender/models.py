@@ -456,7 +456,12 @@ class RecommenderModel(object):
                 scores.append(get_ranking_scores(*scoring_data, switch_positive=switch_positive, topk=topk, alternative=ndcg_alternative))
 
         if 'experience' in metric_type:  # no need for feedback
-            scores.append(get_experience_scores(recommendations, self.data.index.itemid.shape[0]))
+            item_index = self.data.index.itemid
+            try:
+                n_items = item_index.shape[0]
+            except AttributeError:
+                n_items = item_index.training.shape[0]
+            scores.append(get_experience_scores(recommendations, n_items))
 
         if 'hits' in metric_type:  # no need for feedback
             scores.append(get_hits(*scoring_data, not_rated_penalty=not_rated_penalty))
