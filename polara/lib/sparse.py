@@ -1,9 +1,4 @@
-# python 2/3 interoperability
-try:
-    range = xrange
-except NameError:
-    pass
-
+import sys
 from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import as_completed
 import numpy as np
@@ -13,6 +8,48 @@ from numba import float64 as f8
 from numba import intp as ip
 
 from polara.recommender import defaults
+
+
+tuplsize = sys.getsizeof(())
+itemsize = np.dtype(np.intp).itemsize
+pntrsize = sys.getsizeof(1.0)
+# size of list of tuples of indices - to estimate when to convert sparse matrix to dense
+# based on http://stackoverflow.com/questions/15641344/python-memory-consumption-dict-vs-list-of-tuples
+# and https://code.tutsplus.com/tutorials/understand-how-much-memory-your-python-objects-use--cms-25609
+def get_nnz_max():
+    return int(defaults.memory_hard_limit * (1024**3) / (tuplsize + 2*(pntrsize + itemsize)))
+
+
+def check_sparsity(matrix, nnz_coef=0.5, tocsr=False):
+    if matrix.nnz > nnz_coef * matrix.shape[0] * matrix.shape[1]:
+        return matrix.toarray(order='C')
+    if tocsr:
+        return matrix.tocsr()
+    return matrix
+
+
+def sparse_dot(left_mat, right_mat, dense_output=False, tocsr=False):
+    # scipy always returns sparse result, even if dot product is dense
+    # this function offers solution to this problem
+    # it also takes care on sparse result w.r.t. to further processing
+    if dense_output:  # calculate dense result directly
+        # TODO matmat multiplication instead of iteration with matvec
+        res_type = np.result_type(right_mat.dtype, left_mat.dtype)
+        result = np.empty((left_mat.shape[0], right_mat.shape[1]), dtype=res_type)
+        for i in range(left_mat.shape[0]):
+            v = left_mat.getrow(i)
+            result[i, :] = csc_matvec(right_mat, v, dense_output=True, dtype=res_type)
+    else:
+        result = left_mat.dot(right_mat.T)
+        # NOTE even though not neccessary for symmetric i2i matrix,
+        # transpose helps to avoid expensive conversion to CSR (performed by scipy)
+        if result.nnz > get_nnz_max():
+            # too many nnz lead to undesired memory overhead in downvote_seen_items
+            result = result.toarray() # not using order='C' as it may consume memory
+        else:
+            result = check_sparsity(result, tocsr=tocsr)
+    return result
+
 
 # matvec implementation is based on
 # http://stackoverflow.com/questions/18595981/improving-performance-of-multiplication-of-scipy-sparse-matrices

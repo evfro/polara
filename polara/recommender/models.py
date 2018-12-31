@@ -22,10 +22,10 @@ from polara.recommender import defaults
 from polara.recommender.evaluation import get_hits, get_relevance_scores, get_ranking_scores, get_experience_scores
 from polara.recommender.evaluation import get_hr_score, get_mrr_score
 from polara.recommender.evaluation import assemble_scoring_matrices
-from polara.recommender.utils import array_split, get_nnz_max
+from polara.recommender.utils import array_split
 from polara.lib.tensor import hooi
 
-from polara.lib.sparse import csc_matvec, inverse_permutation
+from polara.lib.sparse import sparse_dot, inverse_permutation
 from polara.lib.sparse import unfold_tensor_coordinates, tensor_outer_at
 from polara.tools.timing import Timer
 
@@ -690,27 +690,6 @@ class CooccurrenceModel(RecommenderModel):
         self._i2i_matrix = i2i_matrix
 
 
-    def _sparse_dot(self, tst_mat, i2i_mat):
-        # scipy always returns sparse result, even if dot product is dense
-        # this function offers solution to this problem
-        # it also takes care on sparse result w.r.t. to further processing
-        if self.dense_output:  # calculate dense result directly
-            # TODO matmat multiplication instead of iteration with matvec
-            res_type = np.result_type(i2i_mat.dtype, tst_mat.dtype)
-            scores = np.empty((tst_mat.shape[0], i2i_mat.shape[1]), dtype=res_type)
-            for i in range(tst_mat.shape[0]):
-                v = tst_mat.getrow(i)
-                scores[i, :] = csc_matvec(i2i_mat, v, dense_output=True, dtype=res_type)
-        else:
-            scores = tst_mat.dot(i2i_mat.T)
-            # NOTE even though not neccessary for symmetric i2i matrix,
-            # transpose helps to avoid expensive conversion to CSR (performed by scipy)
-            if scores.nnz > get_nnz_max():
-                # too many nnz lead to undesired memory overhead in downvote_seen_items
-                scores = scores.toarray(order='C')
-        return scores
-
-
     def slice_recommendations(self, test_data, shape, start, stop, test_users=None):
         test_matrix, slice_data = self.get_test_matrix(test_data, shape, (start, stop))
         # NOTE CSR format is mandatory for proper handling of signle user
@@ -719,7 +698,7 @@ class CooccurrenceModel(RecommenderModel):
         if self.implicit:
             test_matrix.data = np.sign(test_matrix.data)
 
-        scores = self._sparse_dot(test_matrix, self._i2i_matrix)
+        scores = sparse_dot(test_matrix, self._i2i_matrix, self.dense_output, True)
         return scores, slice_data
 
 
