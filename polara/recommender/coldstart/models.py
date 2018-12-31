@@ -1,11 +1,13 @@
 import numpy as np
 from polara.recommender.models import RecommenderModel
+from polara.lib.similarity import stack_features
+from polara.lib.sparse import sparse_dot
 
 
-class ContentBasedColdStart(RecommenderModel):
+class ItemColdStartEvaluationMixin:
     def __init__(self, *args, **kwargs):
-        super(ContentBasedColdStart, self).__init__(*args, **kwargs)
-        self.method = 'CB'
+        super().__init__(*args, **kwargs)
+        self.filter_seen = False # there are no seen entities in cold start
         self._prediction_key = '{}_cold'.format(self.data.fields.itemid)
         self._prediction_target = self.data.fields.userid
 
@@ -54,6 +56,15 @@ class PopularityModelItemColdStart(ItemColdStartEvaluationMixin, RecommenderMode
         top_users_array = np.lib.stride_tricks.as_strided(top_users, shape,
                                                           (0, top_users.itemsize))
         return top_users_array
+
+
+class SimilarityAggregationItemColdStart(ItemColdStartEvaluationMixin, RecommenderModel):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.method = 'SIM(cs)'
+        self.implicit = False
+        self.dense_output = False
+
     def build(self):
         pass
 
@@ -61,8 +72,12 @@ class PopularityModelItemColdStart(ItemColdStartEvaluationMixin, RecommenderMode
         item_similarity_scores = self.data.cold_items_similarity
 
         user_item_matrix = self.get_training_matrix()
-        user_item_matrix.data = np.ones_like(user_item_matrix.data)
+        if self.implicit:
+            user_item_matrix.data = np.ones_like(user_item_matrix.data)
+        scores = sparse_dot(item_similarity_scores, user_item_matrix, self.dense_output, True)
+        top_similar_users = self.get_topk_elements(scores).astype(np.intp)
+        return top_similar_users
 
-        scores = item_similarity_scores.dot(user_item_matrix.T).tocsr()
+
         top_similar_users = self.get_topk_elements(scores).astype(np.intp)
         return top_similar_users
