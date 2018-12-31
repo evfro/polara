@@ -3,11 +3,11 @@ from setuptools import setup
 
 _packages = ["polara",
             "polara/recommender",
-            "polara/recommender/coldstart",
             "polara/evaluation",
             "polara/datasets",
             "polara/lib",
             "polara/tools",
+            "polara/recommender/coldstart",
             "polara/recommender/external",
             "polara/recommender/external/mymedialite",
             "polara/recommender/external/turi",
