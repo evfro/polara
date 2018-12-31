@@ -96,7 +96,9 @@ def holdout_test(models, holdout_sizes=[1], metrics='all'):
     return consolidate(holdout_scores, level_name='hsize', level_keys=holdout_sizes)
 
 
-def topk_test(models, topk_list=[10], metrics='all'):
+def topk_test(models, **kwargs):
+    metrics = kwargs.pop('metrics', None) or 'all'
+    topk_list = kwargs.pop('topk_list', [10])
     topk_scores = []
     data = models[0].data
     assert all([model.data is data for model in models[1:]]) # check that data is shared across models
@@ -104,7 +106,8 @@ def topk_test(models, topk_list=[10], metrics='all'):
     topk_list_sorted = list(reversed(sorted(topk_list))) # start from max topk and rollback
 
     for topk in topk_list_sorted:
-        metric_scores = evaluate_models(models, metrics, topk=topk)
+        kwargs['topk'] = topk
+        metric_scores = evaluate_models(models, metrics, **kwargs)
         topk_scores.append(metric_scores)
 
     level_name = 'top-n'
