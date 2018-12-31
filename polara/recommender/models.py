@@ -158,16 +158,18 @@ class RecommenderModel(object):
         raise NotImplementedError('This must be implemented in subclasses')
 
 
-    def get_training_matrix(self, feedback_threshold=None, dtype=None):
+    def get_training_matrix(self, feedback_threshold=None, dtype=None, ignore_feedback=False):
         threshold = feedback_threshold or self.feedback_threshold
         idx, val, shp = self.data.to_coo(tensor_mode=False, feedback_threshold=threshold)
         dtype = dtype or val.dtype
+        if ignore_feedback: # for compatibility with non-numeric tensor feedback data
+            val = np.ones_like(val, dtype=dtype)
         matrix = csr_matrix((val, (idx[:, 0], idx[:, 1])),
                             shape=shp, dtype=dtype)
         return matrix
 
 
-    def get_test_matrix(self, test_data=None, shape=None, user_slice=None):
+    def get_test_matrix(self, test_data=None, shape=None, user_slice=None, dtype=None, ignore_feedback=False):
         if test_data is None:
             test_data, shape, _ = self._get_test_data()
         elif shape is None:
@@ -190,10 +192,14 @@ class RecommenderModel(object):
             item_coo = item_coo[valid_fdbk]
             fdbk_coo = fdbk_coo[valid_fdbk]
 
+        dtype = dtype or fdbk_coo.dtype
+        if ignore_feedback: # for compatibility with non-numeric tensor feedback data
+            fdbk_coo = np.ones_like(fdbk_coo, dtype=dtype)
+
         num_items = shape[1]
         test_matrix = csr_matrix((fdbk_coo, (user_coo, item_coo)),
                                  shape=(num_users, num_items),
-                                 dtype=fdbk_coo.dtype)
+                                 dtype=dtype)
         return test_matrix, coo_data
 
 
