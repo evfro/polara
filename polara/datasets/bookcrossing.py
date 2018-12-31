@@ -7,7 +7,7 @@ except ImportError:
     from zipfile import ZipFile
 
 
-def get_bx_data(local_file=None, get_ratings=True, get_users=False, get_books=False):
+def get_bookcrossing_data(local_file=None, get_ratings=True, get_users=False, get_books=False):
     if not local_file:
         # downloading data
         from requests import get
