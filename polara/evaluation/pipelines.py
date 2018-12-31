@@ -70,7 +70,8 @@ def evaluate_models(models, target_metric='precision', metric_type='all', **kwar
 
 def find_optimal_svd_rank(model, ranks, target_metric, return_scores=False,
                           protect_factors=True, config=None, verbose=False,
-                          ranger=lambda x: x, **kwargs):
+                          evaluator=None, iterator=lambda x: x, **kwargs):
+    evaluator = evaluator or evaluate_models
     model_verbose = model.verbose
     if config:
         set_config(model, *zip(*config.items()))
@@ -85,9 +86,9 @@ def find_optimal_svd_rank(model, ranks, target_metric, return_scores=False,
 
     res = {}
     try:
-        for rank in ranger(list(reversed(sorted(ranks)))):
+        for rank in iterator(list(reversed(sorted(ranks)))):
             model.rank = rank
-            res[rank] = evaluate_models(model, target_metric, **kwargs)[model.method]
+            res[rank] = evaluator(model, target_metric, **kwargs)[model.method]
             # prevent previous scores caching when assigning svd_rank
             model._recommendations = None
     finally:
@@ -106,7 +107,8 @@ def find_optimal_svd_rank(model, ranks, target_metric, return_scores=False,
 
 def find_optimal_tucker_ranks(model, tucker_ranks, target_metric, return_scores=False,
                               config=None, verbose=False, same_space=False,
-                              ranger=lambda x: x, **kwargs):
+                              evaluator=None, iterator=lambda x: x, **kwargs):
+    evaluator = evaluator or evaluate_models
     model_verbose = model.verbose
     if config:
         set_config(model, *zip(*config.items()))
@@ -121,7 +123,7 @@ def find_optimal_tucker_ranks(model, tucker_ranks, target_metric, return_scores=
     tucker_rank = model.mlrank
 
     res_score = {}
-    for r1 in ranger(tucker_ranks[0]):
+    for r1 in iterator(tucker_ranks[0]):
         for r2 in tucker_ranks[1]:
             if same_space and (r2 != r1):
                 continue
@@ -130,7 +132,7 @@ def find_optimal_tucker_ranks(model, tucker_ranks, target_metric, return_scores=
                     continue
                 try:
                     model.mlrank = mlrank = (r1, r2, r3)
-                    res_score[mlrank] = evaluate_models(model, target_metric, **kwargs)[model.method]
+                    res_score[mlrank] = evaluator(model, target_metric, **kwargs)[model.method]
                     # prevent previous scores caching when assigning tucker_rank
                     model._recommendations = None
                 finally:
@@ -148,19 +150,20 @@ def find_optimal_tucker_ranks(model, tucker_ranks, target_metric, return_scores=
 
 def find_optimal_config(model, param_grid, param_names, target_metric, return_scores=False,
                         config=None, reset_config=None, verbose=False, force_build=True,
-                        ranger=lambda x: x, **kwargs):
+                        evaluator=None, iterator=lambda x: x, **kwargs):
+    evaluator = evaluator or evaluate_models
     model_verbose = model.verbose
     if config:
         set_config(model, *zip(*config.items()))
 
     model.verbose = verbose
     grid_results = {}
-    for params in ranger(param_grid):
+    for params in iterator(param_grid):
         try:
             set_config(model, param_names, params)
             if not model._is_ready or force_build:
                 model.build()
-            grid_results[params] = evaluate_models(model, target_metric, **kwargs)[model.method]
+            grid_results[params] = evaluator(model, target_metric, **kwargs)[model.method]
         finally:
             if reset_config is not None:
                 if isinstance(reset_config, dict):
