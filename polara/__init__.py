@@ -10,3 +10,4 @@ from polara.recommender.data import RecommenderData
 from polara.datasets.movielens import get_movielens_data
 from polara.datasets.bookcrossing import get_bookcrossing_data
 from polara.datasets.netflix import get_netflix_data
+from polara.datasets.amazon import get_amazon_data
