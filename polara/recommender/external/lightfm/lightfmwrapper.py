@@ -6,7 +6,7 @@ from numpy.lib.stride_tricks import as_strided
 from lightfm import LightFM
 from polara.recommender.models import RecommenderModel
 from polara.lib.similarity import stack_features
-from polara.tools.timing import Timer
+from polara.tools.timing import track_time
 
 
 class LightFMWrapper(RecommenderModel):
@@ -63,7 +63,7 @@ class LightFMWrapper(RecommenderModel):
                                                                                 normalize=True,
                                                                                 dtype='f4')
 
-        with Timer(self.method, verbose=self.verbose):
+        with track_time(self.training_time, verbose=self.verbose, model=self.method):
             fit(matrix, item_features=self._item_features_csr, user_features=self._user_features_csr)
 
 

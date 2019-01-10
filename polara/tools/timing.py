@@ -1,18 +1,34 @@
+from contextlib import contextmanager
 from timeit import default_timer as timer
+from string import Template
 
 
-class Timer(object):
-    def __init__(self, model_name='Model', verbose=True, msg=None):
-        self.model_name = model_name
-        self.message = msg or '{} training time: {}s'
-        self.elapsed_time = []
-        self.verbose = verbose
+training_time_message = Template('$model training time: ${time}')
 
-    def __enter__(self):
-        self.start = timer()
-        return self.elapsed_time
 
-    def __exit__(self, type, value, traceback):
-        self.elapsed_time.append(timer() - self.start)
-        if self.verbose:
-            print(self.message.format(self.model_name, self.elapsed_time[-1]))
+def format_elapsed_time(seconds_elapsed):
+    minutes, seconds = divmod(seconds_elapsed, 60)
+    hours, minutes = divmod(minutes, 60)
+
+    if hours == 0:
+        if minutes == 0:
+            return f'{seconds:.3f}s'
+        return f'{minutes:>02.0f}m:{seconds:>02.0f}s'
+    return f'{hours:.0f}h:{minutes:>02.0f}m:{seconds:>02.0f}s'
+
+
+@contextmanager
+def track_time(time_container=None, verbose=False, message=None, **kwargs):
+    if time_container is None:
+        time_container = []
+    start = timer()
+    try:
+        yield time_container
+    finally:
+        stop = timer()
+        elapsed = stop - start
+        time_container.append(elapsed)
+    if verbose:
+        message = message or training_time_message
+        elapsed_time = format_elapsed_time(elapsed)
+        print(message.safe_substitute(kwargs, time=elapsed_time))

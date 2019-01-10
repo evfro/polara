@@ -7,7 +7,7 @@ except NameError:
 import numpy as np
 import implicit
 from polara.recommender.models import RecommenderModel
-from polara.tools.timing import Timer
+from polara.tools.timing import track_time
 
 
 class ImplicitALS(RecommenderModel):
@@ -55,7 +55,7 @@ class ImplicitALS(RecommenderModel):
         matrix.data = self.confidence(matrix.data, alpha=self.alpha,
                                       weight=self.weight_func, epsilon=self.epsilon)
 
-        with Timer(self.method, verbose=self.verbose):
+        with track_time(self.training_time, verbose=self.verbose, model=self.method):
             # build the model
             # implicit takes item_by_user matrix as input, need to transpose
             self._model.fit(matrix.T)

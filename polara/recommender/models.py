@@ -27,7 +27,7 @@ from polara.lib.tensor import hooi
 
 from polara.lib.sparse import sparse_dot, inverse_permutation
 from polara.lib.sparse import unfold_tensor_coordinates, tensor_outer_at
-from polara.tools.timing import Timer
+from polara.tools.timing import track_time
 
 def get_default(name):
     return defaults.get_config([name])[name]
@@ -93,6 +93,7 @@ class RecommenderModel(object):
 
         self._is_ready = False
         self.verbose = True
+        self.training_time = []
 
         self.data.subscribe(self.data.on_change_event, self._renew_model)
         self.data.subscribe(self.data.on_update_event, self._refresh_model)
@@ -694,7 +695,7 @@ class CooccurrenceModel(RecommenderModel):
             # np.sign allows for negative values as well
             user_item_matrix.data = np.sign(user_item_matrix.data)
 
-        with Timer(self.method, verbose=self.verbose):
+        with track_time(self.training_time, verbose=self.verbose, model=self.method):
             i2i_matrix = user_item_matrix.T.dot(user_item_matrix)  # gives CSC format
             i2i_matrix.setdiag(0)  # exclude "self-links"
             i2i_matrix.eliminate_zeros()
@@ -757,7 +758,7 @@ class SVDModel(RecommenderModel):
 
         svd_params = dict(k=self.rank, return_singular_vectors=return_factors)
 
-        with Timer(self.method, verbose=self.verbose):
+        with track_time(self.training_time, verbose=self.verbose, model=self.method):
             user_factors, sigma, item_factors = svds(svd_matrix, **svd_params)
 
         if user_factors is not None:
@@ -889,7 +890,7 @@ class CoffeeModel(RecommenderModel):
     def build(self):
         idx, val, shp = self.data.to_coo(tensor_mode=True)
 
-        with Timer(self.method, verbose=self.verbose):
+        with track_time(self.training_time, verbose=self.verbose, model=self.method):
             (users_factors, items_factors,
             feedback_factors, core) = hooi(idx, val, shp, self.mlrank,
                                            growth_tol=self.growth_tol,
