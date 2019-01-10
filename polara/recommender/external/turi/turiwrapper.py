@@ -141,6 +141,8 @@ class TuriFactorizationRecommender(RecommenderModel):
                                     item_id=self.data.fields.itemid,
                                     target=target,
                                     **params)
+        if self.training_time is not None:
+            self.training_time.append(self.tc_model.training_time)
         if self.verbose:
             print(f'{self.method} training time: {self.tc_model.training_time}s')
 

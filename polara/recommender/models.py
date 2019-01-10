@@ -93,7 +93,7 @@ class RecommenderModel(object):
 
         self._is_ready = False
         self.verbose = True
-        self.training_time = []
+        self.training_time = [] # setting to None will prevent storing time
 
         self.data.subscribe(self.data.on_change_event, self._renew_model)
         self.data.subscribe(self.data.on_update_event, self._refresh_model)
