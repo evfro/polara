@@ -151,12 +151,12 @@ def find_optimal_tucker_ranks(model, tucker_ranks, target_metric, return_scores=
 
 
 def find_optimal_config(model, param_grid, param_names, target_metric, return_scores=False,
-                        config=None, reset_config=None, verbose=False, force_build=True,
+                        init_config=None, reset_config=None, verbose=False, force_build=True,
                         evaluator=None, iterator=lambda x: x, **kwargs):
     evaluator = evaluator or evaluate_models
     model_verbose = model.verbose
-    if config:
-        set_config(model, *zip(*config.items()))
+    if init_config:
+        set_config(model, *zip(*init_config.items()))
 
     model.verbose = verbose
     grid_results = {}
