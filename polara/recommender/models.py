@@ -457,12 +457,15 @@ class RecommenderModel(object):
                 scores.append(get_ranking_scores(*scoring_data, switch_positive=switch_positive, topk=topk, alternative=ndcg_alternative))
 
         if 'experience' in metric_type:  # no need for feedback
-            item_index = self.data.index.itemid
+            fields = self.data.fields
+            # support custom scenarios, e.g. coldstart
+            entity_type = fields._fields[fields.index(self._prediction_target)]
+            entity_index = getattr(self.data.index, entity_type)
             try:
-                n_items = item_index.shape[0]
+                n_entities = entity_index.shape[0]
             except AttributeError:
-                n_items = item_index.training.shape[0]
-            scores.append(get_experience_scores(recommendations, n_items))
+                n_entities = entity_index.training.shape[0]
+            scores.append(get_experience_scores(recommendations, n_entities))
 
         if 'hits' in metric_type:  # no need for feedback
             scores.append(get_hits(*scoring_data, not_rated_penalty=not_rated_penalty))
