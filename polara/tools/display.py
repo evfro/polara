@@ -1,5 +1,5 @@
 from IPython.display import HTML
-from contextlib import contextmanager
+from contextlib import contextmanager, redirect_stdout
 import sys, os
 
 
@@ -20,13 +20,11 @@ def print_frames(dataframes):
     return HTML(table)
 
 
-# from http://thesmithfam.org/blog/2012/10/25/temporarily-suppress-console-output-in-python/#
 @contextmanager
-def suppress_stdout():
-    with open(os.devnull, "w") as devnull:
-        old_stdout = sys.stdout
-        sys.stdout = devnull
-        try:
-            yield
-        finally:
-            sys.stdout = old_stdout
+def suppress_stdout(on=True):
+    if on:
+        with open(os.devnull, "w") as target:
+            with redirect_stdout(target):
+                yield
+    else:
+        yield
