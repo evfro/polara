@@ -592,6 +592,16 @@ class RecommenderData(object):
         items_index = self.reindex(self._training, itemid)
         self.index = self.index._replace(itemid=items_index)
 
+    def get_entity_index(self, entity, index_id='training'):
+        entity_type = self.fields._fields[self.fields.index(entity)]
+        index_data = getattr(self.index, entity_type)
+
+        try: # check whether custom index is introduced (as in e.g. coldstart)
+            entity_idx = getattr(index_data, index_id)
+        except AttributeError: # fall back to standard case
+            entity_idx = index_data
+        return entity_idx
+
     def _reindex_feedback(self):
         self.index = self.index._replace(feedback=None)
 
