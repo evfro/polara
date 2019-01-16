@@ -23,6 +23,7 @@ from polara.recommender.evaluation import get_hits, get_relevance_scores, get_ra
 from polara.recommender.evaluation import get_hr_score, get_mrr_score
 from polara.recommender.evaluation import assemble_scoring_matrices
 from polara.recommender.utils import array_split
+from polara.lib.optimize import simple_pmf_sgd
 from polara.lib.tensor import hooi
 
 from polara.lib.sparse import sparse_dot, inverse_permutation
@@ -159,15 +160,22 @@ class RecommenderModel(object):
         raise NotImplementedError('This must be implemented in subclasses')
 
 
-    def get_training_matrix(self, feedback_threshold=None, dtype=None, ignore_feedback=False):
+    def get_training_matrix(self, feedback_threshold=None, ignore_feedback=False,
+                            sparse_format='csr', dtype=None):
         threshold = feedback_threshold or self.feedback_threshold
         idx, val, shp = self.data.to_coo(tensor_mode=False, feedback_threshold=threshold)
         dtype = dtype or val.dtype
         if ignore_feedback: # for compatibility with non-numeric tensor feedback data
             val = np.ones_like(val, dtype=dtype)
-        matrix = csr_matrix((val, (idx[:, 0], idx[:, 1])),
+        matrix = coo_matrix((val, (idx[:, 0], idx[:, 1])),
                             shape=shp, dtype=dtype)
-        return matrix
+        if sparse_format == 'csr':
+            return matrix.tocsr()
+        elif sparse_format == 'csc':
+            return matrix.tocsc()
+        elif sparse_format == 'coo':
+            matrix.sum_duplicates()
+            return matrix
 
 
     def get_test_matrix(self, test_data=None, shape=None, user_slice=None, dtype=None, ignore_feedback=False):
@@ -715,6 +723,66 @@ class CooccurrenceModel(RecommenderModel):
             test_matrix.data = np.sign(test_matrix.data)
 
         scores = sparse_dot(test_matrix, self._i2i_matrix, self.dense_output, True)
+        return scores, slice_data
+
+
+class ProbabilisticMF(RecommenderModel):
+    def __init__(self, *args, **kwargs):
+        self.seed = kwargs.pop('seed', None)
+        super().__init__(*args, **kwargs)
+        self.method = 'PMF'
+        self.optimizer = simple_pmf_sgd
+        self.learn_rate = 0.005
+        self.sigma = 1
+        self.num_epochs = 25
+        self.rank = 10
+        self.tolerance = 1e-4
+        self.factors = {}
+        self.rmse_history = None
+        self.show_rmse = False
+
+    def build(self, *args, **kwargs):
+        matrix = self.get_training_matrix(sparse_format='coo', dtype='f8')
+        user_idx, item_idx = matrix.nonzero()
+        interactions = (user_idx, item_idx, matrix.data)
+        nonzero_count = (matrix.getnnz(axis=1), matrix.getnnz(axis=0))
+
+        rank = self.rank
+        lrate = self.learn_rate
+        sigma = self.sigma
+        num_epochs = self.num_epochs
+        tol = self.tolerance
+        self.rmse_history = []
+
+        general_config = dict(seed=self.seed,
+                              verbose=self.show_rmse,
+                              iter_errors=self.rmse_history)
+
+        with track_time(self.training_time, verbose=self.verbose, model=self.method):
+            P, Q = self.optimizer(interactions, matrix.shape, nonzero_count, rank,
+                                  lrate, sigma, num_epochs, tol,
+                                  *args,
+                                  **kwargs,
+                                  **general_config)
+
+        self.factors[self.data.fields.userid] = P
+        self.factors[self.data.fields.itemid] = Q
+
+    def get_recommendations(self):
+        if self.data.warm_start:
+            raise NotImplementedError
+        else:
+            return super().get_recommendations()
+
+
+    def slice_recommendations(self, test_data, shape, start, stop, test_users=None):
+        userid = self.data.fields.userid
+        itemid = self.data.fields.itemid
+        slice_data = self._slice_test_data(test_data, start, stop)
+
+        user_factors = self.factors[userid][test_users[start:stop], :]
+        item_factors = self.factors[itemid]
+        scores = user_factors.dot(item_factors.T)
         return scores, slice_data
 
 
