@@ -87,11 +87,11 @@ def generate_hits_data(rank_matrix, eval_matrix_hits, eval_matrix_miss=None):
     return hits_rank, miss_rank
 
 
-def assemble_scoring_matrices(recommendations, eval_data, key, target, is_positive, feedback=None):
+def assemble_scoring_matrices(recommendations, holdout, key, target, is_positive, feedback=None):
     # handle singletone case for a single user
     recommendations = np.array(recommendations, copy=False, ndmin=2)
-    shape = (recommendations.shape[0], max(recommendations.max(), eval_data[target].max())+1)
-    eval_matrix = matrix_from_observations(eval_data, key, target, shape, feedback=feedback)
+    shape = (recommendations.shape[0], max(recommendations.max(), holdout[target].max())+1)
+    eval_matrix = matrix_from_observations(holdout, key, target, shape, feedback=feedback)
     eval_matrix_hits, eval_matrix_miss = split_positive(eval_matrix, is_positive)
     rank_matrix = build_rank_matrix(recommendations, shape)
     hits_rank, miss_rank = generate_hits_data(rank_matrix, eval_matrix_hits, eval_matrix_miss)

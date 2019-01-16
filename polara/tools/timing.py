@@ -3,11 +3,11 @@ from timeit import default_timer as timer
 from string import Template
 
 
-training_time_message = Template('$model training time: ${time}')
+training_time_message = Template('$model training time: $time')
 
 
-def format_elapsed_time(seconds_elapsed):
-    minutes, seconds = divmod(seconds_elapsed, 60)
+def format_elapsed_time(seconds_total):
+    minutes, seconds = divmod(seconds_total, 60)
     hours, minutes = divmod(minutes, 60)
 
     if hours == 0:
