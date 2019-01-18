@@ -89,6 +89,17 @@ def adam(grad, m, cum_grad, cum_sq_grad, step, beta1=0.9, beta2=0.999, smoothing
     return adjusted_grad
 
 
+@njit(nogil=True)
+def adanorm(grad, m, smoothing=1e-6):
+    gnorm2 = grad @ grad
+    adjusted_grad = grad / sqrt(smoothing + gnorm2)
+    return adjusted_grad
+
+@njit(nogil=True)
+def gnprop(grad, m, cum_sq_norm, gamma=0.99, smoothing=1e-6):
+    cum_sq_norm_update = gamma * cum_sq_norm[m] + (1 - gamma) * (grad @ grad)
+    cum_sq_norm[m] = cum_sq_norm_update
+    adjusted_grad = grad / sqrt(smoothing + cum_sq_norm_update)
     return adjusted_grad
 
 
@@ -156,6 +167,10 @@ def mf_sgd_boilerplate(interactions, shape, nonzero_count, rank,
         if adjust_gradient in [adagrad, rmsprop]:
             adjustment_params = ((np.zeros(row_shp, dtype='f8'),),
                                  (np.zeros(col_shp, dtype='f8'),)
+                                )
+        if adjust_gradient is gnprop:
+            adjustment_params = ((np.zeros(nrows, dtype='f8'),),
+                                 (np.zeros(ncols, dtype='f8'),)
                                 )
         if adjust_gradient is adam:
             adjustment_params = ((np.zeros(row_shp, dtype='f8'),
