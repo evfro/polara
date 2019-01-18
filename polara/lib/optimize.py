@@ -61,9 +61,34 @@ def identity(x, *args): # used to fall back to standard SGD
 
 
 @njit(nogil=True)
-def adagrad(grad, cum_sq_grad, smoothing=1e-6):
-    cum_sq_grad += grad * grad
-    adjusted_grad = grad / (smoothing + np.sqrt(cum_sq_grad))
+def adagrad(grad, m, cum_sq_grad, smoothing=1e-6):
+    cum_sq_grad_update = cum_sq_grad[m, :] + grad * grad
+    cum_sq_grad[m, :] = cum_sq_grad_update
+    adjusted_grad = grad / (smoothing + np.sqrt(cum_sq_grad_update))
+    return adjusted_grad
+
+
+@njit(nogil=True)
+def rmsprop(grad, m, cum_sq_grad, gamma=0.9, smoothing=1e-6):
+    cum_sq_grad_update = gamma * cum_sq_grad[m, :] + (1 - gamma) * (grad * grad)
+    cum_sq_grad[m, :] = cum_sq_grad_update
+    adjusted_grad = grad / (smoothing + np.sqrt(cum_sq_grad_update))
+    return adjusted_grad
+
+
+@njit(nogil=True)
+def adam(grad, m, cum_grad, cum_sq_grad, step, beta1=0.9, beta2=0.999, smoothing=1e-6):
+    cum_grad_update = beta1 * cum_grad[m, :] + (1 - beta1) * grad
+    cum_grad[m, :] = cum_grad_update
+    cum_sq_grad_update = beta2 * cum_sq_grad[m, :] + (1 - beta2) * (grad * grad)
+    cum_sq_grad[m, :] = cum_sq_grad_update
+    step[m] = t = step[m] + 1
+    db1 = 1 - beta1**t
+    db2 = 1 - beta2**t
+    adjusted_grad = cum_grad_update/db1 / (smoothing + np.sqrt(cum_sq_grad_update/db2))
+    return adjusted_grad
+
+
     return adjusted_grad
 
 
@@ -89,9 +114,9 @@ def generalized_sgd_sweep(row_idx, col_idx, values, P, Q,
         sqn = apply_kernel(qn, Q, n, *kernel_params[1])
         ngrad_q = err * pm - sqn * col_lambda
 
-        adjusted_ngrad_p = adjust_gradient(ngrad_p, *adjustment_params)
+        adjusted_ngrad_p = adjust_gradient(ngrad_p, m, *adjustment_params[0])
         new_pm = pm + eta * adjusted_ngrad_p
-        adjusted_ngrad_q = adjust_gradient(ngrad_q, *adjustment_params)
+        adjusted_ngrad_q = adjust_gradient(ngrad_q, n, *adjustment_params[1])
         new_qn = qn + eta * adjusted_ngrad_q
 
         P[m, :] = new_pm
@@ -108,24 +133,38 @@ def mf_sgd_boilerplate(interactions, shape, nonzero_count, rank,
                        apply_kernel=None, kernel_params=None,
                        adjust_gradient=None, adjustment_params=None,
                        seed=None, verbose=False, iter_errors=None):
+    assert isinstance(interactions, tuple) # required by numba
+    assert isinstance(nonzero_count, tuple) # required by numba
+
+    nrows, ncols = shape
+    row_shp = (nrows, rank)
+    col_shp = (ncols, rank)
+
+    rnds = np.random if seed is None else np.random.RandomState(seed)
+    row_factors = rnds.normal(scale=0.1, size=row_shp)
+    col_factors = rnds.normal(scale=0.1, size=col_shp)
+
     sgd_sweep_func = sgd_sweep_func or generalized_sgd_sweep
     apply_kernel = apply_kernel or identity
     kernel_params = kernel_params or ((), ())
     adjust_gradient = adjust_gradient or identity
-    adjustment_params = adjustment_params or ()
-
-    assert isinstance(interactions, tuple) # required by numba
-    assert isinstance(nonzero_count, tuple) # required by numba
-
-    rnds = np.random if seed is None else np.random.RandomState(seed)
-    row_factors = rnds.normal(scale=0.1, size=(shape[0], rank))
-    col_factors = rnds.normal(scale=0.1, size=(shape[1], rank))
+    adjustment_params = adjustment_params or ((), ())
 
     nnz = len(interactions[-1])
     last_err = np.finfo(np.float64).max
     for epoch in range(num_epochs):
-        if adjust_gradient is adagrad:
-            adjustment_params = (np.zeros(rank, dtype='f8'),)
+        if adjust_gradient in [adagrad, rmsprop]:
+            adjustment_params = ((np.zeros(row_shp, dtype='f8'),),
+                                 (np.zeros(col_shp, dtype='f8'),)
+                                )
+        if adjust_gradient is adam:
+            adjustment_params = ((np.zeros(row_shp, dtype='f8'),
+                                  np.zeros(row_shp, dtype='f8'),
+                                  np.zeros(nrows, dtype='intp')),
+                                 (np.zeros(col_shp, dtype='f8'),
+                                  np.zeros(col_shp, dtype='f8'),
+                                  np.zeros(ncols, dtype='intp'))
+                                )
 
         new_err = sgd_sweep_func(*interactions, row_factors, col_factors,
                                  lrate, lambd, *nonzero_count,
