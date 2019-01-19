@@ -14,7 +14,7 @@ class SimilarityAggregation(RecommenderModel):
 
     def build(self):
         # use copy to prevent contaminating original data
-        self.item_similarity_matrix = self.data.item_similarity.copy()
+        self.item_similarity_matrix = self.data.item_relations.copy()
         self.item_similarity_matrix.setdiag(0) # exclude self-links
         self.item_similarity_matrix.eliminate_zeros()
 
