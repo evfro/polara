@@ -2,6 +2,9 @@ from math import sqrt
 import numpy as np
 from numba import jit, njit, prange
 
+from polara.tools.timing import track_time
+
+
 @njit(nogil=True)
 def mf_sgd_sweep(users_idx, items_idx, feedbacks, P, Q, eta, lambd, *args):
     cum_error = 0
@@ -143,7 +146,8 @@ def mf_sgd_boilerplate(interactions, shape, nonzero_count, rank,
                        sgd_sweep_func=None,
                        apply_kernel=None, kernel_params=None,
                        adjust_gradient=None, adjustment_params=None,
-                       seed=None, verbose=False, iter_errors=None):
+                       seed=None, verbose=False,
+                       iter_errors=None, iter_time=None):
     assert isinstance(interactions, tuple) # required by numba
     assert isinstance(nonzero_count, tuple) # required by numba
 
@@ -163,6 +167,7 @@ def mf_sgd_boilerplate(interactions, shape, nonzero_count, rank,
 
     nnz = len(interactions[-1])
     last_err = np.finfo(np.float64).max
+    training_time = []
     for epoch in range(num_epochs):
         if adjust_gradient in [adagrad, rmsprop]:
             adjustment_params = ((np.zeros(row_shp, dtype='f8'),),
@@ -181,10 +186,11 @@ def mf_sgd_boilerplate(interactions, shape, nonzero_count, rank,
                                   np.zeros(ncols, dtype='intp'))
                                 )
 
-        new_err = sgd_sweep_func(*interactions, row_factors, col_factors,
-                                 lrate, lambd, *nonzero_count,
-                                 apply_kernel, kernel_params,
-                                 adjust_gradient, adjustment_params)
+        with track_time(training_time, verbose=False):
+            new_err = sgd_sweep_func(*interactions, row_factors, col_factors,
+                                     lrate, lambd, *nonzero_count,
+                                     apply_kernel, kernel_params,
+                                     adjust_gradient, adjustment_params)
 
         refined = abs(last_err - new_err) / last_err
         last_err = new_err
@@ -195,6 +201,8 @@ def mf_sgd_boilerplate(interactions, shape, nonzero_count, rank,
             print('Epoch: {}. RMSE: {}'.format(epoch, rmse))
         if refined < tol:
             break
+    if iter_time is not None:
+        iter_time.extend(training_time)
     return row_factors, col_factors
 
 
@@ -210,13 +218,16 @@ def simple_mf_sgd(interactions, shape, nonzero_count, rank, lrate, lambd, num_ep
 def simple_pmf_sgd(interactions, shape, nonzero_count, rank,
                    lrate, sigma, num_epochs, tol,
                    adjust_gradient=None, adjustment_params=None,
-                   seed=None, verbose=False, iter_errors=None):
+                   seed=None, verbose=False,
+                   iter_errors=None, iter_time=None):
     lambd = 0.5 * sigma**2
     return mf_sgd_boilerplate(interactions, shape, nonzero_count, rank,
                               lrate, lambd, num_epochs, tol,
                               adjust_gradient=adjust_gradient,
                               adjustment_params=adjustment_params,
-                              seed=seed, verbose=verbose, iter_errors=iter_errors)
+                              seed=seed, verbose=verbose,
+                              iter_errors=iter_errors, iter_time=iter_time)
+
 
 
 
