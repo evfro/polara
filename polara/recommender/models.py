@@ -740,23 +740,25 @@ class ProbabilisticMF(RecommenderModel):
         self.factors = {}
         self.rmse_history = None
         self.show_rmse = False
+        self.iterations_time = None
 
     def build(self, *args, **kwargs):
         matrix = self.get_training_matrix(sparse_format='coo', dtype='f8')
         user_idx, item_idx = matrix.nonzero()
         interactions = (user_idx, item_idx, matrix.data)
         nonzero_count = (matrix.getnnz(axis=1), matrix.getnnz(axis=0))
-
         rank = self.rank
         lrate = self.learn_rate
         sigma = self.sigma
         num_epochs = self.num_epochs
         tol = self.tolerance
         self.rmse_history = []
+        self.iterations_time = []
 
         general_config = dict(seed=self.seed,
                               verbose=self.show_rmse,
-                              iter_errors=self.rmse_history)
+                              iter_errors=self.rmse_history,
+                              iter_time=self.iterations_time)
 
         with track_time(self.training_time, verbose=self.verbose, model=self.method):
             P, Q = self.optimizer(interactions, matrix.shape, nonzero_count, rank,
