@@ -199,9 +199,12 @@ class RecommenderData(object):
         return getattr(self, data_property)
 
 
-    def update(self):
+    def update(self, training_only=False):
         if self._change_properties:
-            self.prepare()
+            if training_only:
+                self.prepare_training_only()
+            else:
+                self.prepare()
 
 
     def prepare(self):
