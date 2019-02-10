@@ -116,7 +116,7 @@ def topk_test(models, **kwargs):
 
 
 def run_cv_experiment(models, folds=None, metrics='all', fold_experiment=evaluate_models,
-                      force_build=True, deferred_update=False, iterator=lambda x: x, **kwargs):
+                      force_build=True, iterator=lambda x: x, **kwargs):
     if not isinstance(models, (list, tuple)):
         models = [models]
 
@@ -129,9 +129,8 @@ def run_cv_experiment(models, folds=None, metrics='all', fold_experiment=evaluat
     fold_results = []
     for fold in iterator(folds):
         data.test_fold = fold
+        data.update()
         build_models(models, force_build)
-        if not deferred_update:
-            data.update() # data configuration is assumed to be fixed during CV
         fold_result = fold_experiment(models, metrics=metrics, **kwargs)
         fold_results.append(fold_result)
     return consolidate(fold_results, level_name='fold', level_keys=folds)
