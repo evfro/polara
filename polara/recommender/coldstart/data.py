@@ -220,7 +220,7 @@ class ColdSimilarityMixin(object):
         return self.get_cold_similarity(userid)
 
     def get_cold_similarity(self, entity):
-        sim_mat = self._sim_mat[entity]
+        sim_mat = self._rel_mat[entity]
 
         if sim_mat is None:
             return None
@@ -229,7 +229,7 @@ class ColdSimilarityMixin(object):
         entity_type = fields._fields[fields.index(entity)]
         index_data = getattr(self.index, entity_type)
 
-        similarity_index = self._sim_idx[entity]
+        similarity_index = self._rel_idx[entity]
         seen_idx = index_data.training['old'].map(similarity_index).values
         cold_idx = index_data.cold_start['old'].map(similarity_index).values
 
