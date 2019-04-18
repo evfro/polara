@@ -1,4 +1,6 @@
 import numpy as np
+
+from polara import SVDModel
 from polara.recommender.models import RecommenderModel
 from polara.lib.similarity import stack_features
 from polara.lib.sparse import sparse_dot
@@ -79,5 +81,40 @@ class SimilarityAggregationItemColdStart(ItemColdStartEvaluationMixin, Recommend
         return top_similar_users
 
 
+class SVDModelItemColdStart(ItemColdStartEvaluationMixin, SVDModel):
+    def __init__(self, *args, item_features=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.method = 'PureSVD(cs)'
+        self.item_features = item_features
+        self.use_raw_features = item_features is not None
+
+    def build(self, *args, **kwargs):
+        super().build(*args, return_factors=True, **kwargs)
+
+    def get_recommendations(self):
+        userid = self.data.fields.userid
+        itemid = self.data.fields.itemid
+
+        u = self.factors[userid]
+        v = self.factors[itemid]
+        s = self.factors['singular_values']
+
+        if self.use_raw_features:
+            item_info = self.item_features.reindex(self.data.index.itemid.training.old.values,
+                                                   fill_value=[])
+            item_features, feature_labels = stack_features(item_info, normalize=False)
+            w = item_features.T.dot(v).T
+            wwt_inv = np.linalg.pinv(w @ w.T)
+
+            cold_info = self.item_features.reindex(self.data.index.itemid.cold_start.old.values,
+                                                   fill_value=[])
+            cold_item_features, _ = stack_features(cold_info, labels=feature_labels, normalize=False)
+        else:
+            w = self.data.item_relations.T.dot(v).T
+            wwt_inv = np.linalg.pinv(w @ w.T)
+            cold_item_features = self.data.cold_items_similarity
+
+        cold_items_factors = cold_item_features.dot(w.T) @ wwt_inv
+        scores = cold_items_factors @ (u * s[None, :]).T
         top_similar_users = self.get_topk_elements(scores).astype(np.intp)
         return top_similar_users
