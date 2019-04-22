@@ -151,11 +151,7 @@ class ItemColdStartData(RecommenderData):
             return
 
         if self.meta_data.shape[1] > 1:
-            try: # agg is supported only starting from pandas v.0.20.0
-                features_melted = self.meta_data.agg('sum', axis=1)
-            except AttributeError: # fall back to much slower but more general option
-                features_melted = (self.meta_data.apply(lambda x: [x.sum()], axis=1)
-                                                 .apply(lambda x: x[0]))
+            features_melted = self.meta_data.agg(lambda x: [f for l in x for f in l], axis=1)
         else:
             features_melted = self.meta_data.iloc[:, 0]
 
