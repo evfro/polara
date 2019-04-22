@@ -110,15 +110,17 @@ class RecommenderData(object):
 
         if data is None:
             cols = fields + [custom_order]
-            self._data = data = pd.DataFrame(columns=[c for c in cols if c])
-        else:
-            self._data = data
+            data = pd.DataFrame(columns=[c for c in cols if c])
 
         if data.duplicated(subset=[f for f in fields if f]).any():
             # unstable in pandas v. 17.0, only works in <> v.17.0
             # rely on deduplicated data in many places - makes data processing more efficient
             raise NotImplementedError('Data has duplicate values')
 
+        if not data.index.is_unique:
+            data = data.reset_index(drop=True)
+
+        self._data = data
         self._custom_order = custom_order
         self.fields = namedtuple('Fields', self._std_fields)
         self.fields = self.fields(**dict(zip(self._std_fields, fields)))
