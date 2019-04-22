@@ -36,9 +36,9 @@ class TuriFactorizationRecommender(RecommenderModel):
         # other parameters
         self.with_data_feedback = True
         self.other_tc_params = {}
+        self.data.subscribe(self.data.on_change_event, self._clean_metadata)
 
-    def _on_change(self):
-        super()._on_change()
+    def _clean_metadata(self):
         self._item_data = None
         self._user_data = None
 
