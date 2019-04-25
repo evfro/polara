@@ -275,7 +275,7 @@ def kernelized_pmf_sgd(interactions, shape, nonzero_count, rank,
                        lrate, sigma, num_epochs, tol,
                        kernel_matrices, kernel_update=None, sparse_kernel_format=True,
                        adjust_gradient=None, adjustment_params=None,
-                       seed=None, verbose=False, iter_errors=None):
+                       seed=None, verbose=False, iter_errors=None, iter_time=None):
     kernel_update = kernel_update or sparse_kernel_update
 
     row_kernel, col_kernel = kernel_matrices
@@ -296,4 +296,5 @@ def kernelized_pmf_sgd(interactions, shape, nonzero_count, rank,
                               transform_params=kernel_params,
                               adjust_gradient=adjust_gradient,
                               adjustment_params=adjustment_params,
-                              seed=seed, verbose=verbose, iter_errors=iter_errors)
+                              seed=seed, verbose=verbose,
+                              iter_errors=iter_errors, iter_time=iter_time)
