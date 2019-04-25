@@ -19,7 +19,7 @@ from polara.recommender.utils import array_split
 from polara.lib.optimize import simple_pmf_sgd
 from polara.lib.tensor import hooi
 
-from polara.lib.sparse import sparse_dot, inverse_permutation
+from polara.lib.sparse import sparse_dot, inverse_permutation, rescale_matrix
 from polara.lib.sparse import unfold_tensor_coordinates, tensor_outer_at
 from polara.tools.timing import track_time
 
@@ -845,6 +845,20 @@ class SVDModel(RecommenderModel):
         v = self.factors[self.data.fields.itemid]
         scores = (test_matrix.dot(v)).dot(v.T)
         return scores, slice_data
+
+
+class ScaledSVD(SVDModel):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.row_scaling = 1
+        self.col_scaling = 1
+        self.method = 'PureSVDs'
+
+    def get_training_matrix(self, *args, **kwargs):
+        svd_matrix = super().get_training_matrix(*args, **kwargs)
+        svd_matrix = rescale_matrix(svd_matrix, self.row_scaling, 1)
+        svd_matrix = rescale_matrix(svd_matrix, self.col_scaling, 0)
+        return svd_matrix
 
 
 class CoffeeModel(RecommenderModel):

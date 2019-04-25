@@ -2,7 +2,11 @@ import sys
 from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import as_completed
 import numpy as np
+from numpy import power
 from scipy.sparse import csr_matrix
+from scipy.sparse import diags
+from scipy.sparse.linalg import norm as spnorm
+
 from numba import jit, njit, guvectorize, prange
 from numba import float64 as f8
 from numba import intp as ip
@@ -49,6 +53,24 @@ def sparse_dot(left_mat, right_mat, dense_output=False, tocsr=False):
         else:
             result = check_sparsity(result, tocsr=tocsr)
     return result
+
+
+def rescale_matrix(matrix, scaling, axis, binary=True):
+    '''Function to scale either rows or columns of the sparse rating matrix'''
+    if scaling == 1: # no scaling (standard SVD case)
+        return matrix
+
+    if binary:
+        norm = np.sqrt(matrix.getnnz(axis=axis)) # compute Euclidean norm as if values are binary
+    else:
+        norm = spnorm(matrix, axis=axis, ord=2) # compute Euclidean norm
+
+    scaling_matrix = diags(power(norm, scaling-1, where=norm!=0))
+
+    if axis == 0: # scale columns
+        return matrix.dot(scaling_matrix)
+    if axis == 1: # scale rows
+        return scaling_matrix.dot(matrix)
 
 
 # matvec implementation is based on

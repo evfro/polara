@@ -1,7 +1,7 @@
 import numpy as np
 
 from polara import SVDModel
-from polara.recommender.models import RecommenderModel
+from polara.recommender.models import RecommenderModel, ScaledSVD
 from polara.lib.similarity import stack_features
 from polara.lib.sparse import sparse_dot
 
@@ -118,3 +118,9 @@ class SVDModelItemColdStart(ItemColdStartEvaluationMixin, SVDModel):
         scores = cold_items_factors @ (u * s[None, :]).T
         top_similar_users = self.get_topk_elements(scores).astype(np.intp)
         return top_similar_users
+
+
+class ScaledSVDItemColdStart(ScaledSVD, SVDModelItemColdStart):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.method = 'PureSVDs(cs)'
