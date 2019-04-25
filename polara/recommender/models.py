@@ -156,7 +156,9 @@ class RecommenderModel(object):
     def get_training_matrix(self, feedback_threshold=None, ignore_feedback=False,
                             sparse_format='csr', dtype=None):
         threshold = feedback_threshold or self.feedback_threshold
-        idx, val, shp = self.data.to_coo(tensor_mode=False, feedback_threshold=threshold)
+        # the line below also updates data if needed and triggers notifier
+        idx, val, shp = self.data.to_coo(tensor_mode=False,
+                                         feedback_threshold=threshold)
         dtype = dtype or val.dtype
         if ignore_feedback: # for compatibility with non-numeric tensor feedback data
             val = np.ones_like(val, dtype=dtype)
@@ -1000,7 +1002,6 @@ class CoffeeModel(RecommenderModel):
         scores = np.tensordot(scores, wt_flat, axes=(2, 0)).dot(v.T)
         return scores, slice_idx
 
-    # additional functionality: rating pediction
     def get_holdout_slice(self, start, stop):
         userid = self.data.fields.userid
         itemid = self.data.fields.itemid
@@ -1012,6 +1013,7 @@ class CoffeeModel(RecommenderModel):
         return (holdout_users, holdout_items)
 
 
+    # additional functionality: rating pediction
     def predict_feedback(self):
         if self.data.warm_start:
             raise NotImplementedError

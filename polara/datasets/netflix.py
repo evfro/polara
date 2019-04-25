@@ -8,6 +8,8 @@ def get_netflix_data(gz_file, get_ratings=True, get_probe=False):
     with tarfile.open(gz_file) as tar:
         if get_ratings:
             training_data = tar.getmember('download/training_set.tar')
+            # maybe try with threads, e.g.
+            # https://stackoverflow.com/questions/43727520/speed-up-json-to-dataframe-w-a-lot-of-data-manipulation
             with tarfile.open(fileobj=tar.extractfile(training_data)) as inner:
                 for item in inner.getmembers():
                     if item.isfile():
