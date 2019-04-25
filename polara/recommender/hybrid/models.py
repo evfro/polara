@@ -30,10 +30,10 @@ class SimilarityAggregation(RecommenderModel):
 
 
 class KernelizedRecommenderMixin:
-'''Based on the work:
-Kernelized Probabilistic Matrix Factorization: Exploiting Graphs and Side Information
-http://people.ee.duke.edu/~lcarin/kpmf_sdm_final.pdf
-'''
+    '''Based on the work:
+    Kernelized Probabilistic Matrix Factorization: Exploiting Graphs and Side Information
+    http://people.ee.duke.edu/~lcarin/kpmf_sdm_final.pdf
+    '''
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.kernel_type = 'reg'
