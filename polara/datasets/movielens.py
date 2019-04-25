@@ -81,10 +81,14 @@ def get_movielens_data(local_file=None, get_ratings=True, get_genres=False,
 
 
 def get_split_genres(genres_data):
-    genres_data.index.name = 'movie_idx'
-    genres_stacked = genres_data.genres.str.split('|', expand=True).stack().to_frame('genreid')
-    ml_genres = genres_data[['movieid', 'movienm']].join(genres_stacked).reset_index(drop=True)
-    return ml_genres
+    return (genres_data[['movieid', 'movienm']]
+            .join(pd.DataFrame([(i, x)
+                                for i, g in enumerate(genres_data['genres'])
+                                for x in g.split('|')
+                               ], columns=['index', 'genreid']
+                              ).set_index('index'))
+            .reset_index(drop=True))
+
 
 
 def filter_short_head(data, threshold=0.01):
