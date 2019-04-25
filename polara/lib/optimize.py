@@ -105,6 +105,13 @@ def gnprop(grad, m, cum_sq_norm, gamma=0.99, smoothing=1e-6):
     adjusted_grad = grad / sqrt(smoothing + cum_sq_norm_update)
     return adjusted_grad
 
+@njit(nogil=True)
+def gnpropz(grad, m, cum_sq_norm, smoothing=1e-6):
+    cum_sq_norm_update = cum_sq_norm[m] + grad @ grad
+    cum_sq_norm[m] = cum_sq_norm_update
+    adjusted_grad = grad / sqrt(smoothing + cum_sq_norm_update)
+    return adjusted_grad
+
 
 @njit(nogil=True, parallel=False)
 def generalized_sgd_sweep(row_idx, col_idx, values, P, Q,
