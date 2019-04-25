@@ -249,5 +249,51 @@ def simple_pmf_sgd(interactions, shape, nonzero_count, rank,
                               iter_errors=iter_errors, iter_time=iter_time)
 
 
+def sp_kernel_update(pm, P, m, K):
+    k = K.getrow(m)
+    kp = k.dot(P).squeeze()
+    return kp + k[0, m] * pm
+
+@njit(nogil=True, parallel=False)
+def sparse_kernel_update(pm, P, m, kernel_ptr, kernel_ind, kernel_data):
+    lead_idx = kernel_ptr[m]
+    stop_idx = kernel_ptr[m+1]
+
+    kernel_update = np.zeros_like(pm)
+
+    for i in range(lead_idx, stop_idx):
+        index = kernel_ind[i]
+        value = kernel_data[i]
+        p_row = P[index, :]
+        if index == m: # diagonal value
+            p_row = p_row + pm # avoid rewriting original data
+        kernel_update += value * p_row
+    return kernel_update
 
 
+def kernelized_pmf_sgd(interactions, shape, nonzero_count, rank,
+                       lrate, sigma, num_epochs, tol,
+                       kernel_matrices, kernel_update=None, sparse_kernel_format=True,
+                       adjust_gradient=None, adjustment_params=None,
+                       seed=None, verbose=False, iter_errors=None):
+    kernel_update = kernel_update or sparse_kernel_update
+
+    row_kernel, col_kernel = kernel_matrices
+    if sparse_kernel_format:
+        row_kernel_data = (row_kernel.indptr, row_kernel.indices, row_kernel.data)
+        col_kernel_data = (col_kernel.indptr, col_kernel.indices, col_kernel.data)
+    else:
+        row_kernel_data = (row_kernel,)
+        col_kernel_data = (col_kernel,)
+
+    kernel_params = (row_kernel_data, col_kernel_data)
+
+    lambd = 0.5 * sigma**2
+    return mf_sgd_boilerplate(interactions, shape, nonzero_count, rank,
+                              lrate, lambd, num_epochs, tol,
+                              sgd_sweep_func=generalized_sgd_sweep,
+                              transform=kernel_update,
+                              transform_params=kernel_params,
+                              adjust_gradient=adjust_gradient,
+                              adjustment_params=adjustment_params,
+                              seed=seed, verbose=verbose, iter_errors=iter_errors)
