@@ -1,10 +1,3 @@
-# python 2/3 interoperability
-from __future__ import print_function
-try:
-    range = xrange
-except NameError:
-    pass
-
 from functools import wraps
 from collections import namedtuple
 import warnings

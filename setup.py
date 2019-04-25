@@ -26,8 +26,6 @@ opts = dict(name="polara",
             platforms=["any"],
             packages=_packages)
 
-extras = dict(install_requires=['futures; python_version=="2.7"'])
-
 opts.update(extras)
 
 if __name__ == '__main__':
