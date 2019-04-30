@@ -26,7 +26,7 @@ opts = dict(name="polara",
             platforms=["any"],
             packages=_packages)
 
-opts.update(extras)
+# opts.update(extras)
 
 if __name__ == '__main__':
     setup(**opts)
