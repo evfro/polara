@@ -847,18 +847,41 @@ class SVDModel(RecommenderModel):
         return scores, slice_data
 
 
-class ScaledSVD(SVDModel):
+class ScaledMatrixMixin:
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.row_scaling = 1
-        self.col_scaling = 1
-        self.method = 'PureSVDs'
+        self._col_scaling = 0.4
+        self._row_scaling = 1
+        self.method = f'{self.method}-s'
+
+    @property
+    def col_scaling(self):
+        return self._col_scaling
+
+    @property
+    def row_scaling(self):
+        return self._row_scaling
+
+    @col_scaling.setter
+    def col_scaling(self, new_value):
+        if new_value != self._col_scaling:
+            self._col_scaling = new_value
+            self._recommendations = None
+
+    @row_scaling.setter
+    def row_scaling(self, new_value):
+        if new_value != self._row_scaling:
+            self._row_scaling = new_value
+            self._recommendations = None
 
     def get_training_matrix(self, *args, **kwargs):
-        svd_matrix = super().get_training_matrix(*args, **kwargs)
-        svd_matrix = rescale_matrix(svd_matrix, self.row_scaling, 1)
-        svd_matrix = rescale_matrix(svd_matrix, self.col_scaling, 0)
-        return svd_matrix
+        scaled_matrix = super().get_training_matrix(*args, **kwargs)
+        scaled_matrix = rescale_matrix(scaled_matrix, self.row_scaling, 1)
+        scaled_matrix = rescale_matrix(scaled_matrix, self.col_scaling, 0)
+        return scaled_matrix
+
+
+class ScaledSVD(ScaledMatrixMixin, SVDModel): pass
 
 
 class CoffeeModel(RecommenderModel):

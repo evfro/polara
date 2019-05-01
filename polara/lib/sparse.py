@@ -55,22 +55,28 @@ def sparse_dot(left_mat, right_mat, dense_output=False, tocsr=False):
     return result
 
 
-def rescale_matrix(matrix, scaling, axis, binary=True):
+def rescale_matrix(matrix, scaling, axis, binary=True, return_scaling_values=False):
     '''Function to scale either rows or columns of the sparse rating matrix'''
+    scaling_values = None
     if scaling == 1: # no scaling (standard SVD case)
-        return matrix
+        result = matrix
 
     if binary:
         norm = np.sqrt(matrix.getnnz(axis=axis)) # compute Euclidean norm as if values are binary
     else:
         norm = spnorm(matrix, axis=axis, ord=2) # compute Euclidean norm
 
-    scaling_matrix = diags(power(norm, scaling-1, where=norm!=0))
+    scaling_values = power(norm, scaling-1, where=norm != 0)
+    scaling_matrix = diags(scaling_values)
 
     if axis == 0: # scale columns
-        return matrix.dot(scaling_matrix)
+        result = matrix.dot(scaling_matrix)
     if axis == 1: # scale rows
-        return scaling_matrix.dot(matrix)
+        result = scaling_matrix.dot(matrix)
+
+    if return_scaling_values:
+        result = (result, scaling_values)
+    return result
 
 
 # matvec implementation is based on
