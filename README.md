@@ -132,7 +132,7 @@ Now you are ready to build your models (as in examples above) and export them to
 
 ### Warm-start and known-user scenarios
 By default polara makes testset and trainset disjoint by users, which allows to evaluate models against *user warm-start*.
-However in some situations (for example, when polara is used within a larger pipeline) you might want to implement strictly a *known user* scenario to assess the quality of your recommender system on the unseen (held-out) items for the known users. The change between these two scenarios as controlled by setting `data_model.warm_start` attribute to `True` or `False`. See [Warm-start and standard scenarios](examples/Warm-start and standard scenarios.ipynb) Jupyter notebook as an example.
+However in some situations (for example, when polara is used within a larger pipeline) you might want to implement strictly a *known user* scenario to assess the quality of your recommender system on the unseen (held-out) items for the known users. The change between these two scenarios as controlled by setting `data_model.warm_start` attribute to `True` or `False`. See [Warm-start and standard scenarios](examples/Warm_start_and_standard_scenarios.ipynb) Jupyter notebook as an example.
 
 ### Externally provided test data
 If you don't want polara to perform data splitting (for example, when your test data is already provided), you can use the `set_test_data` method of a `RecommenderData` instance. It has a number of input arguments that cover all major cases of externally provided data. For example, assuming that you have new users' preferences encoded in the `unseen_data` dataframe and the corresponding held-out preferences in the `holdout` dataframe, the following command allows to include them into the data model:  
@@ -145,7 +145,7 @@ svd.build()
 svd.evaluate()
 ```
 In this case the recommendations are generated based on the testset and evaluated against the holdout.
-See more usage examples in the [Custom evaluation](examples/Custom evaluation.ipynb) notebook.
+See more usage examples in the [Custom evaluation](examples/Custom_evaluation.ipynb) notebook.
 
 ### Reproducing others work
-Polara offers even more options to highly customize experimentation pipeline and tailor it to specific needs. See, for example, [Reproducing EIGENREC results](examples/Reproducing EIGENREC results.ipynb) notebook to learn how Polara can be used to reproduce experiments from the *"[EIGENREC: generalizing PureSVD for effective and efﬁcient top-N recommendations](https://arxiv.org/abs/1511.06033)"* paper.
+Polara offers even more options to highly customize experimentation pipeline and tailor it to specific needs. See, for example, [Reproducing EIGENREC results](examples/Reproducing_EIGENREC_results.ipynb) notebook to learn how Polara can be used to reproduce experiments from the *"[EIGENREC: generalizing PureSVD for effective and efﬁcient top-N recommendations](https://arxiv.org/abs/1511.06033)"* paper.
