@@ -160,6 +160,13 @@ def find_optimal_tucker_ranks(model, tucker_ranks, target_metric, return_scores=
     return best_mlrank
 
 
+def params_to_dict(names, params):
+    try:
+        return dict(zip(names, params))
+    except TypeError: # encountered single value
+        return {names: params}
+
+
 def find_optimal_config(model, param_grid, param_names, target_metric, return_scores=False,
                         init_config=None, reset_config=None, verbose=False, force_build=True,
                         evaluator=None, iterator=lambda x: x, **kwargs):
@@ -175,8 +182,8 @@ def find_optimal_config(model, param_grid, param_names, target_metric, return_sc
     model.verbose = verbose
     grid_results = {}
     for params in iterator(param_grid):
+        param_config = params_to_dict(param_names, params)
         try:
-            param_config = dict(zip(param_names, params))
             set_config(model, param_config)
             if not model._is_ready or force_build:
                 model.build()
@@ -195,10 +202,7 @@ def find_optimal_config(model, param_grid, param_names, target_metric, return_sc
     scores = pd.Series(**dict(zip(('index', 'data'),
                                   (zip(*grid_results.items())))))
     best_params = scores.idxmax()
-    try:
-        best_config = dict(zip(param_names, best_params))
-    except TypeError:
-        best_config = {param_names: best_params}
+    best_config = params_to_dict(param_names, best_params)
 
     if return_scores:
         try:
