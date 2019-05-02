@@ -8,6 +8,9 @@ def _plot_pair(scores, keys, titles=None, errors=None, err_alpha=0.2, figsize=(1
     else:
         show_legend = False
 
+    if 'model' in scores.index.names:
+        scores = scores.unstack('model')
+
     left, right = keys
     left_title, right_title = titles or keys
 
@@ -18,6 +21,8 @@ def _plot_pair(scores, keys, titles=None, errors=None, err_alpha=0.2, figsize=(1
         plt.legend(loc='center left', bbox_to_anchor=(1.0, 0.5))
 
     if errors is not None:
+        if 'model' in errors.index.names:
+            errors = errors.unstack('model')        
         errG = errors[left]
         errL = errors[right]
         for method in errL.columns:
@@ -39,7 +44,7 @@ def _plot_pair(scores, keys, titles=None, errors=None, err_alpha=0.2, figsize=(1
 
 
 def show_hits(all_scores, **kwargs):
-    scores = all_scores['hits']
+    scores = all_scores['hits'] if 'hits' in all_scores else all_scores
     keys = ['true_positive', 'false_positive']
     kwargs['titles'] = ['True Positive Hits @$n$', 'False Positive Hits @$n$']
     kwargs['errors'] = kwargs['errors']['hits'] if kwargs.get('errors', None) is not None else None
@@ -47,7 +52,7 @@ def show_hits(all_scores, **kwargs):
 
 
 def show_ranking(all_scores, **kwargs):
-    scores = all_scores['ranking']
+    scores = all_scores['ranking'] if 'ranking' in all_scores else all_scores
     keys = ['nDCG', 'nDCL']
     kwargs['titles'] = ['nDCG@$n$', 'nDCL@$n$']
     kwargs['errors'] = kwargs['errors']['ranking'] if kwargs.get('errors', None) is not None else None
@@ -62,6 +67,9 @@ def _cross_plot(scores, keys, titles=None, errors=None, err_alpha=0.2, ROC_middl
     else:
         show_legend = False
 
+    if 'model' in scores.index.names:
+        scores = scores.unstack('model')
+
     methods = scores.columns.levels[1]
     x, y = keys
     for method in methods:
@@ -72,6 +80,8 @@ def _cross_plot(scores, keys, titles=None, errors=None, err_alpha=0.2, ROC_middl
         plt.legend(loc='center left', bbox_to_anchor=(1.0, 0.5))
 
     if errors is not None:
+        if 'model' in errors.index.names:
+            errors = errors.unstack('model')
         for method in methods:
             plot_data = scores.xs(method, 1, 1).sort_values(x)
             error = errors.xs(method, 1, 1).sort_values(x)
@@ -97,7 +107,7 @@ def _cross_plot(scores, keys, titles=None, errors=None, err_alpha=0.2, ROC_middl
 
 
 def show_hit_rates(all_scores, **kwargs):
-    scores = all_scores['relevance']
+    scores = all_scores['relevance'] if 'relevance' in all_scores else all_scores
     keys = ['fallout', 'recall']
     kwargs['titles'] = ['False Positive Rate', 'True Positive Rate']
     kwargs['errors'] = kwargs['errors']['relevance'] if kwargs.get('errors', None) is not None else None
@@ -107,7 +117,7 @@ def show_hit_rates(all_scores, **kwargs):
 
 
 def show_ranking_positivity(all_scores, **kwargs):
-    scores = all_scores['ranking']
+    scores = all_scores['ranking'] if 'ranking' in all_scores else all_scores
     keys = ['nDCL', 'nDCG']
     kwargs['titles'] = ['Negative Ranking', 'Positive Ranking']
     kwargs['errors'] = kwargs['errors']['ranking'] if kwargs.get('errors', None) is not None else None
@@ -117,7 +127,7 @@ def show_ranking_positivity(all_scores, **kwargs):
 
 
 def show_precision_recall(all_scores, limit=False, ignore_field_limit=None, **kwargs):
-    scores = all_scores['relevance']
+    scores = all_scores['relevance'] if 'relevance' in all_scores else all_scores
     keys = ['recall', 'precision']
     kwargs['titles'] = ['Recall', 'Precision']
     kwargs['errors'] = kwargs['errors']['relevance'] if kwargs.get('errors', None) is not None else None

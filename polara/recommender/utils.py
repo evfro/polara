@@ -1,24 +1,7 @@
 from __future__ import division
-import sys
 import numpy as np
 from polara.tools.systools import get_available_memory
-
-
-MEMORY_HARD_LIMIT = 1 # in gigbytes, default=1, depends on hardware
-# varying this value may significantly impact performance
-# setting it to None or large value typically reduces performance,
-# as iterating over a smaller number of huge arrays takes longer
-# than over a higher number of smaller arrays
-
-tuplsize = sys.getsizeof(())
-itemsize = np.dtype(np.intp).itemsize
-pntrsize = sys.getsizeof(1.0)
-# size of list of tuples of indices - to estimate when to convert sparse matrix to dense
-# based on http://stackoverflow.com/questions/15641344/python-memory-consumption-dict-vs-list-of-tuples
-# and https://code.tutsplus.com/tutorials/understand-how-much-memory-your-python-objects-use--cms-25609
-def get_nnz_max():
-    return int(MEMORY_HARD_LIMIT * (1024**3) / (tuplsize + 2*(pntrsize + itemsize)))
-
+from polara.recommender import defaults
 
 def range_division(length, fit_size):
     # based on np.array_split
@@ -47,9 +30,9 @@ def get_chunk_size(shp, result_width, scores_multiplier, dtypes=None):
 
     # take no more than 80% of available memory
     memory_limit = 0.8 * get_available_memory()
-    if MEMORY_HARD_LIMIT:
+    if defaults.memory_hard_limit:
         # too large arrays create significant overhead (with dot or tensordot)
-        memory_limit = min(memory_limit, MEMORY_HARD_LIMIT)
+        memory_limit = min(memory_limit, defaults.memory_hard_limit)
     required_memory = scores_memory + result_memory # memory at peak usage
     if required_memory > memory_limit:
         chunk_size = min(int((memory_limit - result_memory) /

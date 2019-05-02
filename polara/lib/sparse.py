@@ -1,18 +1,83 @@
-# python 2/3 interoperability
-try:
-    range = xrange
-except NameError:
-    pass
-
+import sys
 from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import as_completed
 import numpy as np
+from numpy import power
 from scipy.sparse import csr_matrix
+from scipy.sparse import diags
+from scipy.sparse.linalg import norm as spnorm
+
 from numba import jit, njit, guvectorize, prange
 from numba import float64 as f8
 from numba import intp as ip
 
 from polara.recommender import defaults
+
+
+tuplsize = sys.getsizeof(())
+itemsize = np.dtype(np.intp).itemsize
+pntrsize = sys.getsizeof(1.0)
+# size of list of tuples of indices - to estimate when to convert sparse matrix to dense
+# based on http://stackoverflow.com/questions/15641344/python-memory-consumption-dict-vs-list-of-tuples
+# and https://code.tutsplus.com/tutorials/understand-how-much-memory-your-python-objects-use--cms-25609
+def get_nnz_max():
+    return int(defaults.memory_hard_limit * (1024**3) / (tuplsize + 2*(pntrsize + itemsize)))
+
+
+def check_sparsity(matrix, nnz_coef=0.5, tocsr=False):
+    if matrix.nnz > nnz_coef * matrix.shape[0] * matrix.shape[1]:
+        return matrix.toarray(order='C')
+    if tocsr:
+        return matrix.tocsr()
+    return matrix
+
+
+def sparse_dot(left_mat, right_mat, dense_output=False, tocsr=False):
+    # scipy always returns sparse result, even if dot product is dense
+    # this function offers solution to this problem
+    # it also takes care on sparse result w.r.t. to further processing
+    if dense_output:  # calculate dense result directly
+        # TODO matmat multiplication instead of iteration with matvec
+        res_type = np.result_type(right_mat.dtype, left_mat.dtype)
+        result = np.empty((left_mat.shape[0], right_mat.shape[1]), dtype=res_type)
+        for i in range(left_mat.shape[0]):
+            v = left_mat.getrow(i)
+            result[i, :] = csc_matvec(right_mat, v, dense_output=True, dtype=res_type)
+    else:
+        result = left_mat.dot(right_mat.T)
+        # NOTE even though not neccessary for symmetric i2i matrix,
+        # transpose helps to avoid expensive conversion to CSR (performed by scipy)
+        if result.nnz > get_nnz_max():
+            # too many nnz lead to undesired memory overhead in downvote_seen_items
+            result = result.toarray() # not using order='C' as it may consume memory
+        else:
+            result = check_sparsity(result, tocsr=tocsr)
+    return result
+
+
+def rescale_matrix(matrix, scaling, axis, binary=True, return_scaling_values=False):
+    '''Function to scale either rows or columns of the sparse rating matrix'''
+    scaling_values = None
+    if scaling == 1: # no scaling (standard SVD case)
+        result = matrix
+
+    if binary:
+        norm = np.sqrt(matrix.getnnz(axis=axis)) # compute Euclidean norm as if values are binary
+    else:
+        norm = spnorm(matrix, axis=axis, ord=2) # compute Euclidean norm
+
+    scaling_values = power(norm, scaling-1, where=norm != 0)
+    scaling_matrix = diags(scaling_values)
+
+    if axis == 0: # scale columns
+        result = matrix.dot(scaling_matrix)
+    if axis == 1: # scale rows
+        result = scaling_matrix.dot(matrix)
+
+    if return_scaling_values:
+        result = (result, scaling_values)
+    return result
+
 
 # matvec implementation is based on
 # http://stackoverflow.com/questions/18595981/improving-performance-of-multiplication-of-scipy-sparse-matrices
@@ -161,7 +226,8 @@ def dttm_par(idx, val, mat1, mat2, mode1, mode2, unqs, inds, res):
                     res[i0, j1, j2] += vp * mat1[i1, j1] * mat2[i2, j2]
 
 
-@jit(parallel=True)
+# @jit(parallel=True) # numba up to v0.41.dev only supports the 1st argument
+# https://numba.pydata.org/numba-doc/dev/reference/numpysupported.html
 def arrange_index(array):
     unqs, unq_inv, unq_cnt = np.unique(array, return_inverse=True, return_counts=True)
     inds = np.split(np.argsort(unq_inv), np.cumsum(unq_cnt[:-1]))

@@ -1,10 +1,3 @@
-# python 2/3 interoperability
-from __future__ import print_function
-try:
-    range = xrange
-except NameError:
-    pass
-
 from functools import wraps
 from collections import namedtuple
 import warnings
@@ -22,12 +15,13 @@ from polara.recommender import defaults
 from polara.recommender.evaluation import get_hits, get_relevance_scores, get_ranking_scores, get_experience_scores
 from polara.recommender.evaluation import get_hr_score, get_mrr_score
 from polara.recommender.evaluation import assemble_scoring_matrices
-from polara.recommender.utils import array_split, get_nnz_max
+from polara.recommender.utils import array_split
+from polara.lib.optimize import simple_pmf_sgd
 from polara.lib.tensor import hooi
 
-from polara.lib.sparse import csc_matvec, inverse_permutation
+from polara.lib.sparse import sparse_dot, inverse_permutation, rescale_matrix
 from polara.lib.sparse import unfold_tensor_coordinates, tensor_outer_at
-from polara.tools.timing import Timer
+from polara.tools.timing import track_time
 
 def get_default(name):
     return defaults.get_config([name])[name]
@@ -93,6 +87,7 @@ class RecommenderModel(object):
 
         self._is_ready = False
         self.verbose = True
+        self.training_time = [] # setting to None will prevent storing time
 
         self.data.subscribe(self.data.on_change_event, self._renew_model)
         self.data.subscribe(self.data.on_update_event, self._refresh_model)
@@ -158,16 +153,27 @@ class RecommenderModel(object):
         raise NotImplementedError('This must be implemented in subclasses')
 
 
-    def get_training_matrix(self, feedback_threshold=None, dtype=None):
+    def get_training_matrix(self, feedback_threshold=None, ignore_feedback=False,
+                            sparse_format='csr', dtype=None):
         threshold = feedback_threshold or self.feedback_threshold
-        idx, val, shp = self.data.to_coo(tensor_mode=False, feedback_threshold=threshold)
+        # the line below also updates data if needed and triggers notifier
+        idx, val, shp = self.data.to_coo(tensor_mode=False,
+                                         feedback_threshold=threshold)
         dtype = dtype or val.dtype
-        matrix = csr_matrix((val, (idx[:, 0], idx[:, 1])),
+        if ignore_feedback: # for compatibility with non-numeric tensor feedback data
+            val = np.ones_like(val, dtype=dtype)
+        matrix = coo_matrix((val, (idx[:, 0], idx[:, 1])),
                             shape=shp, dtype=dtype)
-        return matrix
+        if sparse_format == 'csr':
+            return matrix.tocsr()
+        elif sparse_format == 'csc':
+            return matrix.tocsc()
+        elif sparse_format == 'coo':
+            matrix.sum_duplicates()
+            return matrix
 
 
-    def get_test_matrix(self, test_data=None, shape=None, user_slice=None):
+    def get_test_matrix(self, test_data=None, shape=None, user_slice=None, dtype=None, ignore_feedback=False):
         if test_data is None:
             test_data, shape, _ = self._get_test_data()
         elif shape is None:
@@ -190,10 +196,14 @@ class RecommenderModel(object):
             item_coo = item_coo[valid_fdbk]
             fdbk_coo = fdbk_coo[valid_fdbk]
 
+        dtype = dtype or fdbk_coo.dtype
+        if ignore_feedback: # for compatibility with non-numeric tensor feedback data
+            fdbk_coo = np.ones_like(fdbk_coo, dtype=dtype)
+
         num_items = shape[1]
         test_matrix = csr_matrix((fdbk_coo, (user_coo, item_coo)),
                                  shape=(num_users, num_items),
-                                 dtype=fdbk_coo.dtype)
+                                 dtype=dtype)
         return test_matrix, coo_data
 
 
@@ -392,16 +402,31 @@ class RecommenderModel(object):
         return top_recs
 
 
-    def evaluate(self, method='hits', topk=None, not_rated_penalty=None, on_feedback_level=None, ignore_feedback=False, simple_rates=False):
-        feedback = self.data.fields.feedback
+    def evaluate(self, metric_type='all', topk=None, not_rated_penalty=None,
+                 switch_positive=None, ignore_feedback=False, simple_rates=False,
+                 on_feedback_level=None):
+        if metric_type == 'all':
+            metric_type = ['hits', 'relevance', 'ranking', 'experience']
+
+        if metric_type == 'main':
+            metric_type = ['relevance', 'ranking']
+
+        if not isinstance(metric_type, (list, tuple)):
+            metric_type = [metric_type]
+
+        # support rolling back scenario for @k calculations
         if int(topk or 0) > self.topk:
             self.topk = topk  # will also flush old recommendations
 
-        # support rolling back scenario for @k calculations
+        # ORDER OF CALLS MATTERS!!!
+        # make sure to call holdout before getting recommendations
+        # this will ensure that model is renewed if data has changed
+        holdout = self.data.test.holdout # <-- call before getting recs
         recommendations = self.recommendations[:, :topk]  # will recalculate if empty
 
-        eval_data = self.data.test.holdout
-        if (self.switch_positive is None) or (feedback is None):
+        switch_positive = switch_positive or self.switch_positive
+        feedback = self.data.fields.feedback
+        if (switch_positive is None) or (feedback is None):
             # all recommendations are considered positive predictions
             # this is a proper setting for binary data problems (implicit feedback)
             # in this case all unrated items, recommended by an algorithm
@@ -415,33 +440,49 @@ class RecommenderModel(object):
             # the defualt setting in this case is to ignore such items at all
             # by setting penalty to 0, however, it is adjustable
             not_rated_penalty = not_rated_penalty or 0
-            is_positive = (eval_data[feedback] >= self.switch_positive).values
+            is_positive = (holdout[feedback] >= switch_positive).values
 
         feedback = None if ignore_feedback else feedback
-        scoring_data = assemble_scoring_matrices(recommendations, eval_data,
+        scoring_data = assemble_scoring_matrices(recommendations, holdout,
                                                  self._prediction_key, self._prediction_target,
                                                  is_positive, feedback=feedback)
 
-        if method == 'relevance':  # no need for feedback
+        scores = []
+        if 'relevance' in metric_type:  # no need for feedback
             if (self.data.holdout_size == 1) or simple_rates:
-                scores = get_hr_score(scoring_data[1])
+                scores.append(get_hr_score(scoring_data[1]))
             else:
-                scores = get_relevance_scores(*scoring_data, not_rated_penalty=not_rated_penalty)
-        elif method == 'ranking':
+                scores.append(get_relevance_scores(*scoring_data, not_rated_penalty=not_rated_penalty))
+
+        if 'ranking' in metric_type:
             if (self.data.holdout_size == 1) or simple_rates:
-                scores = get_mrr_score(scoring_data[1])
+                scores.append(get_mrr_score(scoring_data[1]))
             else:
                 ndcg_alternative = get_default('ndcg_alternative')
                 topk = recommendations.shape[1]  # handle topk=None case
                 # topk has to be passed explicitly, otherwise it's unclear how to
                 # estimate ideal ranking for NDCG and NDCL metrics in get_ndcr_discounts
-                scores = get_ranking_scores(*scoring_data, switch_positive=self.switch_positive, topk=topk, alternative=ndcg_alternative)
-        elif method == 'hits':  # no need for feedback
-            scores = get_hits(*scoring_data, not_rated_penalty=not_rated_penalty)
-        elif method == 'experience':  # no need for feedback
-            scores = get_experience_scores(recommendations, self.data.index.itemid.shape[0])
-        else:
+                scores.append(get_ranking_scores(*scoring_data, switch_positive=switch_positive, topk=topk, alternative=ndcg_alternative))
+
+        if 'experience' in metric_type:  # no need for feedback
+            fields = self.data.fields
+            # support custom scenarios, e.g. coldstart
+            entity_type = fields._fields[fields.index(self._prediction_target)]
+            entity_index = getattr(self.data.index, entity_type)
+            try:
+                n_entities = entity_index.shape[0]
+            except AttributeError:
+                n_entities = entity_index.training.shape[0]
+            scores.append(get_experience_scores(recommendations, n_entities))
+
+        if 'hits' in metric_type:  # no need for feedback
+            scores.append(get_hits(*scoring_data, not_rated_penalty=not_rated_penalty))
+
+        if not scores:
             raise NotImplementedError
+
+        if len(scores) == 1:
+            scores = scores[0]
         return scores
 
 
@@ -640,7 +681,8 @@ class RandomModel(RecommenderModel):
         except AttributeError:
             index_data = self.data.index.itemid
         self.n_items = index_data.shape[0]
-        self._random_state = np.random.RandomState(self.seed) if self.seed else np.random
+        seed = self.seed
+        self._random_state = np.random.RandomState(seed) if seed is not None else np.random
 
     def slice_recommendations(self, test_data, shape, start, stop, test_users=None):
         slice_data = self._slice_test_data(test_data, start, stop)
@@ -664,33 +706,12 @@ class CooccurrenceModel(RecommenderModel):
             # np.sign allows for negative values as well
             user_item_matrix.data = np.sign(user_item_matrix.data)
 
-        with Timer(self.method, verbose=self.verbose):
+        with track_time(self.training_time, verbose=self.verbose, model=self.method):
             i2i_matrix = user_item_matrix.T.dot(user_item_matrix)  # gives CSC format
             i2i_matrix.setdiag(0)  # exclude "self-links"
             i2i_matrix.eliminate_zeros()
 
         self._i2i_matrix = i2i_matrix
-
-
-    def _sparse_dot(self, tst_mat, i2i_mat):
-        # scipy always returns sparse result, even if dot product is dense
-        # this function offers solution to this problem
-        # it also takes care on sparse result w.r.t. to further processing
-        if self.dense_output:  # calculate dense result directly
-            # TODO matmat multiplication instead of iteration with matvec
-            res_type = np.result_type(i2i_mat.dtype, tst_mat.dtype)
-            scores = np.empty((tst_mat.shape[0], i2i_mat.shape[1]), dtype=res_type)
-            for i in range(tst_mat.shape[0]):
-                v = tst_mat.getrow(i)
-                scores[i, :] = csc_matvec(i2i_mat, v, dense_output=True, dtype=res_type)
-        else:
-            scores = tst_mat.dot(i2i_mat.T)
-            # NOTE even though not neccessary for symmetric i2i matrix,
-            # transpose helps to avoid expensive conversion to CSR (performed by scipy)
-            if scores.nnz > get_nnz_max():
-                # too many nnz lead to undesired memory overhead in downvote_seen_items
-                scores = scores.toarray(order='C')
-        return scores
 
 
     def slice_recommendations(self, test_data, shape, start, stop, test_users=None):
@@ -701,7 +722,69 @@ class CooccurrenceModel(RecommenderModel):
         if self.implicit:
             test_matrix.data = np.sign(test_matrix.data)
 
-        scores = self._sparse_dot(test_matrix, self._i2i_matrix)
+        scores = sparse_dot(test_matrix, self._i2i_matrix, self.dense_output, True)
+        return scores, slice_data
+
+
+class ProbabilisticMF(RecommenderModel):
+    def __init__(self, *args, **kwargs):
+        self.seed = kwargs.pop('seed', None)
+        super().__init__(*args, **kwargs)
+        self.method = 'PMF'
+        self.optimizer = simple_pmf_sgd
+        self.learn_rate = 0.005
+        self.sigma = 1
+        self.num_epochs = 25
+        self.rank = 10
+        self.tolerance = 1e-4
+        self.factors = {}
+        self.rmse_history = None
+        self.show_rmse = False
+        self.iterations_time = None
+
+    def build(self, *args, **kwargs):
+        matrix = self.get_training_matrix(sparse_format='coo', dtype='f8')
+        user_idx, item_idx = matrix.nonzero()
+        interactions = (user_idx, item_idx, matrix.data)
+        nonzero_count = (matrix.getnnz(axis=1), matrix.getnnz(axis=0))
+        rank = self.rank
+        lrate = self.learn_rate
+        sigma = self.sigma
+        num_epochs = self.num_epochs
+        tol = self.tolerance
+        self.rmse_history = []
+        self.iterations_time = []
+
+        general_config = dict(seed=self.seed,
+                              verbose=self.show_rmse,
+                              iter_errors=self.rmse_history,
+                              iter_time=self.iterations_time)
+
+        with track_time(self.training_time, verbose=self.verbose, model=self.method):
+            P, Q = self.optimizer(interactions, matrix.shape, nonzero_count, rank,
+                                  lrate, sigma, num_epochs, tol,
+                                  *args,
+                                  **kwargs,
+                                  **general_config)
+
+        self.factors[self.data.fields.userid] = P
+        self.factors[self.data.fields.itemid] = Q
+
+    def get_recommendations(self):
+        if self.data.warm_start:
+            raise NotImplementedError
+        else:
+            return super().get_recommendations()
+
+
+    def slice_recommendations(self, test_data, shape, start, stop, test_users=None):
+        userid = self.data.fields.userid
+        itemid = self.data.fields.itemid
+        slice_data = self._slice_test_data(test_data, start, stop)
+
+        user_factors = self.factors[userid][test_users[start:stop], :]
+        item_factors = self.factors[itemid]
+        scores = user_factors.dot(item_factors.T)
         return scores, slice_data
 
 
@@ -734,6 +817,8 @@ class SVDModel(RecommenderModel):
                 self.factors = dict.fromkeys(self.factors.keys())
                 break
             else:
+                # avoid accidental overwrites if factors backup exists
+                self.factors = dict(**self.factors)
                 # ellipsis allows to handle 1d array of singular values
                 self.factors[entity] = factor[..., :rank]
 
@@ -746,7 +831,7 @@ class SVDModel(RecommenderModel):
 
         svd_params = dict(k=self.rank, return_singular_vectors=return_factors)
 
-        with Timer(self.method, verbose=self.verbose):
+        with track_time(self.training_time, verbose=self.verbose, model=self.method):
             user_factors, sigma, item_factors = svds(svd_matrix, **svd_params)
 
         if user_factors is not None:
@@ -765,6 +850,43 @@ class SVDModel(RecommenderModel):
         v = self.factors[self.data.fields.itemid]
         scores = (test_matrix.dot(v)).dot(v.T)
         return scores, slice_data
+
+
+class ScaledMatrixMixin:
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._col_scaling = 0.4
+        self._row_scaling = 1
+        self.method = f'{self.method}-s'
+
+    @property
+    def col_scaling(self):
+        return self._col_scaling
+
+    @property
+    def row_scaling(self):
+        return self._row_scaling
+
+    @col_scaling.setter
+    def col_scaling(self, new_value):
+        if new_value != self._col_scaling:
+            self._col_scaling = new_value
+            self._recommendations = None
+
+    @row_scaling.setter
+    def row_scaling(self, new_value):
+        if new_value != self._row_scaling:
+            self._row_scaling = new_value
+            self._recommendations = None
+
+    def get_training_matrix(self, *args, **kwargs):
+        scaled_matrix = super().get_training_matrix(*args, **kwargs)
+        scaled_matrix = rescale_matrix(scaled_matrix, self.row_scaling, 1)
+        scaled_matrix = rescale_matrix(scaled_matrix, self.col_scaling, 0)
+        return scaled_matrix
+
+
+class ScaledSVD(ScaledMatrixMixin, SVDModel): pass
 
 
 class CoffeeModel(RecommenderModel):
@@ -829,6 +951,8 @@ class CoffeeModel(RecommenderModel):
             elif factor.shape[1] == rank:
                 continue
             else:
+                # avoid accidental overwrites if factors backup exists
+                self.factors = dict(**self.factors)
                 rfactor, new_core = self.round_core(self.factors['core'], mode, rank)
                 self.factors[entity] = factor.dot(rfactor)
                 self.factors['core'] = new_core
@@ -876,7 +1000,7 @@ class CoffeeModel(RecommenderModel):
     def build(self):
         idx, val, shp = self.data.to_coo(tensor_mode=True)
 
-        with Timer(self.method, verbose=self.verbose):
+        with track_time(self.training_time, verbose=self.verbose, model=self.method):
             (users_factors, items_factors,
             feedback_factors, core) = hooi(idx, val, shp, self.mlrank,
                                            growth_tol=self.growth_tol,
@@ -920,36 +1044,40 @@ class CoffeeModel(RecommenderModel):
         scores = np.tensordot(scores, wt_flat, axes=(2, 0)).dot(v.T)
         return scores, slice_idx
 
-    # additional functionality: rating pediction
     def get_holdout_slice(self, start, stop):
         userid = self.data.fields.userid
         itemid = self.data.fields.itemid
-        eval_data = self.data.test.holdout
+        holdout = self.data.test.holdout
 
-        user_sel = (eval_data[userid] >= start) & (eval_data[userid] < stop)
-        holdout_users = eval_data.loc[user_sel, userid].values.astype(np.int64) - start
-        holdout_items = eval_data.loc[user_sel, itemid].values.astype(np.int64)
+        user_sel = (holdout[userid] >= start) & (holdout[userid] < stop)
+        holdout_users = holdout.loc[user_sel, userid].values.astype(np.int64) - start
+        holdout_items = holdout.loc[user_sel, itemid].values.astype(np.int64)
         return (holdout_users, holdout_items)
 
 
+    # additional functionality: rating pediction
     def predict_feedback(self):
-        flattener_old = self.flattener
-        self.flattener = 'argmax'  # this will be applied along feedback axis
+        if self.data.warm_start:
+            raise NotImplementedError
+
+        userid = self.data.fields.userid
+        itemid = self.data.fields.itemid
+        feedback = self.data.fields.feedback
+
+        holdout = self.data.test.holdout
+        holdout_users = holdout[userid].values.astype(np.int64)
+        holdout_items = holdout[itemid].values.astype(np.int64)
+
+        u = self.factors[userid]
+        v = self.factors[itemid]
+        w = self.factors[feedback]
+        g = self.factors['core']
+
+        gv = np.tensordot(g,  v[holdout_items, :], (1, 1))
+        gu = (gv * u[holdout_users, None, :].T).sum(axis=0)
+        scores = w.dot(gu).T
+        predictions = np.argmax(scores, axis=-1)
+
         feedback_idx = self.data.index.feedback.set_index('new')
-
-        test_data, test_shape, _ = self._get_test_data()
-        holdout_size = self.data.holdout_size
-        dtype = feedback_idx.old.dtype
-        predicted_feedback = np.empty((test_shape[0], holdout_size), dtype=dtype)
-
-        user_slices = self._get_slices_idx(test_shape, result_width=holdout_size)
-        start = user_slices[0]
-        for i in user_slices[1:]:
-            stop = i
-            predicted, _ = self.slice_recommendations(test_data, test_shape, start, stop)
-            holdout_idx = self.get_holdout_slice(start, stop)
-            feedback_values = feedback_idx.loc[predicted[holdout_idx], 'old'].values
-            predicted_feedback[start:stop, :] = feedback_values.reshape(-1, holdout_size)
-            start = stop
-        self.flattener = flattener_old
+        predicted_feedback = feedback_idx.loc[predictions, 'old'].values
         return predicted_feedback

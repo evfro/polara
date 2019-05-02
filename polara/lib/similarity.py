@@ -47,9 +47,10 @@ def set_diagonal_values(mat, val=1):
 
 
 def safe_inverse_root(d, dtype=None):
-    if (d < 0).any():
-        raise ValueError
-    return np.power(d, -0.5, where=d>0, dtype=dtype)
+    pos_d = d > 0
+    res = np.zeros(len(d), dtype=dtype)
+    np.power(d, -0.5, where=pos_d, dtype=dtype, out=res)
+    return res
 
 
 def normalize_binary_features(feature_mat, dtype=None):
@@ -251,13 +252,25 @@ def build_indicator_matrix(labels, max_items=None):
     return csr_matrix((data, indices, indprt), shape=shape)
 
 
-def feature2sparse(feature_data, ranking=None, deduplicate=True):
+def feature2sparse(feature_data, ranking=None, deduplicate=True, labels=None):
     if deduplicate:
         feature_data = feature_data.apply(uniquify_ordered if ranking else set)
 
-    feature_lbl = defaultdict(lambda: len(feature_lbl))
-    indices = [feature_lbl[item] for items in feature_data for item in items]
-    indptr = np.r_[0, feature_data.apply(len).cumsum().values]
+    if labels:
+        feature_lbl = labels
+        indices = []
+        indlens = []
+        for items in feature_data:
+            # wiil also remove unknown items to ensure index consistency
+            inds = [feature_lbl[item] for item in items if item in feature_lbl]
+            indices.extend(inds)
+            indlens.append(len(inds))
+    else:
+        feature_lbl = defaultdict(lambda: len(feature_lbl))
+        indices = [feature_lbl[item] for items in feature_data for item in items]
+        indlens = feature_data.apply(len).values
+
+    indptr = np.r_[0, np.cumsum(indlens)]
 
     if ranking:
         if ranking is True:
@@ -285,7 +298,7 @@ def feature2sparse(feature_data, ranking=None, deduplicate=True):
     return feature_mat, dict(feature_lbl)
 
 
-def get_features_data(meta_data, ranking=None, deduplicate=True):
+def get_features_data(meta_data, ranking=None, deduplicate=True, labels=None):
     feature_mats = OrderedDict()
     feature_lbls = OrderedDict()
     features = meta_data.columns
@@ -303,13 +316,16 @@ def get_features_data(meta_data, ranking=None, deduplicate=True):
 
     for feature in features:
         feature_data = meta_data[feature]
-        mat, lbl = feature2sparse(feature_data, ranking=ranking.get(feature, None), deduplicate=deduplicate)
+        mat, lbl = feature2sparse(feature_data,
+                                  ranking=ranking.get(feature, None),
+                                  deduplicate=deduplicate,
+                                  labels=labels[feature] if labels else None)
         feature_mats[feature], feature_lbls[feature] = mat, lbl
     return feature_mats, feature_lbls
 
 
-def stack_features(features, add_identity=False, normalize=True, dtype=None, **kwargs):
-    feature_mats, feature_lbls = get_features_data(features, **kwargs)
+def stack_features(features, add_identity=False, normalize=True, dtype=None, labels=None, stacked_index=False, **kwargs):
+    feature_mats, feature_lbls = get_features_data(features, labels=labels, **kwargs)
 
     all_matrices = list(feature_mats.values())
     if add_identity:
@@ -320,9 +336,15 @@ def stack_features(features, add_identity=False, normalize=True, dtype=None, **k
 
     if normalize:
         norm = stacked_features.getnnz(axis=1)
+        norm = norm.astype(np.promote_types(norm.dtype, 'f4'))
         scaling = np.power(norm, -1, where=norm>0, dtype=dtype)
         stacked_features = sp.sparse.diags(scaling).dot(stacked_features)
 
+    if stacked_index:
+        index_shift = identity.shape[1] if add_identity else 0
+        for feature, lbls in feature_lbls.items():
+            feature_lbls[feature] = {k:v+index_shift for k, v in lbls.items()}
+            index_shift += feature_mats[feature].shape[1]
     return stacked_features, feature_lbls
 
 

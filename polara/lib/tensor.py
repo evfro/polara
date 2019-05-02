@@ -34,7 +34,8 @@ def ttm3d_par(idx, val, shape, U, V, modes, unqs, inds, dtype=None):
     return res
 
 
-def hooi(idx, val, shape, core_shape, num_iters=25, parallel_ttm=False, growth_tol=0.01, verbose=False, seed=None):
+def hooi(idx, val, shape, core_shape, return_core=True, num_iters=25,
+         parallel_ttm=False, growth_tol=0.01, verbose=False, seed=None):
     '''
     Compute Tucker decomposition of a sparse tensor in COO format
     with the help of HOOI algorithm. Usage:
@@ -62,19 +63,20 @@ def hooi(idx, val, shape, core_shape, num_iters=25, parallel_ttm=False, growth_t
     u2 = np.linalg.qr(u2, mode='reduced')[0]
 
     g_norm_old = 0
+    return_core_vectors = True if return_core else 'u'
     for i in range(num_iters):
         log_status('Step %i of %i' % (i+1, num_iters))
 
         u0 = ttm[0](*tensor_data, u2, u1, ((2, 0), (1, 0)), *index_data[0]).reshape(shape[0], r1*r2)
-        uu = svds(u0, k=r0, return_singular_vectors='u')[0]
+        uu, ss, _ = svds(u0, k=r0, return_singular_vectors='u')
         u0 = np.ascontiguousarray(uu[:, ::-1])
 
         u1 = ttm[1](*tensor_data, u2, u0, ((2, 0), (0, 0)), *index_data[1]).reshape(shape[1], r0*r2)
-        uu = svds(u1, k=r1, return_singular_vectors='u')[0]
+        uu, ss, _ = svds(u1, k=r1, return_singular_vectors='u')
         u1 = np.ascontiguousarray(uu[:, ::-1])
 
         u2 = ttm[2](*tensor_data, u1, u0, ((1, 0), (0, 0)), *index_data[2]).reshape(shape[2], r0*r1)
-        uu, ss, vv = svds(u2, k=r2)
+        uu, ss, vv = svds(u2, k=r2, return_singular_vectors=return_core_vectors)
         u2 = np.ascontiguousarray(uu[:, ::-1])
 
         g_norm_new = np.linalg.norm(ss)
@@ -85,7 +87,10 @@ def hooi(idx, val, shape, core_shape, num_iters=25, parallel_ttm=False, growth_t
             log_status('Core is no longer growing. Norm of the core: %f' % g_norm_old)
             break
 
-    g = np.ascontiguousarray((ss[:, np.newaxis] * vv)[::-1, :])
-    g = g.reshape(r2, r1, r0).transpose(2, 1, 0)
+    if return_core:
+        g = np.ascontiguousarray((ss[:, np.newaxis] * vv)[::-1, :])
+        g = g.reshape(r2, r1, r0).transpose(2, 1, 0)
+    else:
+        g = None
     log_status('Done')
     return u0, u1, u2, g

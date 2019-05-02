@@ -110,15 +110,17 @@ class RecommenderData(object):
 
         if data is None:
             cols = fields + [custom_order]
-            self._data = data = pd.DataFrame(columns=[c for c in cols if c])
-        else:
-            self._data = data
+            data = pd.DataFrame(columns=[c for c in cols if c])
 
         if data.duplicated(subset=[f for f in fields if f]).any():
             # unstable in pandas v. 17.0, only works in <> v.17.0
             # rely on deduplicated data in many places - makes data processing more efficient
             raise NotImplementedError('Data has duplicate values')
 
+        if not data.index.is_unique:
+            data = data.reset_index(drop=True)
+
+        self._data = data
         self._custom_order = custom_order
         self.fields = namedtuple('Fields', self._std_fields)
         self.fields = self.fields(**dict(zip(self._std_fields, fields)))
@@ -199,9 +201,12 @@ class RecommenderData(object):
         return getattr(self, data_property)
 
 
-    def update(self):
+    def update(self, training_only=False):
         if self._change_properties:
-            self.prepare()
+            if training_only:
+                self.prepare_training_only()
+            else:
+                self.prepare()
 
 
     def prepare(self):
@@ -591,6 +596,16 @@ class RecommenderData(object):
         itemid = self.fields.itemid
         items_index = self.reindex(self._training, itemid)
         self.index = self.index._replace(itemid=items_index)
+
+    def get_entity_index(self, entity, index_id='training'):
+        entity_type = self.fields._fields[self.fields.index(entity)]
+        index_data = getattr(self.index, entity_type)
+
+        try: # check whether custom index is introduced (as in e.g. coldstart)
+            entity_idx = getattr(index_data, index_id)
+        except AttributeError: # fall back to standard case
+            entity_idx = index_data
+        return entity_idx
 
     def _reindex_feedback(self):
         self.index = self.index._replace(feedback=None)

@@ -48,7 +48,11 @@ ndcg_alternative = True  #use exponential instead of linear relevance contributi
 #COMPUTATION
 test_chunk_size = 1000 #to split tensor decompositions into smaller pieces in memory
 max_test_workers = None # to compute recommendations in parallel for groups of test users
-
+memory_hard_limit = 1 # in gigabytes, default=1, depends on hardware
+# varying this value may significantly impact performance
+# setting it to None or large value typically reduces performance,
+# as iterating over a smaller number of huge arrays takes longer
+# than over a higher number of smaller arrays
 
 def get_config(params):
     this = sys.modules[__name__]
