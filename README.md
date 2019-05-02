@@ -2,16 +2,15 @@
 Polara is the first recommendation framework that allows a deeper analysis of recommender systems performance, based on the idea of feedback polarity (by analogy with sentiment polarity in NLP).
 
 In addition to standard question of "how good a recommender system is at recommending relevant items", it allows assessing the ability of a recommender system to **avoid irrelevant recommendations** (thus, less likely to disappoint a user). You can read more about this idea in a research paper [Fifty Shades of Ratings: How to Benefit from a Negative Feedback in Top-N Recommendations Tasks](http://arxiv.org/abs/1607.04228). The research results can be easily reproduced with this framework, visit a "fixed state" version of the code at https://github.com/Evfro/fifty-shades (there're also many usage examples).
-
-The framework also features efficient tensor-based implementation of an algorithm, proposed in the paper, that takes full advantage of the polarity-based formulation. Currently, there is an [online demo](http://coremodel.azurewebsites.net) (for test purposes only), that demonstrates the effect of taking into account feedback polarity.
+The framework also features efficient tensor-based implementation of an algorithm, proposed in the paper, that takes full advantage of the polarity-based formulation.
 
 
 ## Prerequisites
 Current version of Polara supports both Python 2 and Python 3 environments. Future versions are likely to drop support of Python 2 to make a better use of Python 3 features.
 
-The framework heavily depends on `Pandas, Numpy, Scipy` and `Numba` packages. Better performance can be achieved with `mkl` (optional). It's also recommended to use `jupyter notebook` for experimentation. Visualization of results can be done with help of `matplotlib` and optionally `seaborn`. The easiest way to get all those at once is to use the latest [Anaconda distribution](https://www.continuum.io/downloads).
+The framework heavily depends on `Pandas, Numpy, Scipy` and `Numba` packages. Better performance can be achieved with `mkl` (optional). It's also recommended to use `jupyter notebook` for experimentation. Visualization of results can be done with help of `matplotlib`. The easiest way to get all those at once is to use the latest [Anaconda distribution](https://www.continuum.io/downloads).
 
-If you use a separate `conda` environment for testing, the following command can be used to ensure that all required dependencies are in place (see [this](http://conda.pydata.org/docs/commands/conda-install.html) for more info):
+If you use a separate `conda` environment for testing, the following command can be issued to ensure that all required dependencies are in place (see [this](http://conda.pydata.org/docs/commands/conda-install.html) for more info):
 
 `conda install --file conda_req.txt`
 
@@ -98,30 +97,26 @@ random = RandomModel(data_model)
 models = [i2i, svd, popular, random]
 
 metrics = ['ranking', 'relevance'] # metrics for evaluation: NDGC, Precision, Recall, etc.
-folds = [1, 2, 3, 4, 5] # use all 5 folds for cross-validation
+folds = [1, 2, 3, 4, 5] # use all 5 folds for cross-validation (default)
 topk_values = [1, 5, 10, 20, 50] # values of k to experiment with
 
-# run experiment
-topk_result = {}
-for fold in folds:
-    data_model.test_fold = fold
-    topk_result[fold] = ee.topk_test(models, topk_list=topk_values, metrics=metrics)
-
-# rearrange results into a more friendly representation
-# this is just a dictionary of Pandas Dataframes
-result = ee.consolidate_folds(topk_result, folds, metrics)
-result.keys() # outputs ['ranking', 'relevance']
+# run 5-fold CV experiment
+result = ee.run_cv_experiment(models, folds, metrics,
+                              fold_experiment=ee.topk_test,
+                              topk_list=topk_values)
 
 # calculate average values across all folds for e.g. relevance metrics
-result['relevance'].mean(axis=0).unstack() # use .std instead of .mean for standard deviation
+scores = result.mean(axis=0, level=['top-n', 'model']) # use .std instead of .mean for standard deviation
+scores.xs('recall', level='metric', axis=1).unstack('model')
 ```
 which results in something like:
 
-| metric/model |item-to-item | SVD | mostpopular | random |
+| **model** | **MP** | **PureSVD** | **RND** | **item-to-item** |
 | ---: |:---:|:---:|:---:|:---:|
-| *precision* | 0.348212 | 0.600066 | 0.411126 | 0.016159 |
-| *recall*    | 0.147969 | 0.304338 | 0.182472 | 0.005486 |
-| *miss_rate* | 0.852031 | 0.695662 | 0.817528 | 0.994514 |
+| **top-n** |
+| **1** |  0.017828 |  0.079428 |  0.000055 |  0.024673 |
+| **5** |  0.086604 |  0.219408 |  0.001104 |  0.126013 |
+| **10** |  0.138546 |  0.300658 |  0.001987 |  0.202134 |
 | ... | ... | ... | ... | ... |
 
 ## Custom pipelines
@@ -151,3 +146,6 @@ svd.evaluate()
 ```
 In this case the recommendations are generated based on the testset and evaluated against the holdout.
 See more usage examples in the [Custom evaluation](examples/Custom evaluation.ipynb) notebook.
+
+### Reproducing others work
+Polara offers even more options to highly customize experimentation pipeline and tailor it to specific needs. See, for example, [Reproducing EIGENREC results](examples/Reproducing EIGENREC results.ipynb) notebook to learn how Polara can be used to reproduce experiments from the *"[EIGENREC: generalizing PureSVD for effective and efﬁcient top-N recommendations](https://arxiv.org/abs/1511.06033)"* paper.
