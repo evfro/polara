@@ -2,6 +2,7 @@ import numpy as np
 
 from polara import SVDModel
 from polara.recommender.models import RecommenderModel, ScaledSVD
+from polara.recommender.hybrid.models import LCEModel
 from polara.lib.similarity import stack_features
 from polara.lib.sparse import sparse_dot
 
@@ -124,3 +125,23 @@ class ScaledSVDItemColdStart(ScaledSVD, SVDModelItemColdStart):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.method = 'PureSVDs(cs)'
+
+
+class LCEModelItemColdStart(ItemColdStartEvaluationMixin, LCEModel):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.method = 'LCE(cs)'
+
+    def get_recommendations(self):
+        Hu = self.factors[self.data.fields.userid].T
+        Hs = self.factors['item_features'].T
+        cold_info = self.item_features.reindex(self.data.index.itemid.cold_start.old.values,
+                                               fill_value=[])
+        cold_item_features, _ = stack_features(cold_info, labels=self.feature_labels, normalize=False)
+
+        cold_items_factors = cold_item_features.dot(Hs.T).dot(np.linalg.pinv(Hs @ Hs.T))
+        cold_items_factors[cold_items_factors < 0] = 0
+
+        scores = cold_items_factors @ Hu
+        top_relevant_users = self.get_topk_elements(scores).astype(np.intp)
+        return top_relevant_users
