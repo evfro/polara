@@ -1,9 +1,11 @@
+import math
 import scipy as sp
 import numpy as np
 
 from polara.recommender.models import RecommenderModel, ProbabilisticMF
 from polara.lib.optimize import kernelized_pmf_sgd, local_collective_embeddings
 from polara.lib.sparse import sparse_dot
+from polara.lib.similarity import stack_features
 from polara.tools.timing import track_time
 
 
@@ -149,10 +151,22 @@ class LCEModel(RecommenderModel):
                     item_index = index_data
 
                 self._item_data = self.item_features.reindex(item_index.old.values, # make correct sorting
-                                                            fill_value=[])
+                                                             fill_value=[])
         else:
             self._item_data = None
         return self._item_data
+
+
+    def build_item_graph(self, item_features, n_neighbors):
+        try:
+            from sklearn.neighbors import NearestNeighbors
+        except ImportError:
+            raise NotImplementedError('Install scikit-learn to construct graph for LCE model.')
+        else:
+            nbrs = NearestNeighbors(n_neighbors=1 + n_neighbors).fit(item_features)
+        if self.binary_features:
+            return nbrs.kneighbors_graph(item_features)
+        return nbrs.kneighbors_graph(item_features, mode='distance')
 
 
     def build(self):
@@ -161,7 +175,7 @@ class LCEModel(RecommenderModel):
         Xu = self.get_training_matrix().T # item-user sparse matrix
 
         n_nbrs = min(self.max_neighbours, int(math.sqrt(Xs.shape[0])))
-        A = construct_A(Xs, n_nbrs, binary=self.binary_features)
+        A = self.build_item_graph(Xs, n_nbrs)
 
         with track_time(self.training_time, verbose=self.verbose, model=self.method):
             W, Hu, Hs = local_collective_embeddings(Xs, Xu, A,
