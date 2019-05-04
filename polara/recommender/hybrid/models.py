@@ -1,9 +1,11 @@
+import math
 import scipy as sp
 import numpy as np
 
 from polara.recommender.models import RecommenderModel, ProbabilisticMF
-from polara.lib.optimize import kernelized_pmf_sgd
+from polara.lib.optimize import kernelized_pmf_sgd, local_collective_embeddings
 from polara.lib.sparse import sparse_dot
+from polara.lib.similarity import stack_features
 from polara.tools.timing import track_time
 
 
@@ -100,3 +102,111 @@ class KernelizedPMF(KernelizedRecommenderMixin, ProbabilisticMF):
         kernel_config = dict(kernel_update=self.kernel_update,
                              sparse_kernel_format=self.sparse_kernel_format)
         super().build(kernel_matrices, *args, **kernel_config, **kwargs)
+
+
+class LCEModel(RecommenderModel):
+    def __init__(self, *args, item_features=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._rank = 10
+        self.factors = {}
+        self.alpha = 0.1
+        self.beta = 0.05
+        self.max_neighbours = 10
+        self.item_features = item_features
+        self.binary_features = True
+        self._item_data = None
+        self.feature_labels = None
+        self.seed = None
+        self.show_error = False
+        self.regularization = 1
+        self.max_iterations = 15
+        self.tolerance = 0.0001
+        self.method = 'LCE'
+        self.data.subscribe(self.data.on_change_event, self._clean_metadata)
+
+    def _clean_metadata(self):
+        self._item_data = None
+        self.feature_labels = None
+
+    @property
+    def rank(self):
+        return self._rank
+
+    @rank.setter
+    def rank(self, new_value):
+        if new_value != self._rank:
+            self._rank = new_value
+            self._is_ready = False
+            self._recommendations = None
+
+    @property
+    def item_data(self):
+        if self.item_features is not None:
+            if self._item_data is None:
+                index_data = getattr(self.data.index, 'itemid')
+
+                try:
+                    item_index = index_data.training
+                except AttributeError:
+                    item_index = index_data
+
+                self._item_data = self.item_features.reindex(item_index.old.values, # make correct sorting
+                                                             fill_value=[])
+        else:
+            self._item_data = None
+        return self._item_data
+
+
+    def build_item_graph(self, item_features, n_neighbors):
+        try:
+            from sklearn.neighbors import NearestNeighbors
+        except ImportError:
+            raise NotImplementedError('Install scikit-learn to construct graph for LCE model.')
+        else:
+            nbrs = NearestNeighbors(n_neighbors=1 + n_neighbors).fit(item_features)
+        if self.binary_features:
+            return nbrs.kneighbors_graph(item_features)
+        return nbrs.kneighbors_graph(item_features, mode='distance')
+
+
+    def build(self):
+        # prepare input matrix for learning the model
+        Xs, lbls = stack_features(self.item_data, normalize=False) # item-features sparse matrix
+        Xu = self.get_training_matrix().T # item-user sparse matrix
+
+        n_nbrs = min(self.max_neighbours, int(math.sqrt(Xs.shape[0])))
+        A = self.build_item_graph(Xs, n_nbrs)
+
+        with track_time(self.training_time, verbose=self.verbose, model=self.method):
+            W, Hu, Hs = local_collective_embeddings(Xs, Xu, A,
+                                                    k=self.rank,
+                                                    alpha=self.alpha,
+                                                    beta=self.beta,
+                                                    lamb=self.regularization,
+                                                    epsilon=self.tolerance,
+                                                    maxiter=self.max_iterations,
+                                                    seed=self.seed,
+                                                    verbose=self.show_error)
+
+        userid = self.data.fields.userid
+        itemid = self.data.fields.itemid
+        self.factors[userid] = Hu.T
+        self.factors[itemid] = W
+        self.factors['item_features'] = Hs.T
+        self.feature_labels = lbls
+
+    def get_recommendations(self):
+        if self.data.warm_start:
+            raise NotImplementedError
+        else:
+            return super().get_recommendations()
+
+    def slice_recommendations(self, test_data, shape, start, stop, test_users=None):
+        userid = self.data.fields.userid
+        itemid = self.data.fields.itemid
+        slice_data = self._slice_test_data(test_data, start, stop)
+
+        user_factors = self.factors[userid][test_users[start:stop], :]
+        item_factors = self.factors[itemid]
+        scores = user_factors.dot(item_factors.T)
+        return scores, slice_data
