@@ -173,6 +173,12 @@ class RecommenderData(object):
         return config
 
 
+    @classmethod
+    def default_configuration(cls):
+        params = [prop[1:] for prop in cls._config]
+        return defaults.get_config(params)
+
+
     @property
     def test(self):
         self.update()
