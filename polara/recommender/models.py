@@ -414,18 +414,13 @@ class RecommenderModel(object):
         if not isinstance(metric_type, (list, tuple)):
             metric_type = [metric_type]
 
-        # support rolling back scenario for @k calculations
         if int(topk or 0) > self.topk:
             self.topk = topk  # will also flush old recommendations
-
-        # ORDER OF CALLS MATTERS!!!
-        # make sure to call holdout before getting recommendations
-        # this will ensure that model is renewed if data has changed
-        holdout = self.data.test.holdout # <-- call before getting recs
+        # support rolling back scenario for @k calculations
         recommendations = self.recommendations[:, :topk]  # will recalculate if empty
-
         switch_positive = switch_positive or self.switch_positive
         feedback = self.data.fields.feedback
+        holdout = self.data.test.holdout
         if (switch_positive is None) or (feedback is None):
             # all recommendations are considered positive predictions
             # this is a proper setting for binary data problems (implicit feedback)
