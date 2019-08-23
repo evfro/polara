@@ -361,9 +361,24 @@ def _sim_func(func_type):
         raise NotImplementedError
 
 
-def one_hot_similarity(meta_data):
-    raise NotImplementedError
+def one_hot_similarity(meta_data, metric='common', assume_binary=True, fill_diagonal=True, ensure_csc=True):
+    features, labels = stack_features(meta_data, normalize=False)
+    similarity = None
 
+    if metric == 'common': # common neighbours similarity
+        similarity = features.dot(features.T)
+        maxel = max(similarity.data.max(), abs(similarity.data.min()))
+        similarity = similarity / maxel
+        if fill_diagonal:
+            similarity.setdiag(1.0)
+
+    if (metric == 'cosine') or (metric == 'salton'):
+        similarity = cosine_similarity(features, assume_binary=assume_binary, fill_diagonal=fill_diagonal)
+
+    if ensure_csc and (similarity.format == 'csr'):
+        similarity = similarity.T # ensure CSC format (matrix is symmetric)
+
+    return similarity, labels
 
 def get_similarity_data(meta_data, similarity_type='jaccard'):
     features = meta_data.columns

@@ -2,7 +2,7 @@ import numpy as np
 
 from polara import SVDModel
 from polara.recommender.models import RecommenderModel, ScaledMatrixMixin
-from polara.recommender.hybrid.models import LCEModel
+from polara.recommender.hybrid.models import LCEModel, HybridSVD
 from polara.lib.similarity import stack_features
 from polara.lib.sparse import sparse_dot
 
@@ -145,3 +145,42 @@ class LCEModelItemColdStart(ItemColdStartEvaluationMixin, LCEModel):
         scores = cold_items_factors @ Hu
         top_relevant_users = self.get_topk_elements(scores).astype(np.intp)
         return top_relevant_users
+
+
+class HybridSVDItemColdStart(ItemColdStartEvaluationMixin, HybridSVD):
+    def __init__(self, *args, item_features=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.method = 'HybridSVD(cs)'
+        self.item_features = item_features
+        self.use_raw_features = item_features is not None
+
+    def build(self, *args, **kwargs):
+        super().build(*args, return_factors=True, **kwargs)
+
+    def get_recommendations(self):
+        userid = self.data.fields.userid
+
+        u = self.factors[userid]
+        v = self.factors['items_projector_right']
+        s = self.factors['singular_values']
+
+        if self.use_raw_features:
+            item_info = self.item_features.reindex(self.data.index.itemid.training.old.values,
+                                                   fill_value=[])
+            item_features, feature_labels = stack_features(item_info, normalize=False)
+            w = item_features.T.dot(v).T
+            cold_info = self.item_features.reindex(self.data.index.itemid.cold_start.old.values,
+                                                   fill_value=[])
+            cold_item_features, _ = stack_features(cold_info, labels=feature_labels, normalize=False)
+        else:
+            w = self.data.item_relathions.T.dot(v).T
+            cold_item_features = self.data.cold_items_similarity
+
+        wwt_inv = np.linalg.pinv(w @ w.T)
+        cold_items_factors = cold_item_features.dot(w.T) @ wwt_inv
+        scores = cold_items_factors @ (u * s[None, :]).T
+        top_similar_users = self.get_topk_elements(scores)
+        return top_similar_users
+
+
+class ScaledHybridSVDItemColdStart(ScaledMatrixMixin, HybridSVDItemColdStart): pass
