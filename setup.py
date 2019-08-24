@@ -18,8 +18,8 @@ _packages = ["polara",
 
 
 opts = dict(name="polara",
-            description="Fast and flexible recommender system framework",
-            keywords = "recommender system",
+            description="Fast and flexible recommender systems framework",
+            keywords = "recommender systems",
             version = "0.6.5.dev",
             license="MIT",
             author="Evgeny Frolov",
