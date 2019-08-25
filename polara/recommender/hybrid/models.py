@@ -128,7 +128,7 @@ class LCEModel(RecommenderModel):
         self.item_features = item_features
         self.binary_features = True
         self._item_data = None
-        self.feature_labels = None
+        self.item_features_labels = None
         self.seed = None
         self.show_error = False
         self.regularization = 1
@@ -139,7 +139,7 @@ class LCEModel(RecommenderModel):
 
     def _clean_metadata(self):
         self._item_data = None
-        self.feature_labels = None
+        self.item_features_labels = None
 
     @property
     def rank(self):
@@ -206,7 +206,7 @@ class LCEModel(RecommenderModel):
         self.factors[userid] = Hu.T
         self.factors[itemid] = W
         self.factors['item_features'] = Hs.T
-        self.feature_labels = lbls
+        self.item_features_labels = lbls
 
     def get_recommendations(self):
         if self.data.warm_start:
