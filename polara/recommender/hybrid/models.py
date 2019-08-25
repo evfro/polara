@@ -228,8 +228,6 @@ class LCEModel(RecommenderModel):
 class CholeskyFactorsMixin:
     def __init__(self, *args, **kwargs):
         self._sparse_mode = SPARSE_MODE
-        self.return_factors = True
-
         super().__init__(*args, **kwargs)
         entities = [self.data.fields.userid, self.data.fields.itemid]
         self._cholesky = dict.fromkeys(entities)
