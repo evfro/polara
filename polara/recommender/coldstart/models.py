@@ -15,6 +15,40 @@ class ItemColdStartEvaluationMixin:
         self._prediction_target = self.data.fields.userid
 
 
+class ItemColdStartRecommenderMixin:
+    def get_recommendations(self):
+        if self.verify_integrity:
+            self.verify_data_integrity()
+
+        cold_item_meta = self.item_features.reindex(
+            self.data.index.itemid.cold_start.old.values,
+            fill_value=[]
+        )
+
+        n_test_items = cold_item_meta.shape[0]
+        try:
+            n_test_users = self.data.representative_users.shape[0]
+        except AttributeError:
+            n_test_users = self.data.index.userid.training.shape[0]
+
+        test_shape = (n_test_items, n_test_users)
+        cold_slices_idx = self._get_slices_idx(test_shape)
+        cold_slices = zip(cold_slices_idx[:-1], cold_slices_idx[1:])
+
+        result = np.empty((test_shape[0], self.topk), dtype=np.int64)
+        if self.max_test_workers and len(cold_slices_idx) > 2:
+            self.run_parallel_recommender(result, cold_slices, cold_item_meta)
+        else:
+            self.run_sequential_recommender(result, cold_slices, cold_item_meta)
+        return result
+
+    def _slice_recommender(self, cold_slice, cold_item_meta):
+        start, stop = cold_slice
+        scores = self.slice_recommendations(cold_item_meta, start, stop)
+        top_recs = self.get_topk_elements(scores)
+        return top_recs
+
+
 class RandomModelItemColdStart(ItemColdStartEvaluationMixin, RecommenderModel):
     def __init__(self, *args, **kwargs):
         self.seed = kwargs.pop('seed', None)
@@ -82,43 +116,50 @@ class SimilarityAggregationItemColdStart(ItemColdStartEvaluationMixin, Recommend
         return top_similar_users
 
 
-class SVDModelItemColdStart(ItemColdStartEvaluationMixin, SVDModel):
-    def __init__(self, *args, item_features=None, **kwargs):
+class SVDModelItemColdStart(ItemColdStartEvaluationMixin, ItemColdStartRecommenderMixin, SVDModel):
+    def __init__(self, *args, item_features, **kwargs):
         super().__init__(*args, **kwargs)
         self.method = 'PureSVD(cs)'
         self.item_features = item_features
-        self.use_raw_features = item_features is not None
+        self.item_features_labels = None
+        self.item_features_transform = None
+
+    def _check_reduced_rank(self, rank):
+        super()._check_reduced_rank(rank)
+        try:
+            w = self.item_features_transform[0]
+        except TypeError:
+            return
+        if w.shape[0] < rank:
+            self.item_features_transform = None
+        else:
+            w = w[:rank, :]
+            self.item_features_transform = (w, np.linalg.pinv(w @ w.T))
 
     def build(self, *args, **kwargs):
         super().build(*args, return_factors=True, **kwargs)
 
-    def get_recommendations(self):
-        userid = self.data.fields.userid
-        itemid = self.data.fields.itemid
+        item_meta = self.item_features.reindex(
+            self.data.index.itemid.training.old.values, fill_value=[])
+        item_one_hot, self.item_features_labels = stack_features(
+            item_meta, stacked_index=False, normalize=False)
 
-        u = self.factors[userid]
-        v = self.factors[itemid]
+        w = item_one_hot.T.dot(self.factors[self.data.fields.itemid]).T
+        self.item_features_transform = (w, np.linalg.pinv(w @ w.T))
+
+    def slice_recommendations(self, cold_item_meta, start, stop):
+        cold_slice_meta = cold_item_meta.iloc[start:stop]
+        cold_item_features, _ = stack_features(
+            cold_slice_meta,
+            labels=self.item_features_labels,
+            normalize=False)
+
+        u = self.factors[self.data.fields.userid]
         s = self.factors['singular_values']
-
-        if self.use_raw_features:
-            item_info = self.item_features.reindex(self.data.index.itemid.training.old.values,
-                                                   fill_value=[])
-            item_features, feature_labels = stack_features(item_info, normalize=False)
-            w = item_features.T.dot(v).T
-            wwt_inv = np.linalg.pinv(w @ w.T)
-
-            cold_info = self.item_features.reindex(self.data.index.itemid.cold_start.old.values,
-                                                   fill_value=[])
-            cold_item_features, _ = stack_features(cold_info, labels=feature_labels, normalize=False)
-        else:
-            w = self.data.item_relations.T.dot(v).T
-            wwt_inv = np.linalg.pinv(w @ w.T)
-            cold_item_features = self.data.cold_items_similarity
-
+        w, wwt_inv = self.item_features_transform
         cold_items_factors = cold_item_features.dot(w.T) @ wwt_inv
         scores = cold_items_factors @ (u * s[None, :]).T
-        top_similar_users = self.get_topk_elements(scores).astype(np.intp)
-        return top_similar_users
+        return scores
 
 
 class ScaledSVDItemColdStart(ScaledMatrixMixin, SVDModelItemColdStart):
@@ -127,60 +168,81 @@ class ScaledSVDItemColdStart(ScaledMatrixMixin, SVDModelItemColdStart):
         self.method = 'PureSVDs(cs)'
 
 
-class LCEModelItemColdStart(ItemColdStartEvaluationMixin, LCEModel):
+class LCEModelItemColdStart(ItemColdStartEvaluationMixin, ItemColdStartRecommenderMixin, LCEModel):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.method = 'LCE(cs)'
+        self.item_features_invgram = None
 
-    def get_recommendations(self):
+    def build(self, *args, **kwargs):
+        super().build(*args, **kwargs)
+        Hs = self.factors['item_features'].T
+        self.item_features_invgram = np.linalg.pinv(Hs @ Hs.T)
+
+    def slice_recommendations(self, cold_item_meta, start, stop):
+        cold_slice_meta = cold_item_meta.iloc[start:stop]
+        cold_item_features, _ = stack_features(
+            cold_slice_meta,
+            labels=self.item_features_labels,
+            normalize=False)
+
         Hu = self.factors[self.data.fields.userid].T
         Hs = self.factors['item_features'].T
-        cold_info = self.item_features.reindex(self.data.index.itemid.cold_start.old.values,
-                                               fill_value=[])
-        cold_item_features, _ = stack_features(cold_info, labels=self.feature_labels, normalize=False)
 
-        cold_items_factors = cold_item_features.dot(Hs.T).dot(np.linalg.pinv(Hs @ Hs.T))
+        cold_items_factors = cold_item_features.dot(Hs.T).dot(self.item_features_invgram)
         cold_items_factors[cold_items_factors < 0] = 0
-
         scores = cold_items_factors @ Hu
-        top_relevant_users = self.get_topk_elements(scores).astype(np.intp)
-        return top_relevant_users
+        return scores
 
 
-class HybridSVDItemColdStart(ItemColdStartEvaluationMixin, HybridSVD):
-    def __init__(self, *args, item_features=None, **kwargs):
+class HybridSVDItemColdStart(ItemColdStartEvaluationMixin, ItemColdStartRecommenderMixin, HybridSVD):
+    def __init__(self, *args, item_features, **kwargs):
         super().__init__(*args, **kwargs)
         self.method = 'HybridSVD(cs)'
         self.item_features = item_features
-        self.use_raw_features = item_features is not None
+        self.item_features_labels = None
+        self.item_features_transform = None
+        self.data.subscribe(self.data.on_change_event, self._clean_metadata)
+
+    def _clean_metadata(self):
+        self.item_features_labels = None
+
+    def _check_reduced_rank(self, rank):
+        super()._check_reduced_rank(rank)
+        try:
+            w = self.item_features_transform[0]
+        except TypeError:
+            return
+        if w.shape[0] < rank:
+            self.item_features_transform = None
+        else:
+            w = w[:rank, :]
+            self.item_features_transform = (w, np.linalg.pinv(w @ w.T))
 
     def build(self, *args, **kwargs):
         super().build(*args, return_factors=True, **kwargs)
 
-    def get_recommendations(self):
-        userid = self.data.fields.userid
+        item_meta = self.item_features.reindex(
+            self.data.index.itemid.training.old.values, fill_value=[])
+        item_one_hot, self.item_features_labels = stack_features(
+            item_meta, stacked_index=False, normalize=False)
 
-        u = self.factors[userid]
-        v = self.factors['items_projector_right']
+        w = item_one_hot.T.dot(self.factors['items_projector_right']).T
+        self.item_features_transform = (w, np.linalg.pinv(w @ w.T))
+
+    def slice_recommendations(self, cold_item_meta, start, stop):
+        cold_slice_meta = cold_item_meta.iloc[start:stop]
+        cold_item_features, _ = stack_features(
+            cold_slice_meta,
+            labels=self.item_features_labels,
+            normalize=False)
+
+        u = self.factors[self.data.fields.userid]
         s = self.factors['singular_values']
-
-        if self.use_raw_features:
-            item_info = self.item_features.reindex(self.data.index.itemid.training.old.values,
-                                                   fill_value=[])
-            item_features, feature_labels = stack_features(item_info, normalize=False)
-            w = item_features.T.dot(v).T
-            cold_info = self.item_features.reindex(self.data.index.itemid.cold_start.old.values,
-                                                   fill_value=[])
-            cold_item_features, _ = stack_features(cold_info, labels=feature_labels, normalize=False)
-        else:
-            w = self.data.item_relathions.T.dot(v).T
-            cold_item_features = self.data.cold_items_similarity
-
-        wwt_inv = np.linalg.pinv(w @ w.T)
-        cold_items_factors = cold_item_features.dot(w.T) @ wwt_inv
+        w, w_invgram = self.item_features_transform
+        cold_items_factors = cold_item_features.dot(w.T) @ w_invgram
         scores = cold_items_factors @ (u * s[None, :]).T
-        top_similar_users = self.get_topk_elements(scores)
-        return top_similar_users
+        return scores
 
 
 class ScaledHybridSVDItemColdStart(ScaledMatrixMixin, HybridSVDItemColdStart): pass
