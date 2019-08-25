@@ -232,7 +232,7 @@ class CholeskyFactorsMixin:
         entities = [self.data.fields.userid, self.data.fields.itemid]
         self._cholesky = dict.fromkeys(entities)
 
-        self._features_weight = 0.999
+        self._features_weight = 0.5
         self.data.subscribe(self.data.on_change_event, self._clean_cholesky)
 
     def _clean_cholesky(self):
