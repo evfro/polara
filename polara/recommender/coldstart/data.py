@@ -74,7 +74,7 @@ class ItemColdStartData(RecommenderData):
         if self._holdout_size > 0:
             holdout = super(ItemColdStartData, self)._sample_holdout(test_split, group_id=itemid)
         else:
-            holdout = self._data.loc[test_split, list(self.fields)]
+            holdout = self._data.loc[test_split, [f for f in self.fields if f is not None]]
 
         itemid_cold = '{}_cold'.format(itemid)
         return holdout.rename(columns={itemid: itemid_cold}, copy=False)
