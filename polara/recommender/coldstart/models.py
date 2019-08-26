@@ -116,58 +116,6 @@ class SimilarityAggregationItemColdStart(ItemColdStartEvaluationMixin, Recommend
         return top_similar_users
 
 
-class SVDModelItemColdStart(ItemColdStartEvaluationMixin, ItemColdStartRecommenderMixin, SVDModel):
-    def __init__(self, *args, item_features, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.method = 'PureSVD(cs)'
-        self.item_features = item_features
-        self.item_features_labels = None
-        self.item_features_transform = None
-
-    def _check_reduced_rank(self, rank):
-        super()._check_reduced_rank(rank)
-        try:
-            w = self.item_features_transform[0]
-        except TypeError:
-            return
-        if w.shape[0] < rank:
-            self.item_features_transform = None
-        else:
-            w = w[:rank, :]
-            self.item_features_transform = (w, np.linalg.pinv(w @ w.T))
-
-    def build(self, *args, **kwargs):
-        super().build(*args, return_factors=True, **kwargs)
-
-        item_meta = self.item_features.reindex(
-            self.data.index.itemid.training.old.values, fill_value=[])
-        item_one_hot, self.item_features_labels = stack_features(
-            item_meta, stacked_index=False, normalize=False)
-
-        w = item_one_hot.T.dot(self.factors[self.data.fields.itemid]).T
-        self.item_features_transform = (w, np.linalg.pinv(w @ w.T))
-
-    def slice_recommendations(self, cold_item_meta, start, stop):
-        cold_slice_meta = cold_item_meta.iloc[start:stop]
-        cold_item_features, _ = stack_features(
-            cold_slice_meta,
-            labels=self.item_features_labels,
-            normalize=False)
-
-        u = self.factors[self.data.fields.userid]
-        s = self.factors['singular_values']
-        w, wwt_inv = self.item_features_transform
-        cold_items_factors = cold_item_features.dot(w.T) @ wwt_inv
-        scores = cold_items_factors @ (u * s[None, :]).T
-        return scores
-
-
-class ScaledSVDItemColdStart(ScaledMatrixMixin, SVDModelItemColdStart):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.method = 'PureSVDs(cs)'
-
-
 class LCEModelItemColdStart(ItemColdStartEvaluationMixin, ItemColdStartRecommenderMixin, LCEModel):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -195,10 +143,9 @@ class LCEModelItemColdStart(ItemColdStartEvaluationMixin, ItemColdStartRecommend
         return scores
 
 
-class HybridSVDItemColdStart(ItemColdStartEvaluationMixin, ItemColdStartRecommenderMixin, HybridSVD):
+class ItemColdStartSVDModelMixin:
     def __init__(self, *args, item_features, **kwargs):
         super().__init__(*args, **kwargs)
-        self.method = 'HybridSVD(cs)'
         self.item_features = item_features
         self.item_features_labels = None
         self.item_features_transform = None
@@ -207,8 +154,7 @@ class HybridSVDItemColdStart(ItemColdStartEvaluationMixin, ItemColdStartRecommen
     def _clean_metadata(self):
         self.item_features_labels = None
 
-    def _check_reduced_rank(self, rank):
-        super()._check_reduced_rank(rank)
+    def round_item_features_transform(self, rank):
         try:
             w = self.item_features_transform[0]
         except TypeError:
@@ -219,16 +165,26 @@ class HybridSVDItemColdStart(ItemColdStartEvaluationMixin, ItemColdStartRecommen
             w = w[:rank, :]
             self.item_features_transform = (w, np.linalg.pinv(w @ w.T))
 
-    def build(self, *args, **kwargs):
-        super().build(*args, return_factors=True, **kwargs)
+    def _check_reduced_rank(self, rank):
+        super()._check_reduced_rank(rank)
+        self.round_item_features_transform(rank)
 
+    def encode_item_features(self):
         item_meta = self.item_features.reindex(
             self.data.index.itemid.training.old.values, fill_value=[])
         item_one_hot, self.item_features_labels = stack_features(
             item_meta, stacked_index=False, normalize=False)
+        return item_one_hot
 
-        w = item_one_hot.T.dot(self.factors['items_projector_right']).T
-        self.item_features_transform = (w, np.linalg.pinv(w @ w.T))
+    def assemble_item_features_transform(self):
+        item_one_hot = self.encode_item_features()
+        mapping = self.compute_item_features_mapping(item_one_hot) # model dependent
+        mapping_invgram = np.linalg.pinv(mapping @ mapping.T)
+        self.item_features_transform = (mapping, mapping_invgram)
+
+    def build(self, *args, **kwargs):
+        super().build(*args, return_factors=True, **kwargs)
+        self.assemble_item_features_transform()
 
     def slice_recommendations(self, cold_item_meta, start, stop):
         cold_slice_meta = cold_item_meta.iloc[start:stop]
@@ -243,6 +199,33 @@ class HybridSVDItemColdStart(ItemColdStartEvaluationMixin, ItemColdStartRecommen
         cold_items_factors = cold_item_features.dot(w.T) @ w_invgram
         scores = cold_items_factors @ (u * s[None, :]).T
         return scores
+
+
+class SVDModelItemColdStart(ItemColdStartEvaluationMixin,
+                            ItemColdStartRecommenderMixin,
+                            ItemColdStartSVDModelMixin,
+                            SVDModel):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.method = 'PureSVD(cs)'
+
+    def compute_item_features_mapping(self, item_features):
+        return item_features.T.dot(self.factors[self.data.fields.itemid]).T
+
+
+class HybridSVDItemColdStart(ItemColdStartEvaluationMixin,
+                             ItemColdStartRecommenderMixin,
+                             ItemColdStartSVDModelMixin,
+                             HybridSVD):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.method = 'HybridSVD(cs)'
+
+    def compute_item_features_mapping(self, item_features):
+        return item_features.T.dot(self.factors['items_projector_right']).T
+
+
+class ScaledSVDItemColdStart(ScaledMatrixMixin, SVDModelItemColdStart): pass
 
 
 class ScaledHybridSVDItemColdStart(ScaledMatrixMixin, HybridSVDItemColdStart): pass
