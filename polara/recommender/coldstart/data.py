@@ -63,7 +63,7 @@ class ItemColdStartData(RecommenderData):
         # in standard state 3 scenario (as there's no testset)
         if '_test_sample' in self._change_properties:
             update_rule['test_update'] = True
-            self._repr_users = None
+            self._clean_representative_users()
         return new_state, update_rule
 
 
