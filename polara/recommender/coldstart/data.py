@@ -14,7 +14,6 @@ class ItemColdStartData(RecommenderData):
 
         self._test_ratio = 0.2
         self._warm_start = False
-        self._holdout_size = -1  # needed for correct processing of test data
 
         # build unique items list to split them by folds
         itemid = self.fields.itemid
