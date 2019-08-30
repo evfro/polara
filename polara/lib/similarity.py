@@ -370,7 +370,7 @@ def one_hot_similarity(meta_data, metric='common', assume_binary=True, fill_diag
         maxel = max(similarity.data.max(), abs(similarity.data.min()))
         similarity = similarity / maxel
         if fill_diagonal:
-            similarity.setdiag(1.0)
+            set_diagonal_values(similarity, 1)
 
     if (metric == 'cosine') or (metric == 'salton'):
         similarity = cosine_similarity(features, assume_binary=assume_binary, fill_diagonal=fill_diagonal)
