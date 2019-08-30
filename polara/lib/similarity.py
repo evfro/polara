@@ -261,7 +261,7 @@ def feature2sparse(feature_data, ranking=None, deduplicate=True, labels=None):
         indices = []
         indlens = []
         for items in feature_data:
-            # wiil also remove unknown items to ensure index consistency
+            # will also remove unknown items to ensure index consistency
             inds = [feature_lbl[item] for item in items if item in feature_lbl]
             indices.extend(inds)
             indlens.append(len(inds))

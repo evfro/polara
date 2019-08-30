@@ -393,7 +393,7 @@ class RecommenderData(object):
                 testset = holdout = None
                 train_split = ~test_split
             else:  # state 3 or state 4
-                # NOTE holdout_size = None is also here; this can be used in
+                # NOTE holdout_size < 0 is also here; this can be used in
                 # subclasses like ItemColdStartData to preprocess data properly
                 # in that case _sample_holdout must be modified accordingly
                 holdout = self._sample_holdout(test_split)
