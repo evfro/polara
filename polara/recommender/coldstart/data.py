@@ -55,8 +55,6 @@ class ItemColdStartData(RecommenderData):
 
     def _check_state_transition(self):
         assert not self._warm_start
-        assert self._holdout_size != 0 # needed for correct processing of test data
-        assert self._test_ratio > 0
         new_state, update_rule = super(ItemColdStartData, self)._check_state_transition()
 
         # handle change of test_sample value which is not handled
@@ -79,7 +77,7 @@ class ItemColdStartData(RecommenderData):
         return holdout.rename(columns={itemid: itemid_cold}, copy=False)
 
 
-    def _try_drop_unseen_test_items(self):
+    def _try_drop_unseen_test_items(self, *args, **kwargs):
         # there will be no such items except cold-start items
         pass
 
@@ -90,13 +88,16 @@ class ItemColdStartData(RecommenderData):
 
 
     def _assign_test_items_index(self):
-        if self.build_index:
+        cold_items_are_initialized = self._test.holdout is not None
+        if self.build_index and cold_items_are_initialized:
             self._reindex_cold_items()
 
 
     def _reindex_cold_items(self):
         itemid_cold = '{}_cold'.format(self.fields.itemid)
-        cold_item_index = self.reindex(self._test.holdout, itemid_cold, inplace=True, sort=False)
+        holdout = self._test.holdout
+        cold_item_index = self.reindex(
+            holdout, itemid_cold, inplace=True, sort=False)
 
         try: # check if already modified item index to avoid nested assignemnt
             item_index = self.index.itemid.training
@@ -115,10 +116,12 @@ class ItemColdStartData(RecommenderData):
 
     def _post_process_cold_items(self):
         self._clean_representative_users()
-        self._verify_cold_items_representatives()
-        self._verify_cold_items_features()
-        self._try_cleanup_cold_items()
-        self._sort_by_cold_items()
+        cold_items_are_initialized = self._test.holdout is not None
+        if cold_items_are_initialized:
+            self._verify_cold_items_representatives()
+            self._verify_cold_items_features()
+            self._try_cleanup_cold_items()
+            self._sort_by_cold_items()
 
 
     def _clean_representative_users(self):
@@ -201,6 +204,14 @@ class ItemColdStartData(RecommenderData):
         cold_index.sort_values('new', inplace=True)
         holdout = self._test.holdout
         holdout.sort_values(itemid_cold, inplace=True)
+
+    def set_test_data(self, *, holdout, **kwargs):
+        itemid = self.fields.itemid
+        itemid_cold = '{}_cold'.format(itemid)
+        if itemid_cold not in holdout.columns:
+            holdout = holdout.rename(columns={itemid: itemid_cold}, copy=kwargs.pop('copy', True))
+        super().set_test_data(holdout=holdout, copy=False, **kwargs)
+        self._post_process_cold_items()
 
 
 class ColdSimilarityMixin(object):
