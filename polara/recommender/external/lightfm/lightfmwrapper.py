@@ -1,6 +1,3 @@
-# python 2/3 interoperability
-from __future__ import print_function
-
 import numpy as np
 from numpy.lib.stride_tricks import as_strided
 from lightfm import LightFM
@@ -15,15 +12,16 @@ class LightFMWrapper(RecommenderModel):
         self.method='LightFM'
         self.rank = 10
         self.fit_method = 'fit'
+        self.fit_params = {}
 
         self.item_features = item_features
-        self.item_feature_labels = None
+        self.item_features_labels = None
         self.item_alpha = 0.0
         self.item_identity = True
         self._item_features_csr = None
 
         self.user_features = user_features
-        self.user_feature_labels = None
+        self.user_features_labels = None
         self.user_alpha = 0.0
         self.user_identity = True
         self._user_features_csr = None
@@ -50,21 +48,32 @@ class LightFMWrapper(RecommenderModel):
 
         matrix = self.get_training_matrix()
 
+        try:
+            item_index = self.data.index.itemid.training
+        except AttributeError:
+            item_index = self.data.index.itemid
+
         if self.item_features is not None:
-            item_features = self.item_features.reindex(self.data.index.itemid.old.values, fill_value=[])
-            self._item_features_csr, self.item_feature_labels = stack_features(item_features,
-                                                                               add_identity=self.item_identity,
-                                                                               normalize=True,
-                                                                               dtype='f4')
+            item_features = self.item_features.reindex(
+                item_index.old.values,
+                fill_value=[])
+            self._item_features_csr, self.item_features_labels = stack_features(
+                item_features,
+                add_identity=self.item_identity,
+                normalize=True,
+                dtype='f4')
         if self.user_features is not None:
-            user_features = self.user_features.reindex(self.data.index.userid.training.old.values, fill_value=[])
-            self._user_features_csr, self.user_feature_labels = stack_features(user_features,
-                                                                                add_identity=self.user_identity,
-                                                                                normalize=True,
-                                                                                dtype='f4')
+            user_features = self.user_features.reindex(
+                self.data.index.userid.training.old.values,
+                fill_value=[])
+            self._user_features_csr, self.user_features_labels = stack_features(
+                user_features,
+                add_identity=self.user_identity,
+                normalize=True,
+                dtype='f4')
 
         with track_time(self.training_time, verbose=self.verbose, model=self.method):
-            fit(matrix, item_features=self._item_features_csr, user_features=self._user_features_csr)
+            fit(matrix, item_features=self._item_features_csr, user_features=self._user_features_csr, **self.fit_params)
 
 
     def slice_recommendations(self, test_data, shape, start, stop, test_users=None):

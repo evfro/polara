@@ -3,6 +3,7 @@ import numpy as np
 from polara import SVDModel
 from polara.recommender.models import RecommenderModel, ScaledMatrixMixin
 from polara.recommender.hybrid.models import LCEModel, HybridSVD
+from polara.recommender.external.lightfm.lightfmwrapper import LightFMWrapper, ItemColdStartLightFMMixin
 from polara.lib.similarity import stack_features
 from polara.lib.sparse import sparse_dot
 
@@ -229,3 +230,9 @@ class ScaledSVDItemColdStart(ScaledMatrixMixin, SVDModelItemColdStart): pass
 
 
 class ScaledHybridSVDItemColdStart(ScaledMatrixMixin, HybridSVDItemColdStart): pass
+
+
+class LightFMItemColdStart(ItemColdStartEvaluationMixin,
+                           ItemColdStartRecommenderMixin,
+                           ItemColdStartLightFMMixin,
+                           LightFMWrapper): pass
