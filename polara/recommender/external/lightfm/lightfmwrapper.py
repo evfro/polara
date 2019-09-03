@@ -96,25 +96,3 @@ class LightFMWrapper(RecommenderModel):
                                      item_features=self._item_features_csr
                                      ).reshape(n_users, n_items)
         return scores, slice_data
-
-
-class ItemColdStartLightFMMixin:
-    def slice_recommendations(self, cold_item_meta, start, stop):
-        cold_slice_meta = cold_item_meta.iloc[start:stop]
-        cold_item_features, _ = stack_features(
-            cold_slice_meta,
-            labels=self.item_features_labels,
-            add_identity=False,
-            normalize=True)
-
-        user_embeddings = self._model.user_embeddings
-        repr_users = self.data.representative_users
-        if repr_users is not None:
-            user_embeddings = user_embeddings[repr_users.new.values, :]
-
-        # proper handling of cold-start (instead of built-in predict)
-        n_items = self.data.index.itemid.training.shape[0]
-        item_features_embeddings = self._model.item_embeddings[n_items:, :]
-        cold_items_embeddings = cold_item_features.dot(item_features_embeddings)
-        scores = cold_items_embeddings @ user_embeddings.T
-        return scores
