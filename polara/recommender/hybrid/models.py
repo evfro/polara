@@ -238,6 +238,14 @@ class CholeskyFactorsMixin:
     def _clean_cholesky(self):
         self._cholesky = {entity:None for entity in self._cholesky.keys()}
 
+    def _clear_cholesky_cache(self):
+        cholesky_items = self.item_cholesky_factor
+        cholesky_users = self.user_cholesky_factor
+        if cholesky_items is not None:
+            cholesky_items._L = None
+        if cholesky_users is not None:
+            cholesky_users._L = None
+
     def _update_cholesky(self):
         for entity, cholesky in self._cholesky.items():
             if cholesky is not None:
@@ -350,29 +358,31 @@ class HybridSVD(CholeskyFactorsMixin, SVDModel):
         if self.precompute_auxiliary_matrix:
             if cholesky_items is not None:
                 svd_matrix = cholesky_items.T.dot(svd_matrix.T).T
-                cholesky_items._L = None
             if cholesky_users is not None:
                 svd_matrix = cholesky_users.T.dot(svd_matrix)
-                cholesky_users._L = None
             operator = svd_matrix
         else:
-            if cholesky_items is not None:
-                L_item = cholesky_items
-            else:
-                L_item = sp.sparse.eye(svd_matrix.shape[1])
-            if cholesky_users is not None:
-                L_user = cholesky_users
-            else:
-                L_user = sp.sparse.eye(svd_matrix.shape[0])
-
             def matvec(v):
-                return L_user.T.dot(svd_matrix.dot(L_item.dot(v)))
+                if cholesky_items is not None:
+                    v = cholesky_items.dot(v)
+                mat_vec = svd_matrix @ v
+                if cholesky_users is not None:
+                    mat_vec = cholesky_users.T.dot(mat_vec)
+                return mat_vec
+
             def rmatvec(v):
-                return L_item.T.dot(svd_matrix.T.dot(L_user.dot(v)))
+                if cholesky_users is not None:
+                    v = cholesky_users.dot(v)
+                r_mat_vec = svd_matrix.T @ v
+                if cholesky_items is not None:
+                    r_mat_vec = cholesky_items.T.dot(r_mat_vec)
+                return r_mat_vec
+
             operator = LinearOperator(svd_matrix.shape, matvec, rmatvec)
 
         super().build(*args, operator=operator, **kwargs)
         self.build_item_projector(self.factors[self.data.fields.itemid])
+        self._clear_cholesky_cache()
 
     def slice_recommendations(self, test_data, shape, start, stop, test_users=None):
         test_matrix, slice_data = self.get_test_matrix(test_data, shape, (start, stop))
