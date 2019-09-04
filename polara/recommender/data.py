@@ -912,6 +912,11 @@ class RecommenderData(object):
             self._try_reindex_test_data()  # either assign known index, or reindex (if warm_start)
         self._try_sort_test_data()
 
+        if self.verbose:
+            if holdout is not None:
+                num_events = self.test.holdout.shape[0]
+                print(f'Done. There are {num_events} events in the holdout.')
+
 
 class LongTailMixin(object):
     def __init__(self, *args, **kwargs):
