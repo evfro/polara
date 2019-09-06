@@ -10,7 +10,7 @@ class LightFMWrapper(RecommenderModel):
     def __init__(self, *args, item_features=None, user_features=None, **kwargs):
         super(LightFMWrapper, self).__init__(*args, **kwargs)
         self.method='LightFM'
-        self.rank = 10
+        self._rank = 10
         self.fit_method = 'fit'
         self.fit_params = {}
 
@@ -33,6 +33,18 @@ class LightFMWrapper(RecommenderModel):
 
         self.seed = 0
         self._model = None
+
+
+    @property
+    def rank(self):
+        return self._rank
+
+    @rank.setter
+    def rank(self, new_value):
+        if new_value != self._rank:
+            self._rank = new_value
+            self._is_ready = False
+            self._recommendations = None
 
 
     def build(self):
