@@ -6,15 +6,15 @@ from polara.recommender.data import RecommenderData
 
 
 class SideRelationsMixin:
-    def __init__(self, rel_mat, rel_idx, *args, **kwargs):
+    def __init__(self, *args, relations_matrices, relations_indices, **kwargs):
         super().__init__(*args, **kwargs)
 
         entities = [self.fields.userid, self.fields.itemid]
         self._rel_idx = {entity: pd.Series(index=idx, data=np.arange(len(idx)), copy=False)
                                  if idx is not None else None
-                         for entity, idx in rel_idx.items()
+                         for entity, idx in relations_indices.items()
                          if entity in entities}
-        self._rel_mat = {entity: mat for entity, mat in rel_mat.items() if entity in entities}
+        self._rel_mat = {entity: mat for entity, mat in relations_matrices.items() if entity in entities}
         self._relations = dict.fromkeys(entities)
 
         self.subscribe(self.on_change_event, self._clean_relations)
