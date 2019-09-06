@@ -205,7 +205,7 @@ class LCEModel(RecommenderModel):
         itemid = self.data.fields.itemid
         self.factors[userid] = Hu.T
         self.factors[itemid] = W
-        self.factors['item_features'] = Hs.T
+        self.factors[f'{itemid}_features'] = Hs.T
         self.item_features_labels = lbls
 
     def get_recommendations(self):
