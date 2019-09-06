@@ -149,6 +149,11 @@ class RecommenderData(object):
         # on_update indicates whether only test data has been changed -> renew recommendations
         self.verbose = True
 
+    def __str__(self):
+        name = self.__class__.__name__
+        fields = self.fields
+        return f'{name} with {fields}'
+
 
     def subscribe(self, event, model_callback):
         self._notify.subscribe(event, model_callback)
