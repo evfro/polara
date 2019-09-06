@@ -145,8 +145,11 @@ class LCEModelItemColdStart(ItemColdStartEvaluationMixin, ItemColdStartRecommend
 
 
 class ItemColdStartSVDModelMixin:
-    def __init__(self, *args, item_features, **kwargs):
+    def __init__(self, *args, item_features=None, **kwargs):
         super().__init__(*args, **kwargs)
+        if item_features is None: # assume features are provided via data model
+            item_features = self.data.item_features
+        assert item_features is not None
         self.item_features = item_features
         self.item_features_labels = None
         self._item_features_transform_helper = None
