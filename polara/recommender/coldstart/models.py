@@ -149,43 +149,57 @@ class ItemColdStartSVDModelMixin:
         super().__init__(*args, **kwargs)
         self.item_features = item_features
         self.item_features_labels = None
-        self.item_features_transform = None
+        self._item_features_transform_helper = None
         self.data.subscribe(self.data.on_change_event, self._clean_metadata)
 
     def _clean_metadata(self):
         self.item_features_labels = None
 
-    def round_item_features_transform(self, rank):
+    @property
+    def item_features_embeddings(self):
+        itemid = self.data.fields.itemid
+        item_features_key = f'{itemid}_features'
+        return self.factors.get(item_features_key, None)
+
+    def _round_item_features_transform(self):
         try:
-            w = self.item_features_transform[0]
-        except TypeError:
-            return
-        if w.shape[0] < rank:
-            self.item_features_transform = None
+            rank = self.item_features_embeddings.shape[1]
+        except AttributeError: # embeddings are None (not computed yet)
+            self._item_features_transform_helper = None
         else:
-            w = w[:rank, :]
-            self.item_features_transform = (w, np.linalg.pinv(w @ w.T))
+            transform_rank = self._item_features_transform_helper.shape[0]
+            if transform_rank > rank: # round transform
+                self.update_item_features_transform()
+            else:
+                raise ValueError(f'Unable to round: the rank of factors is not lower than the rank of transform!')
 
     def _check_reduced_rank(self, rank):
         super()._check_reduced_rank(rank)
-        self.round_item_features_transform(rank)
+        self._round_item_features_transform()
 
     def encode_item_features(self):
-        item_meta = self.item_features.reindex(
-            self.data.index.itemid.training.old.values, fill_value=[])
+        training_items = self.data.index.itemid.training.old.values
+        item_features = self.item_features.reindex(training_items, fill_value=[])
         item_one_hot, self.item_features_labels = stack_features(
-            item_meta, stacked_index=False, normalize=False)
+            item_features, stacked_index=False, normalize=False)
         return item_one_hot
 
-    def assemble_item_features_transform(self):
+    def update_item_features_transform(self):
+        mapping = self.item_features_embeddings
+        mapping_invgram = np.linalg.pinv(mapping.T @ mapping)
+        self._item_features_transform_helper = mapping_invgram
+
+    def prepare_item_features_transformation(self):
         item_one_hot = self.encode_item_features()
         mapping = self.compute_item_features_mapping(item_one_hot) # model dependent
-        mapping_invgram = np.linalg.pinv(mapping @ mapping.T)
-        self.item_features_transform = (mapping, mapping_invgram)
+        item_features_key = f'{self.data.fields.itemid}_features'
+        # this will take care of truncating the matrix when the rank is reduced:
+        self.factors[item_features_key] = mapping
+        self.update_item_features_transform()
 
     def build(self, *args, **kwargs):
         super().build(*args, return_factors=True, **kwargs)
-        self.assemble_item_features_transform()
+        self.prepare_item_features_transformation()
 
     def slice_recommendations(self, cold_item_meta, start, stop):
         cold_slice_meta = cold_item_meta.iloc[start:stop]
@@ -196,8 +210,9 @@ class ItemColdStartSVDModelMixin:
 
         u = self.factors[self.data.fields.userid]
         s = self.factors['singular_values']
-        w, w_invgram = self.item_features_transform
-        cold_items_factors = cold_item_features.dot(w.T) @ w_invgram
+        w = self.item_features_embeddings
+        w_invgram = self._item_features_transform_helper
+        cold_items_factors = (cold_item_features @ w) @ w_invgram
         scores = cold_items_factors @ (u * s[None, :]).T
         return scores
 
@@ -211,7 +226,9 @@ class SVDModelItemColdStart(ItemColdStartEvaluationMixin,
         self.method = 'PureSVD(cs)'
 
     def compute_item_features_mapping(self, item_features):
-        return item_features.T.dot(self.factors[self.data.fields.itemid]).T
+        itemid = self.data.fields.itemid
+        item_factors = self.factors[itemid]
+        return item_features.T.dot(item_factors)
 
 
 class HybridSVDItemColdStart(ItemColdStartEvaluationMixin,
@@ -223,7 +240,10 @@ class HybridSVDItemColdStart(ItemColdStartEvaluationMixin,
         self.method = 'HybridSVD(cs)'
 
     def compute_item_features_mapping(self, item_features):
-        return item_features.T.dot(self.factors['items_projector_right']).T
+        itemid = self.data.fields.itemid
+        right_projector_key = f'{itemid}_projector_right'
+        item_factors = self.factors[right_projector_key]
+        return item_features.T.dot(item_factors)
 
 
 class ScaledSVDItemColdStart(ScaledMatrixMixin, SVDModelItemColdStart): pass

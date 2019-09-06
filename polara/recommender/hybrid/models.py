@@ -318,15 +318,17 @@ class CholeskyFactorsMixin:
             if self.verbose:
                 print(f'Building {self.data.fields.itemid} projector for {self.method}')
             msg = Template('    Solving triangular system: $time')
+            itemid = self.data.fields.itemid
             with track_time(verbose=self.verbose, message=msg):
-                self.factors['items_projector_left'] = cholesky_items.T.solve(v)
+                self.factors[f'{itemid}_projector_left'] = cholesky_items.T.solve(v)
             msg = Template('    Applying Cholesky factor: $time')
             with track_time(verbose=self.verbose, message=msg):
-                self.factors['items_projector_right'] = cholesky_items.dot(v)
+                self.factors[f'{itemid}_projector_right'] = cholesky_items.dot(v)
 
     def get_item_projector(self):
-        vl = self.factors.get('items_projector_left', None)
-        vr = self.factors.get('items_projector_right', None)
+        itemid = self.data.fields.itemid
+        vl = self.factors.get(f'{itemid}_projector_left', None)
+        vr = self.factors.get(f'{itemid}_projector_right', None)
         return vl, vr
 
 
@@ -343,8 +345,9 @@ class HybridSVD(CholeskyFactorsMixin, SVDModel):
     def round_item_projector(self, rank):
         vl, vr = self.get_item_projector()
         if (vl is not None) and (rank < vl.shape[1]):
-            self.factors['items_projector_left'] = vl[:, :rank]
-            self.factors['items_projector_right'] = vr[:, :rank]
+            itemid = self.data.fields.itemid
+            self.factors[f'{itemid}_projector_left'] = vl[:, :rank]
+            self.factors[f'{itemid}_projector_right'] = vr[:, :rank]
 
     def build(self, *args, **kwargs):
         if not self._sparse_mode:
