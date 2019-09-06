@@ -8,10 +8,9 @@ from polara.recommender.hybrid.data import (IdentityDiagonalMixin,
 
 
 class ItemColdStartData(RecommenderData):
-    def __init__(self, *args, **kwargs):
-        self.item_meta = kwargs.pop('item_meta', None)
+    def __init__(self, *args, item_features=None, **kwargs):
         super(ItemColdStartData, self).__init__(*args, **kwargs)
-
+        self.item_features = item_features
         self._test_ratio = 0.2
         self._warm_start = False
 
@@ -149,13 +148,13 @@ class ItemColdStartData(RecommenderData):
 
 
     def _verify_cold_items_features(self):
-        if self.item_meta is None:
+        if self.item_features is None:
             return
 
-        if self.item_meta.shape[1] > 1:
-            features_melted = self.item_meta.agg(lambda x: [f for l in x for f in l], axis=1)
+        if self.item_features.shape[1] > 1:
+            features_melted = self.item_features.agg(lambda x: [f for l in x for f in l], axis=1)
         else:
-            features_melted = self.item_meta.iloc[:, 0]
+            features_melted = self.item_features.iloc[:, 0]
 
         feature_labels = defaultdict(lambda: len(feature_labels))
         labels = features_melted.apply(lambda x: [feature_labels[i] for i in x])
