@@ -265,12 +265,19 @@ class LightFMItemColdStart(ItemColdStartEvaluationMixin,
         cold_item_features, _ = stack_features(
             cold_slice_meta,
             labels=self.item_features_labels,
-            add_identity=self.item_identity,
+            add_identity=False,
             normalize=True
         )
 
         n_cold_items = stop - start
         cold_items_index = np.arange(n_cold_items, dtype='i4')
+
+        if self.item_identity:
+            n_items = self._item_features_csr.shape[0]
+            no_identity = sp.sparse.csr_matrix((n_cold_items, n_items))
+            cold_item_features = sp.sparse.hstack(
+                [no_identity, cold_item_features], format='csr'
+            )
 
         test_users = self.data.representative_users
         if test_users is None:
