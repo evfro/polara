@@ -90,7 +90,7 @@ class LightFMWrapper(RecommenderModel):
 
     def slice_recommendations(self, test_data, shape, start, stop, test_users=None):
         if self.data.warm_start:
-            raise NotImplementedError
+            raise NotImplementedError('Not supported by LightFM.')
 
         slice_data = self._slice_test_data(test_data, start, stop)
         all_items = self.data.index.itemid.new.values
