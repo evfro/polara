@@ -58,7 +58,7 @@ class LightFMWrapper(RecommenderModel):
                               random_state=self.seed)
         fit = getattr(self._model, self.fit_method)
 
-        matrix = self.get_training_matrix()
+        matrix = self.get_training_matrix(sparse_format='coo') # as reqired by LightFM
 
         try:
             item_index = self.data.index.itemid.training
