@@ -257,29 +257,35 @@ class ScaledSVDItemColdStart(ScaledMatrixMixin, SVDModelItemColdStart): pass
 class ScaledHybridSVDItemColdStart(ScaledMatrixMixin, HybridSVDItemColdStart): pass
 
 
-class ItemColdStartLightFMMixin:
+class LightFMItemColdStart(ItemColdStartEvaluationMixin,
+                           ItemColdStartRecommenderMixin,
+                           LightFMWrapper):
     def slice_recommendations(self, cold_item_meta, start, stop):
         cold_slice_meta = cold_item_meta.iloc[start:stop]
         cold_item_features, _ = stack_features(
             cold_slice_meta,
             labels=self.item_features_labels,
-            add_identity=False,
-            normalize=True)
+            add_identity=self.item_identity,
+            normalize=True
+        )
 
-        user_embeddings = self._model.user_embeddings
-        repr_users = self.data.representative_users
-        if repr_users is not None:
-            user_embeddings = user_embeddings[repr_users.new.values, :]
+        n_cold_items = stop - start
+        cold_items_index = np.arange(n_cold_items, dtype='i4')
 
-        # proper handling of cold-start (instead of built-in predict)
-        n_items = self.data.index.itemid.training.shape[0]
-        item_features_embeddings = self._model.item_embeddings[n_items:, :]
-        cold_items_embeddings = cold_item_features.dot(item_features_embeddings)
-        scores = cold_items_embeddings @ user_embeddings.T
+        test_users = self.data.representative_users
+        if test_users is None:
+            test_users = self.data.index.userid.training
+
+        n_test_users = test_users.shape[0]
+        test_users_index = test_users.new.values.astype('i4', copy=False)
+
+        test_shape = (n_cold_items, n_test_users)
+        itemsize = np.dtype('i4').itemsize
+        scores = self._model.predict(
+            as_strided(test_users_index, test_shape, (0, itemsize)).ravel(),
+            as_strided(cold_items_index, test_shape, (itemsize, 0)).ravel(),
+            user_features=self._user_features_csr,
+            item_features=cold_item_features,
+            num_threads=self.fit_params.get('num_threads', 1)
+        ).reshape(test_shape)
         return scores
-
-
-class LightFMItemColdStart(ItemColdStartEvaluationMixin,
-                           ItemColdStartRecommenderMixin,
-                           ItemColdStartLightFMMixin,
-                           LightFMWrapper): pass
