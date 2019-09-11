@@ -709,30 +709,31 @@ class RecommenderData(object):
     def _sample_holdout(self, test_split, group_id=None):
         # TODO order_field may also change - need to check it as well
         order_field = self._custom_order or self.fields.feedback or []
+        sample_at_random = self._random_holdout or (order_field == [])
 
         selector = self._data.loc[test_split, order_field]
         # data may have many items with the same top ratings
         # randomizing the data helps to avoid biases in that case
-        if self._permute_tops and not self._random_holdout:
+        if self._permute_tops and not sample_at_random:
             random_state = np.random.RandomState(self.seed)
             selector = selector.sample(frac=1, random_state=random_state)
 
         group_id = group_id or self.fields.userid
         grouper = selector.groupby(self._data[group_id], sort=False, group_keys=False)
 
-        if self._random_holdout:  # randomly sample data for evaluation
+        if sample_at_random: # randomly sample data for evaluation
             random_state = np.random.RandomState(self.seed)
-            if self._holdout_size >= 1:  # pick at most _holdout_size elements
+            if self._holdout_size >= 1: # pick at most _holdout_size elements
                 holdout = grouper.apply(random_choice, self._holdout_size, random_state)
             else:
                 holdout = grouper.apply(random_sample, self._holdout_size, random_state)
-        elif self._negative_prediction:  # try to holdout negative only examples
-            if self._holdout_size >= 1:  # pick at most _holdout_size elements
+        elif self._negative_prediction: # try to holdout negative only examples
+            if self._holdout_size >= 1: # pick at most _holdout_size elements
                 holdout = grouper.nsmallest(self._holdout_size, keep='last')
             else:
                 raise NotImplementedError
-        else:  # standard top-score prediction mode
-            if self._holdout_size >= 1:  # pick at most _holdout_size elements
+        else: # standard top-score prediction mode
+            if self._holdout_size >= 1: # pick at most _holdout_size elements
                 holdout = grouper.nlargest(self._holdout_size, keep='last')
             else:
                 frac = self._holdout_size
