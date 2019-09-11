@@ -208,7 +208,7 @@ class RecommenderData(object):
 
     def _verified_data_property(self, data_property):
         if data_property in self._change_properties:
-            print('The value of {} might be not effective yet.'.format(data_property[1:]))
+            print(f'The value of {data_property[1:]} might be not effective yet.')
         return getattr(self, data_property)
 
 
@@ -239,8 +239,8 @@ class RecommenderData(object):
         if self.verbose:
             num_train_events = self.training.shape[0] if self.training is not None else 0
             num_holdout_events = self.test.holdout.shape[0] if self.test.holdout is not None else 0
-            stats_msg = 'Done.\nThere are {} events in the training and {} events in the holdout.'
-            print(stats_msg.format(num_train_events, num_holdout_events))
+            print(f'Done.\nThere are {num_train_events} events in the training '
+                  f'and {num_holdout_events} events in the holdout.')
 
     def prepare_training_only(self):
         self.holdout_size = 0  # do not form holdout
@@ -565,8 +565,10 @@ class RecommenderData(object):
             invalid_session_index = invalid_sessions.index[invalid_sessions]
             holdout.query('{} not in @invalid_session_index'.format(group_id), inplace=True)
             if self.verbose:
-                msg = '{} of {} {}\'s were filtered out from holdout. Reason: incompatible number of items.'
-                print(msg.format(n_invalid_sessions, len(invalid_sessions), group_id))
+                n_sessions = len(invalid_sessions)
+                incompatible = 'incompatible number of items'
+                print(f'{n_invalid_sessions} of {n_sessions} {group_id} entities '
+                      f'were filtered out from holdout. Reason: {incompatible}.')
 
     def _align_test_users(self):
         if (self._test.testset is None) or (self._test.holdout is None):
@@ -584,18 +586,18 @@ class RecommenderData(object):
             n_unique_users = invalid_holdout_users.nunique()
             holdout.drop(invalid_holdout_users.index, inplace=True)
             if self.verbose:
-                REASON = 'Reason: inconsistent with testset'
-                msg = '{} {}\'s were filtered out from holdout. {}.'
-                print(msg.format(n_unique_users, userid, REASON))
+                inconsistent = 'inconsistent with testset'
+                print(f'{n_unique_users} {userid} entities were filtered out '
+                      f'from holdout. Reason: {inconsistent}.')
 
         if not testset_in_holdout.all():
             invalid_testset_users = testset.loc[~testset_in_holdout, userid]
             n_unique_users = invalid_testset_users.nunique()
             testset.drop(invalid_testset_users.index, inplace=True)
             if self.verbose:
-                REASON = 'Reason: inconsistent with holdout'
-                msg = '{} {}\'s were filtered out from testset. {}.'
-                print(msg.format(n_unique_users, userid, REASON))
+                inconsistent = 'inconsistent with holdout'
+                print(f'{n_unique_users} {userid} entities were filtered out '
+                      f'from testset. Reason: {inconsistent}.')
 
     def _reindex_train_users(self):
         userid = self.fields.userid
@@ -662,9 +664,10 @@ class RecommenderData(object):
             # unseen_index = dataset.index[unseen_entities]
             # dataset.drop(unseen_index, inplace=True)
             if self.verbose:
-                UNSEEN = 'not in the training data'
-                msg = '{} unique {}\'s within {} {} interactions were filtered. Reason: {}.'
-                print(msg.format(n_unseen_entities, entity, (~seen_data).sum(), label, UNSEEN))
+                unseen = 'not in the training data'
+                print(f'{n_unseen_entities} unique {entity} entities within '
+                      f'{(~seen_data).sum()} {label} interactions were filtered. '
+                      f'Reason: {unseen}.')
 
     def _reindex_testset_users(self):
         userid = self.fields.userid
