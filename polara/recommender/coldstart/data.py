@@ -13,6 +13,7 @@ class ItemColdStartData(RecommenderData):
         self.item_features = item_features
         self._test_ratio = 0.2
         self._warm_start = False
+        self._holdout_size = -1
 
         # build unique items list to split them by folds
         itemid = self.fields.itemid
@@ -21,6 +22,17 @@ class ItemColdStartData(RecommenderData):
 
         self._test_sample = None # fraction of representative users from train
         self._repr_users = None
+
+    @property
+    def holdout_size(self):
+        return -1
+
+    @holdout_size.setter
+    def holdout_size(self, new_value):
+        if new_value == 0: # enable setting test data
+            self._holdout_size = 0
+        else:
+            raise NotImplementedError('Setting holdout size is currently not supported in item cold start.')
 
     @property
     def representative_users(self):
