@@ -253,7 +253,7 @@ class ColdSimilarityMixin(object):
         return sim_mat[:, seen_idx][cold_idx, :]
 
 
-class ColdStartSimilarityDataModel(ColdSimilarityMixin,
-                                   IdentityDiagonalMixin,
-                                   SideRelationsMixin,
-                                   ItemColdStartData): pass
+class ItemColdStartSimilarityData(ColdSimilarityMixin,
+                                  IdentityDiagonalMixin,
+                                  SideRelationsMixin,
+                                  ItemColdStartData): pass
