@@ -13,7 +13,7 @@ from polara.recommender import defaults
 def random_choice(df, num, random_state):
     n = df.shape[0]
     if n > num:
-        return df.take(random_state.choice(n, num, replace=False), is_copy=False)
+        return df.take(random_state.choice(n, num, replace=False))
     else:
         return df
 
