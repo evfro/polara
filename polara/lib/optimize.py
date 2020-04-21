@@ -74,7 +74,7 @@ def identity(x, *args): # used to fall back to standard SGD
 def adagrad(grad, m, cum_sq_grad, smoothing=1e-6):
     cum_sq_grad_update = cum_sq_grad[m, :] + grad * grad
     cum_sq_grad[m, :] = cum_sq_grad_update
-    adjusted_grad = grad / (smoothing + np.sqrt(cum_sq_grad_update))
+    adjusted_grad = grad / np.sqrt(smoothing + cum_sq_grad_update)
     return adjusted_grad
 
 
@@ -82,7 +82,7 @@ def adagrad(grad, m, cum_sq_grad, smoothing=1e-6):
 def rmsprop(grad, m, cum_sq_grad, gamma=0.9, smoothing=1e-6):
     cum_sq_grad_update = gamma * cum_sq_grad[m, :] + (1 - gamma) * (grad * grad)
     cum_sq_grad[m, :] = cum_sq_grad_update
-    adjusted_grad = grad / (smoothing + np.sqrt(cum_sq_grad_update))
+    adjusted_grad = grad / np.sqrt(smoothing + cum_sq_grad_update)
     return adjusted_grad
 
 
