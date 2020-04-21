@@ -1,6 +1,6 @@
 from __future__ import division
 import numpy as np
-from scipy.sparse import csr_matrix
+from scipy.sparse import csr_matrix, diags
 from collections import namedtuple
 
 
@@ -103,11 +103,34 @@ def get_hr_score(hits_rank):
     hr = hits_rank.getnnz(axis=1).mean()
     return namedtuple('Relevance', ['hr'])._make([hr])
 
+def get_rr_scores(hits_rank):
+    'Reciprocal Rank scores'
+    arhr = get_arhr_score(hits_rank)
+    mrr = get_mrr_score(hits_rank)
+    return namedtuple('Ranking', ['arhr', 'mrr'])._make([arhr, mrr])
+
+def get_arhr_score(hits_rank):
+    'Average Reciprocal Hit-Rank score'
+    return hits_rank.power(-1, 'f8').sum(axis=1).mean()
 
 def get_mrr_score(hits_rank):
     'Mean Reciprocal Rank score'
-    mrr = hits_rank.power(-1, 'f8').max(axis=1).mean()
-    return namedtuple('Ranking', ['mrr'])._make([mrr])
+    return hits_rank.power(-1, 'f8').max(axis=1).mean()
+
+def get_map_score(hits_rank, eval_matrix, topk):
+    'Mean Avergage Precision score'
+    # transform input from (n_users x n_items) to (n_users x topk)
+    topk_rank = hits_rank._with_data(hits_rank.data, copy=False)
+    topk_rank.indices = topk_rank.data.astype('i4') - 1
+    topk_rank._shape = (hits_rank.shape[0], topk)
+
+    cumsummer = diags([np.ones(topk, dtype='i4')]*topk, offsets=range(topk))
+    prec_at_k = (topk_rank>0).dot(cumsummer).multiply(topk_rank.power(-1, 'f8'))
+
+    num_relevant = eval_matrix.getnnz(axis=1)
+    num_relevant_adjusted = np.where(num_relevant<topk, num_relevant, topk)
+    map_at_k = (prec_at_k.sum(axis=1) / num_relevant_adjusted).mean()
+    return map_at_k
 
 
 def get_ndcr_discounts(rank_matrix, eval_matrix, topn):
@@ -151,14 +174,16 @@ def get_ndcl_score(eval_matrix, discounts_matrix, ideal_discounts, switch_positi
     return get_ndcr_score(eval_matrix, -discounts_matrix, -ideal_discounts, alternative=alternative)
 
 
-def get_ranking_scores(rank_matrix, hits_rank, miss_rank, eval_matrix, eval_matrix_hits, eval_matrix_miss, switch_positive=None, topk=None, alternative=False):
+def get_ranking_scores(rank_matrix, hits_rank, miss_rank, eval_matrix, eval_matrix_hits, eval_matrix_miss, topk, switch_positive=None, alternative=False):
     discounts_matrix, ideal_discounts = get_ndcr_discounts(rank_matrix, eval_matrix, topk)
     ndcg = get_ndcg_score(eval_matrix_hits, discounts_matrix, ideal_discounts, alternative=alternative)
     ndcl = None
     if miss_rank is not None:
         ndcl = get_ndcl_score(eval_matrix_miss, discounts_matrix, ideal_discounts, switch_positive, alternative=alternative)
 
-    ranking_score = namedtuple('Ranking', ['nDCG', 'nDCL'])._make([ndcg, ndcl])
+    mean_ap = get_map_score(hits_rank, eval_matrix, topk)
+    arhr = get_arhr_score(hits_rank)
+    ranking_score = namedtuple('Ranking', ['ndcg', 'ndcl', 'map', 'arhr'])._make([ndcg, ndcl, mean_ap, arhr])
     return ranking_score
 
 

@@ -13,7 +13,7 @@ from scipy.sparse.linalg import svds
 
 from polara.recommender import defaults
 from polara.recommender.evaluation import get_hits, get_relevance_scores, get_ranking_scores, get_experience_scores
-from polara.recommender.evaluation import get_hr_score, get_mrr_score
+from polara.recommender.evaluation import get_hr_score, get_rr_scores
 from polara.recommender.evaluation import assemble_scoring_matrices
 from polara.recommender.utils import array_split
 from polara.lib.optimize import simple_pmf_sgd
@@ -451,13 +451,14 @@ class RecommenderModel(object):
 
         if 'ranking' in metric_type:
             if (self.data.holdout_size == 1) or simple_rates:
-                scores.append(get_mrr_score(scoring_data[1]))
+                scores.append(get_rr_scores(scoring_data[1]))
             else:
                 ndcg_alternative = get_default('ndcg_alternative')
                 topk = recommendations.shape[1]  # handle topk=None case
                 # topk has to be passed explicitly, otherwise it's unclear how to
                 # estimate ideal ranking for NDCG and NDCL metrics in get_ndcr_discounts
-                scores.append(get_ranking_scores(*scoring_data, switch_positive=switch_positive, topk=topk, alternative=ndcg_alternative))
+                # it's also used in MAP calculation
+                scores.append(get_ranking_scores(*scoring_data, topk=topk, switch_positive=switch_positive, alternative=ndcg_alternative))
 
         if 'experience' in metric_type:  # no need for feedback
             fields = self.data.fields
