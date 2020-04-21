@@ -104,7 +104,7 @@ class RecommenderData(object):
                '_warm_start', '_holdout_size', '_test_sample',
                '_permute_tops', '_random_holdout', '_negative_prediction'}
 
-    def __init__(self, data, userid, itemid, feedback=None, custom_order=None, seed=None):
+    def __init__(self, data, userid, itemid, feedback=None, custom_order=None, config=None, seed=None, verbose=True):
         self.name = None
         fields = [userid, itemid, feedback]
 
@@ -134,7 +134,10 @@ class RecommenderData(object):
         # random_holdout - test_update. Need to implement checks
         # non-empty set is used to indicate non-initialized state ->
         # the data will be updated upon the first access of internal data splits
+        if config is not None:
+            self.set_configuration(config)
         self.seed = seed  # use with permute_tops, random_choice
+
         self.verify_sessions_length_distribution = True
         self.ensure_consistency = True  # drop test entities if not present in training
         self.build_index = True  # reindex data, avoid gaps in user and item index
@@ -147,7 +150,7 @@ class RecommenderData(object):
         self._notify = EventNotifier([self.on_change_event, self.on_update_event])
         # on_change indicates whether full data has been changed -> rebuild model
         # on_update indicates whether only test data has been changed -> renew recommendations
-        self.verbose = True
+        self.verbose = verbose
 
     def __str__(self):
         name = self.__class__.__name__
@@ -173,10 +176,16 @@ class RecommenderData(object):
 
     def get_configuration(self):
         # [1:] omits undersacores in properties names, i.e. uses external name
-        # in that case it prints worning if change is pending
+        # in that case it prints warning if change is pending
         config = {attr[1:]: getattr(self, attr[1:]) for attr in self._config}
         return config
 
+    def set_configuration(self, params):
+        for name, value in params.items():
+            if hasattr(self, name):
+                setattr(self, name, value)
+            else:
+                print(f'Property {name} is undefined.')
 
     @classmethod
     def default_configuration(cls):
