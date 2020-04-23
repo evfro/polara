@@ -935,6 +935,64 @@ class RecommenderData(object):
                 num_events = self.test.holdout.shape[0]
                 print(f'Done. There are {num_events} events in the holdout.')
 
+class RandomSampleEvaluationMixin():
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.unseen_interactions = None
+        self.unseen_items_num = None
+        self._holdout_item_prefix = 'x'
+
+    def adapt_holdout(self):
+        holdout = self.test.holdout
+        userid = self.fields.userid
+        itemid = self.fields.itemid
+        # holdout items are expected to be in the
+        # first columns of the predicted scores array
+        # hence, holdout item index is monotonic and
+        # starts from 0 -> can use cumcount
+        # example: sequence {user: [ind1 ,ind2]}
+        # will be converted to {user: [0, 1]}
+        holdout_item_index = (
+            holdout
+            .groupby(userid, sort=False)
+            [itemid]
+            .transform('cumcount')
+        )
+        holdout_item_field = f'{self._holdout_item_prefix}_{itemid}'
+        holdout.loc[:, holdout_item_field] = holdout_item_index
+
+    def set_unseen_interactions(self, interactions, reindex=True, warm_start=False):
+        n_unseen_items = len(interactions.iloc[0])
+        assert interactions.apply(len).eq(n_unseen_items).all(), 'Number of unseen items is inconsistent'
+        if reindex:
+            if warm_start:
+                # TODO modify `set_test_holdout` to generate internal user index
+                raise NotImplementedError
+            else:
+                userid = self.fields.userid
+                itemid = self.fields.itemid
+                get_index = self.get_entity_index
+                # reindexing users
+                user_index = get_index(userid, index_id='training')
+                user_index_map = user_index.set_index('old').new
+                interactions = interactions.loc[user_index_map.index]
+                new_user_index = pd.Index(
+                    interactions.index.map(user_index_map), name=userid
+                )
+                if new_user_index.isnull().any():
+                    raise IndexError('Input is inconsistent with existing data.')
+                interactions = pd.Series(
+                    index=new_user_index, data=interactions.values, name=itemid
+                )
+                # reindexing items
+                item_index = get_index(itemid, index_id='training')
+                item_index_map = item_index.set_index('old').new
+                interactions = interactions.apply(lambda x: item_index_map.loc[x].values)
+
+        self.unseen_interactions = interactions
+        self.unseen_items_num = n_unseen_items
+        self.adapt_holdout()
+
 
 class LongTailMixin(object):
     def __init__(self, *args, **kwargs):

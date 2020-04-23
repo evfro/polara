@@ -20,6 +20,7 @@ from polara.lib.optimize import simple_pmf_sgd
 from polara.lib.tensor import hooi
 
 from polara.lib.sparse import sparse_dot, inverse_permutation, rescale_matrix
+from polara.lib.sparse import inner_product_at
 from polara.lib.sparse import unfold_tensor_coordinates, tensor_outer_at
 from polara.tools.timing import track_time
 
@@ -1077,3 +1078,54 @@ class CoffeeModel(RecommenderModel):
         feedback_idx = self.data.index.feedback.set_index('new')
         predicted_feedback = feedback_idx.loc[predictions, 'old'].values
         return predicted_feedback
+
+
+class RandomSampleEvaluationSVDMixin():
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # as deifined in RandomSampleEvaluationMixin in data models
+        prefix = self.data._holdout_item_prefix
+        self._prediction_target = f'{prefix}_{self.data.fields.itemid}'
+
+    def compute_holdout_scores(self, user_factors, item_factors):
+        holdout = self.data.test.holdout
+        userid = self.data.fields.userid
+        itemid = self.data.fields.itemid
+        holdout_size = self.data.holdout_size
+        assert holdout_size >= 1 # only fixed number of holdout items is supported
+
+        # "rebasing" user index (see comments in `get_recommmendations`)
+        useridx, _ = pd.factorize(holdout[userid], sort=False) # already sorted via data moodel
+        useridx = useridx.reshape(-1, holdout_size)
+        itemidx = holdout[itemid].values.reshape(-1, holdout_size)
+        return inner_product_at()(user_factors, item_factors, useridx, itemidx)
+
+    def compute_random_item_scores(self, user_factors, item_factors):
+        holdout = self.data.test.holdout
+        userid = self.data.fields.userid
+        itemid = self.data.fields.itemid
+        n_unseen = self.data.unseen_items_num
+        test_users = holdout[userid].drop_duplicates() # preserve sorted order via data moodel
+        n_users = len(test_users)
+
+        # "rebasing" user index (see comments in `get_recommmendations`)
+        useridx = np.broadcast_to(np.arange(n_users)[:, None], (n_users, n_unseen))
+        unseen_interactions = self.data.unseen_interactions.loc[test_users]
+        itemidx = np.concatenate(unseen_interactions.values).reshape(-1, n_unseen)
+        return inner_product_at()(user_factors, item_factors, useridx, itemidx)
+
+    def get_recommendations(self):
+        itemid = self.data.fields.itemid
+        if self._prediction_target == itemid:
+            return super().get_recommendations()
+
+        item_factors = self.factors[itemid]
+        test_matrix, _ = self.get_test_matrix()
+        user_factors = test_matrix.dot(item_factors)
+        # from now on will need to work with "rebased" user indices
+        # to properly index contiguous user matrices
+        holdout_scores = self.compute_holdout_scores(user_factors, item_factors)
+        unseen_scores = self.compute_random_item_scores(user_factors, item_factors)
+        # combine all scores and rank selected items
+        scores = np.concatenate((holdout_scores, unseen_scores), axis=1)
+        return np.apply_along_axis(self.topsort, 1, scores, self.topk)
