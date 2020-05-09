@@ -1,5 +1,6 @@
-from __future__ import division
+from itertools import chain
 import numpy as np
+import pandas as pd
 from scipy.sparse import csr_matrix, diags
 from collections import namedtuple
 
@@ -251,3 +252,12 @@ def get_experience_scores(recommendations, total):
     cov = len(np.unique(recommendations)) / total
     scores = namedtuple('Experience', ['coverage'])._make([cov])
     return scores
+
+
+def convert_scores_to_series(metrics, name='scores'):
+    if not isinstance(metrics, list):
+        metrics = [metrics]
+    return pd.DataFrame.from_records(
+        chain(*map(lambda x: x._asdict().items(), metrics)),
+        columns=['metric', name]
+    ).set_index('metric')[name]
