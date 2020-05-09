@@ -15,10 +15,12 @@ from polara.recommender import defaults
 from polara.recommender.evaluation import get_hits, get_relevance_scores, get_ranking_scores, get_experience_scores
 from polara.recommender.evaluation import get_hr_score, get_rr_scores
 from polara.recommender.evaluation import assemble_scoring_matrices
+from polara.recommender.evaluation import matrix_from_observations
 from polara.recommender.utils import array_split
 from polara.lib.optimize import simple_pmf_sgd
 from polara.lib.tensor import hooi
 
+from polara.lib.sampler import mf_random_item_scoring
 from polara.lib.sparse import sparse_dot, inverse_permutation, rescale_matrix
 from polara.lib.sparse import inner_product_at
 from polara.lib.sparse import unfold_tensor_coordinates, tensor_outer_at
@@ -1098,12 +1100,12 @@ class RandomSampleEvaluationSVDMixin():
         useridx, _ = pd.factorize(holdout[userid], sort=False) # already sorted via data moodel
         useridx = useridx.reshape(-1, holdout_size)
         itemidx = holdout[itemid].values.reshape(-1, holdout_size)
-        return inner_product_at()(user_factors, item_factors, useridx, itemidx)
+        inner_product = inner_product_at(target='parallel')
+        return inner_product(user_factors, item_factors, useridx, itemidx)
 
     def compute_random_item_scores(self, user_factors, item_factors):
         holdout = self.data.test.holdout
         userid = self.data.fields.userid
-        itemid = self.data.fields.itemid
         n_unseen = self.data.unseen_items_num
         test_users = holdout[userid].drop_duplicates() # preserve sorted order via data moodel
         n_users = len(test_users)
@@ -1112,7 +1114,29 @@ class RandomSampleEvaluationSVDMixin():
         useridx = np.broadcast_to(np.arange(n_users)[:, None], (n_users, n_unseen))
         unseen_interactions = self.data.unseen_interactions.loc[test_users]
         itemidx = np.concatenate(unseen_interactions.values).reshape(-1, n_unseen)
-        return inner_product_at()(user_factors, item_factors, useridx, itemidx)
+        inner_product = inner_product_at(target='parallel')
+        return inner_product(user_factors, item_factors, useridx, itemidx)
+
+    def compute_random_item_scores_gen(self, user_factors, item_factors,
+                                       profile_matrix, n_unseen):
+        userid = self.data.fields.userid
+        itemid = self.data.fields.itemid
+        holdout = self.data.test.holdout
+        n_users = profile_matrix.shape[0]
+        seed = self.data.seed
+
+        holdout_matrix = matrix_from_observations(
+            holdout, userid, itemid, profile_matrix.shape, feedback=None
+        )
+        all_seen = profile_matrix + holdout_matrix # only need nnz indices
+
+        scores = np.zeros((n_users, n_unseen))
+        seedseq = np.random.SeedSequence(seed).generate_state(n_users)
+        mf_random_item_scoring(
+            user_factors, item_factors, all_seen.indptr, all_seen.indices,
+            n_unseen, seedseq, scores
+        )
+        return scores
 
     def get_recommendations(self):
         itemid = self.data.fields.itemid
@@ -1125,7 +1149,18 @@ class RandomSampleEvaluationSVDMixin():
         # from now on will need to work with "rebased" user indices
         # to properly index contiguous user matrices
         holdout_scores = self.compute_holdout_scores(user_factors, item_factors)
-        unseen_scores = self.compute_random_item_scores(user_factors, item_factors)
+        if self.data.unseen_interactions is None:
+            n_unseen = self.data.unseen_items_num
+            if n_unseen is None:
+                raise ValueError('Number of items to sample is unspecified.')
+
+            unseen_scores = self.compute_random_item_scores_gen(
+                user_factors, item_factors, test_matrix, n_unseen
+            )
+        else:
+            unseen_scores = self.compute_random_item_scores(
+                user_factors, item_factors
+            )
         # combine all scores and rank selected items
         scores = np.concatenate((holdout_scores, unseen_scores), axis=1)
         return np.apply_along_axis(self.topsort, 1, scores, self.topk)
