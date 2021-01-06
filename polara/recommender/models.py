@@ -1097,25 +1097,32 @@ class RandomSampleEvaluationSVDMixin():
         holdout_size = self.data.holdout_size
         assert holdout_size >= 1 # only fixed number of holdout items is supported
 
-        # "rebasing" user index (see comments in `get_recommmendations`)
-        useridx, _ = pd.factorize(holdout[userid], sort=False) # already sorted via data moodel
-        useridx = useridx.reshape(-1, holdout_size)
+        # "rebase" user index (see comments in `get_recommmendations`)
+        useridx = pd.factorize(
+            holdout[userid], sort=False  # already sorted via data moodel
+        )[0].reshape(-1, holdout_size)
         itemidx = holdout[itemid].values.reshape(-1, holdout_size)
         inner_product = inner_product_at(target='parallel')
+        # for general matrix factorization user must take care of submitting
+        # user_factors of the correct shape, otherwise, if holdout contains
+        # only a subset of all users, the answer will be incorrect
         return inner_product(user_factors, item_factors, useridx, itemidx)
 
     def compute_random_item_scores(self, user_factors, item_factors):
         holdout = self.data.test.holdout
         userid = self.data.fields.userid
-        n_unseen = self.data.unseen_items_num
-        test_users = holdout[userid].drop_duplicates() # preserve sorted order via data moodel
+        test_users = holdout[userid].drop_duplicates().values # preserve sorted
+        test_items = self.data.unseen_interactions.loc[test_users].values
+        # "rebase" user index (see comments in `get_recommmendations`)
         n_users = len(test_users)
-
-        # "rebasing" user index (see comments in `get_recommmendations`)
-        useridx = np.broadcast_to(np.arange(n_users)[:, None], (n_users, n_unseen))
-        unseen_interactions = self.data.unseen_interactions.loc[test_users]
-        itemidx = np.concatenate(unseen_interactions.values).reshape(-1, n_unseen)
+        n_items = self.data.unseen_items_num
+        useridx = np.broadcast_to(np.arange(n_users)[:, None], (n_users, n_items))
+        itemidx = np.concatenate(test_items).reshape(n_users, n_items)
+        # perform vectorized scalar products at bulk
         inner_product = inner_product_at(target='parallel')
+        # for general matrix factorization user must take care of submitting
+        # user_factors of the correct shape, otherwise, if holdout contains
+        # only a subset of all users, the answer will be incorrect
         return inner_product(user_factors, item_factors, useridx, itemidx)
 
     def compute_random_item_scores_gen(self, user_factors, item_factors,
