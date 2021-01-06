@@ -20,8 +20,9 @@ from polara.recommender.utils import array_split
 from polara.lib.optimize import simple_pmf_sgd
 from polara.lib.tensor import hooi
 
+from polara.preprocessing.matrices import rescale_matrix
 from polara.lib.sampler import mf_random_item_scoring
-from polara.lib.sparse import sparse_dot, inverse_permutation, rescale_matrix
+from polara.lib.sparse import sparse_dot, inverse_permutation
 from polara.lib.sparse import inner_product_at
 from polara.lib.sparse import unfold_tensor_coordinates, tensor_outer_at
 from polara.tools.timing import track_time
