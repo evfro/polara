@@ -1,4 +1,5 @@
-from __future__ import division
+from io import BytesIO
+from urllib.request import urlopen
 import numpy as np
 from polara.tools.systools import get_available_memory
 from polara.recommender import defaults
@@ -50,3 +51,10 @@ def array_split(shp, result_width, scores_multiplier, dtypes=None):
     chunk_size = get_chunk_size(shp, result_width, scores_multiplier, dtypes=dtypes)
     split = range_division(shp[0], chunk_size)
     return split
+
+
+def read_npz_form_url(url, allow_pickle=False):
+    '''Read numpy's .npz file directly from source url.'''
+    with urlopen(url) as response:
+        file_handle = BytesIO(response.read())
+        return np.load(file_handle, allow_pickle=allow_pickle)
