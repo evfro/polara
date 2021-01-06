@@ -788,6 +788,16 @@ class ProbabilisticMF(RecommenderModel):
         return scores, slice_data
 
 
+class EmbeddingsMixin:
+    @property
+    def user_embeddings(self):
+        return self.factors[self.data.fields.userid]
+
+    @property
+    def item_embeddings(self):
+        return self.factors[self.data.fields.itemid]
+
+
 class SVDModel(RecommenderModel):
 
     def __init__(self, *args, **kwargs):
