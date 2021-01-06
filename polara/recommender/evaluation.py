@@ -57,7 +57,8 @@ def matrix_from_observations(observations, key, target, shape, feedback=None):
     # set data and indices manually to avoid index dtype checks
     # and thus prevent possible unnecesssary copies of indices
     indices = observations[target].values
-    indptr = np.r_[0, np.where(np.diff(observations[key].values))[0]+1, n_observations]
+    keys = observations[key].values
+    indptr = np.r_[0, np.where(np.diff(keys))[0]+1, n_observations]
     matrix = no_copy_csr_matrix(data, indices, indptr, shape, dtype)
     return matrix
 

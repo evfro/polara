@@ -622,8 +622,8 @@ class RecommenderData(object):
     def get_entity_index(self, entity, index_id='training'):
         entity_type = self.fields._fields[self.fields.index(entity)]
         index_data = getattr(self.index, entity_type)
-
         try: # check whether custom index is introduced (as in e.g. coldstart)
+        # TODO catch index_id='test' for warm_start = True
             entity_idx = getattr(index_data, index_id)
         except AttributeError: # fall back to standard case
             entity_idx = index_data
@@ -885,7 +885,7 @@ class RecommenderData(object):
 
 
     def set_test_data(self, testset=None, holdout=None, warm_start=False, test_users=None,
-                            reindex=True, ensure_consistency=True, holdout_size=None, copy=True):
+                      reindex=True, ensure_consistency=True, holdout_size=None, copy=True):
         '''Should be used only with custom data.'''
         if warm_start and ((testset is None) and (test_users is None)):
             raise ValueError('When warm_start is True, information about test users must be present. '
