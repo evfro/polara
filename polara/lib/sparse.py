@@ -87,30 +87,6 @@ def inner_product_at(target='parallel', **kwargs):
 #     return res
 
 
-def rescale_matrix(matrix, scaling, axis, binary=True, return_scaling_values=False):
-    '''Function to scale either rows or columns of the sparse rating matrix'''
-    scaling_values = None
-    if scaling == 1: # no scaling (standard SVD case)
-        result = matrix
-
-    if binary:
-        norm = np.sqrt(matrix.getnnz(axis=axis)) # compute Euclidean norm as if values are binary
-    else:
-        norm = spnorm(matrix, axis=axis, ord=2) # compute Euclidean norm
-
-    scaling_values = power(norm, scaling-1, where=norm != 0)
-    scaling_matrix = diags(scaling_values)
-
-    if axis == 0: # scale columns
-        result = matrix.dot(scaling_matrix)
-    if axis == 1: # scale rows
-        result = scaling_matrix.dot(matrix)
-
-    if return_scaling_values:
-        result = (result, scaling_values)
-    return result
-
-
 # matvec implementation is based on
 # http://stackoverflow.com/questions/18595981/improving-performance-of-multiplication-of-scipy-sparse-matrices
 @njit(nogil=True)
