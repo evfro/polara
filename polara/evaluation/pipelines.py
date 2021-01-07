@@ -4,6 +4,14 @@ from operator import mul as mul_op
 from functools import reduce
 from random import choice
 import pandas as pd
+from collections import abc
+
+
+def is_list_like(obj, allow_sets=False, allow_dict=False):
+    return (isinstance(obj, abc.Iterable) and
+        not isinstance(obj, (str, bytes)) and
+        not (allow_sets is False and isinstance(obj, abc.Set)) and
+        not (allow_dict is False and isinstance(obj, abc.Mapping)))
 
 
 def random_chooser():
@@ -45,13 +53,15 @@ def random_grid(params, n=60, grid_cache=None, skip_config=None):
     return grid, param_names
 
 
-def set_config(model, attributes, values):
-    for name, value in zip(attributes, values):
+def set_config(model, config, convert_nan=True):
+    for name, value in config.items():
+        if convert_nan:
+            value = value if value == value else None # convert NaN to None
         setattr(model, name, value)
 
 
 def evaluate_models(models, target_metric='precision', metric_type='all', **kwargs):
-    if not isinstance(models, (list, tuple)):
+    if not is_list_like(models, allow_sets=True):
         models = [models]
 
     model_scores = {}
@@ -74,7 +84,7 @@ def find_optimal_svd_rank(model, ranks, target_metric, return_scores=False,
     evaluator = evaluator or evaluate_models
     model_verbose = model.verbose
     if config:
-        set_config(model, *zip(*config.items()))
+        set_config(model, config)
 
     model.rank = svd_rank = max(max(ranks), model.rank)
     if not model._is_ready:
@@ -86,7 +96,7 @@ def find_optimal_svd_rank(model, ranks, target_metric, return_scores=False,
 
     res = {}
     try:
-        for rank in iterator(list(reversed(sorted(ranks)))):
+        for rank in iterator(sorted(ranks, key=lambda x: -x)):
             model.rank = rank
             res[rank] = evaluator(model, target_metric, **kwargs)[model.method]
             # prevent previous scores caching when assigning svd_rank
@@ -112,7 +122,7 @@ def find_optimal_tucker_ranks(model, tucker_ranks, target_metric, return_scores=
     evaluator = evaluator or evaluate_models
     model_verbose = model.verbose
     if config:
-        set_config(model, *zip(*config.items()))
+        set_config(model, config)
 
     model.mlrank = tuple([max(mode_ranks) for mode_ranks in tucker_ranks])
 
@@ -150,26 +160,38 @@ def find_optimal_tucker_ranks(model, tucker_ranks, target_metric, return_scores=
     return best_mlrank
 
 
+def params_to_dict(names, params):
+    try:
+        return dict(zip(names, params))
+    except TypeError: # encountered single value
+        return {names: params}
+
+
 def find_optimal_config(model, param_grid, param_names, target_metric, return_scores=False,
                         init_config=None, reset_config=None, verbose=False, force_build=True,
                         evaluator=None, iterator=lambda x: x, **kwargs):
     evaluator = evaluator or evaluate_models
     model_verbose = model.verbose
+
     if init_config:
-        set_config(model, *zip(*init_config.items()))
+        if not is_list_like(init_config):
+            init_config = [init_config]
+        for config in init_config:
+            set_config(model, config)
 
     model.verbose = verbose
     grid_results = {}
     for params in iterator(param_grid):
+        param_config = params_to_dict(param_names, params)
         try:
-            set_config(model, param_names, params)
+            set_config(model, param_config)
             if not model._is_ready or force_build:
                 model.build()
             grid_results[params] = evaluator(model, target_metric, **kwargs)[model.method]
         finally:
             if reset_config is not None:
                 if isinstance(reset_config, dict):
-                    set_config(model, *zip(*reset_config.items()))
+                    set_config(model, reset_config)
                 elif callable(reset_config):
                     reset_config(model)
                 else:
@@ -179,9 +201,14 @@ def find_optimal_config(model, param_grid, param_names, target_metric, return_sc
     # workaround non-orderable configs (otherwise pandas raises error)
     scores = pd.Series(**dict(zip(('index', 'data'),
                                   (zip(*grid_results.items())))))
-    best_config = scores.idxmax()
+    best_params = scores.idxmax()
+    best_config = params_to_dict(param_names, best_params)
+
     if return_scores:
-        scores.index.names = param_names
+        try:
+            scores.index.names = param_names
+        except ValueError: # not list-like
+            scores.index.name = param_names
         scores.name = model.method
         return best_config, scores
     return best_config

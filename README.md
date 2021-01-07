@@ -149,3 +149,9 @@ See more usage examples in the [Custom evaluation](examples/Custom_evaluation.ip
 
 ### Reproducing others work
 Polara offers even more options to highly customize experimentation pipeline and tailor it to specific needs. See, for example, [Reproducing EIGENREC results](examples/Reproducing_EIGENREC_results.ipynb) notebook to learn how Polara can be used to reproduce experiments from the *"[EIGENREC: generalizing PureSVD for effective and efﬁcient top-N recommendations](https://arxiv.org/abs/1511.06033)"* paper.
+
+## How to cite
+If you find this framework useful for your research, please cite [the following paper](https://dl.acm.org/citation.cfm?id=3347055):
+```
+"HybridSVD: when collaborative information is not enough"; Evgeny Frolov and Ivan Oseledets, 2019. In Proceedings of the 13th ACM Conference on Recommender Systems (RecSys '19). ACM, New York, NY, USA, 331-339.
+```

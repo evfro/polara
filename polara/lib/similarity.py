@@ -261,7 +261,7 @@ def feature2sparse(feature_data, ranking=None, deduplicate=True, labels=None):
         indices = []
         indlens = []
         for items in feature_data:
-            # wiil also remove unknown items to ensure index consistency
+            # will also remove unknown items to ensure index consistency
             inds = [feature_lbl[item] for item in items if item in feature_lbl]
             indices.extend(inds)
             indlens.append(len(inds))
@@ -361,9 +361,24 @@ def _sim_func(func_type):
         raise NotImplementedError
 
 
-def one_hot_similarity(meta_data):
-    raise NotImplementedError
+def one_hot_similarity(meta_data, metric='common', assume_binary=True, fill_diagonal=True, ensure_csc=True):
+    features, labels = stack_features(meta_data, normalize=False)
+    similarity = None
 
+    if metric == 'common': # common neighbours similarity
+        similarity = features.dot(features.T)
+        maxel = max(similarity.data.max(), abs(similarity.data.min()))
+        similarity = similarity / maxel
+        if fill_diagonal:
+            set_diagonal_values(similarity, 1)
+
+    if (metric == 'cosine') or (metric == 'salton'):
+        similarity = cosine_similarity(features, assume_binary=assume_binary, fill_diagonal=fill_diagonal)
+
+    if ensure_csc and (similarity.format == 'csr'):
+        similarity = similarity.T # ensure CSC format (matrix is symmetric)
+
+    return similarity, labels
 
 def get_similarity_data(meta_data, similarity_type='jaccard'):
     features = meta_data.columns

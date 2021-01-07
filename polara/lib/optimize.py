@@ -1,6 +1,7 @@
 from math import sqrt
 import numpy as np
 from numba import jit, njit, prange
+from scipy import sparse
 
 from polara.tools.timing import track_time
 
@@ -73,7 +74,7 @@ def identity(x, *args): # used to fall back to standard SGD
 def adagrad(grad, m, cum_sq_grad, smoothing=1e-6):
     cum_sq_grad_update = cum_sq_grad[m, :] + grad * grad
     cum_sq_grad[m, :] = cum_sq_grad_update
-    adjusted_grad = grad / (smoothing + np.sqrt(cum_sq_grad_update))
+    adjusted_grad = grad / np.sqrt(smoothing + cum_sq_grad_update)
     return adjusted_grad
 
 
@@ -81,7 +82,7 @@ def adagrad(grad, m, cum_sq_grad, smoothing=1e-6):
 def rmsprop(grad, m, cum_sq_grad, gamma=0.9, smoothing=1e-6):
     cum_sq_grad_update = gamma * cum_sq_grad[m, :] + (1 - gamma) * (grad * grad)
     cum_sq_grad[m, :] = cum_sq_grad_update
-    adjusted_grad = grad / (smoothing + np.sqrt(cum_sq_grad_update))
+    adjusted_grad = grad / np.sqrt(smoothing + cum_sq_grad_update)
     return adjusted_grad
 
 
@@ -298,3 +299,93 @@ def kernelized_pmf_sgd(interactions, shape, nonzero_count, rank,
                               adjustment_params=adjustment_params,
                               seed=seed, verbose=verbose,
                               iter_errors=iter_errors, iter_time=iter_time)
+
+
+def trace(A, B):
+    if sparse.issparse(A):
+        return A.multiply(B).sum()
+    return (A * B).sum()
+
+def local_collective_embeddings(Xs, Xu, A, k=15, alpha=0.1, beta=0.05,
+                                lamb=1, epsilon=0.0001, maxiter=15,
+                                seed=None, verbose=True):
+    """
+    Python Implementation of Local Collective Embeddings
+
+    author : Abhishek Thakur, https://github.com/abhishekkrthakur/LCE
+    original : https://github.com/msaveski/LCE
+    adapted for Polara by: Evgeny Frolov
+    """
+    n = Xs.shape[0]
+    v1 = Xs.shape[1]
+    v2 = Xu.shape[1]
+
+    random = np.random if seed is None else np.random.RandomState(seed)
+    W = random.rand(n, k)
+    Hs = random.rand(k, v1)
+    Hu = random.rand(k, v2)
+
+    D = sparse.dia_matrix((A.sum(axis=0), 0), A.shape)
+
+    gamma = 1. - alpha
+    trXstXs = trace(Xs, Xs)
+    trXutXu = trace(Xu, Xu)
+
+    WtW = W.T.dot(W)
+    WtXs = Xs.T.dot(W).T
+    WtXu = Xu.T.dot(W).T
+    WtWHs = WtW.dot(Hs)
+    WtWHu = WtW.dot(Hu)
+    DW = D.dot(W)
+    AW = A.dot(W)
+
+    itNum = 1
+    delta = 2.0 * epsilon
+
+    ObjHist = []
+
+    while True:
+
+        # update H
+        Hs_1 = np.divide(
+            (alpha * WtXs), np.maximum(alpha * WtWHs + lamb * Hs, 1e-10))
+        Hs = np.multiply(Hs, Hs_1)
+
+        Hu_1 = np.divide(
+            (gamma * WtXu), np.maximum(gamma * WtWHu + lamb * Hu, 1e-10))
+        Hu = np.multiply(Hu, Hu_1)
+
+        # update W
+        W_t1 = alpha * Xs.dot(Hs.T) + gamma * Xu.dot(Hu.T) + beta * AW
+        W_t2 = alpha * W.dot(Hs.dot(Hs.T)) + gamma * \
+            W.dot(Hu.dot(Hu.T)) + beta * DW + lamb * W
+        W_t3 = np.divide(W_t1, np.maximum(W_t2, 1e-10))
+        W = np.multiply(W, W_t3)
+
+        # calculate objective function
+        WtW = W.T.dot(W)
+        WtXs = Xs.T.dot(W).T
+        WtXu = Xu.T.dot(W).T
+        WtWHs = WtW.dot(Hs)
+        WtWHu = WtW.dot(Hu)
+        DW = D.dot(W)
+        AW = A.dot(W)
+
+        tr1 = alpha * (trXstXs - 2. * trace(Hs, WtXs) + trace(Hs, WtWHs))
+        tr2 = gamma * (trXutXu - 2. * trace(Hu, WtXu) + trace(Hu, WtWHu))
+        tr3 = beta * (trace(W, DW) - trace(W, AW))
+        tr4 = lamb * (np.trace(WtW) + trace(Hs, Hs) + trace(Hu, Hu))
+
+        Obj = tr1 + tr2 + tr3 + tr4
+        ObjHist.append(Obj)
+
+        if itNum > 1:
+            delta = abs(ObjHist[-1] - ObjHist[-2])
+            if verbose:
+                print("Iteration: ", itNum, "Objective: ", Obj, "Delta: ", delta)
+            if itNum > maxiter or delta < epsilon:
+                break
+
+        itNum += 1
+
+    return W, Hu, Hs

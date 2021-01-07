@@ -48,6 +48,14 @@ def average_results(scores):
 
     return averaged, errors
 
+def consolidate_metrics(scores, label='scores', include_metric_types=True):
+    metric_types = None
+    if include_metric_types:
+        metric_types = [s.__class__.__name__.lower() for s in scores]
+
+    labeled_scores = [pd.DataFrame([s], index=[label]) for s in scores]
+    metrics_df = pd.concat(labeled_scores, keys=metric_types, axis=1)
+    return metrics_df
 
 def evaluate_models(models, metrics, **kwargs):
     scores = []
@@ -55,11 +63,8 @@ def evaluate_models(models, metrics, **kwargs):
         model_scores = model.evaluate(metric_type=metrics, **kwargs)
         # ensure correct format
         model_scores = model_scores if isinstance(model_scores, list) else [model_scores]
-        # concatenate all scores
-        name = [model.method]
-        metric_types = [s.__class__.__name__.lower() for s in model_scores]
-        scores_df = pd.concat([pd.DataFrame([s], index=name) for s in model_scores],
-                              keys=metric_types, axis=1)
+        # gather all scores
+        scores_df = consolidate_metrics(model_scores, label=model.method)
         scores.append(scores_df)
     res = pd.concat(scores, axis=0)
     res.columns.names = ['type', 'metric']

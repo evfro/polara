@@ -13,7 +13,7 @@ from polara.recommender import defaults
 def random_choice(df, num, random_state):
     n = df.shape[0]
     if n > num:
-        return df.take(random_state.choice(n, num, replace=False), is_copy=False)
+        return df.take(random_state.choice(n, num, replace=False))
     else:
         return df
 
@@ -104,7 +104,7 @@ class RecommenderData(object):
                '_warm_start', '_holdout_size', '_test_sample',
                '_permute_tops', '_random_holdout', '_negative_prediction'}
 
-    def __init__(self, data, userid, itemid, feedback=None, custom_order=None, seed=None):
+    def __init__(self, data, userid, itemid, feedback=None, custom_order=None, config=None, seed=None, verbose=True):
         self.name = None
         fields = [userid, itemid, feedback]
 
@@ -134,7 +134,10 @@ class RecommenderData(object):
         # random_holdout - test_update. Need to implement checks
         # non-empty set is used to indicate non-initialized state ->
         # the data will be updated upon the first access of internal data splits
+        if config is not None:
+            self.set_configuration(config)
         self.seed = seed  # use with permute_tops, random_choice
+
         self.verify_sessions_length_distribution = True
         self.ensure_consistency = True  # drop test entities if not present in training
         self.build_index = True  # reindex data, avoid gaps in user and item index
@@ -147,7 +150,12 @@ class RecommenderData(object):
         self._notify = EventNotifier([self.on_change_event, self.on_update_event])
         # on_change indicates whether full data has been changed -> rebuild model
         # on_update indicates whether only test data has been changed -> renew recommendations
-        self.verbose = True
+        self.verbose = verbose
+
+    def __str__(self):
+        name = self.__class__.__name__
+        fields = self.fields
+        return f'{name} with {fields}'
 
 
     def subscribe(self, event, model_callback):
@@ -168,9 +176,21 @@ class RecommenderData(object):
 
     def get_configuration(self):
         # [1:] omits undersacores in properties names, i.e. uses external name
-        # in that case it prints worning if change is pending
+        # in that case it prints warning if change is pending
         config = {attr[1:]: getattr(self, attr[1:]) for attr in self._config}
         return config
+
+    def set_configuration(self, params):
+        for name, value in params.items():
+            if hasattr(self, name):
+                setattr(self, name, value)
+            else:
+                print(f'Property {name} is undefined.')
+
+    @classmethod
+    def default_configuration(cls):
+        params = [prop[1:] for prop in cls._config]
+        return defaults.get_config(params)
 
 
     @property
@@ -197,7 +217,7 @@ class RecommenderData(object):
 
     def _verified_data_property(self, data_property):
         if data_property in self._change_properties:
-            print('The value of {} might be not effective yet.'.format(data_property[1:]))
+            print(f'The value of {data_property[1:]} might be not effective yet.')
         return getattr(self, data_property)
 
 
@@ -228,8 +248,8 @@ class RecommenderData(object):
         if self.verbose:
             num_train_events = self.training.shape[0] if self.training is not None else 0
             num_holdout_events = self.test.holdout.shape[0] if self.test.holdout is not None else 0
-            stats_msg = 'Done.\nThere are {} events in the training and {} events in the holdout.'
-            print(stats_msg.format(num_train_events, num_holdout_events))
+            print(f'Done.\nThere are {num_train_events} events in the training '
+                  f'and {num_holdout_events} events in the holdout.')
 
     def prepare_training_only(self):
         self.holdout_size = 0  # do not form holdout
@@ -387,7 +407,7 @@ class RecommenderData(object):
                 testset = holdout = None
                 train_split = ~test_split
             else:  # state 3 or state 4
-                # NOTE holdout_size = None is also here; this can be used in
+                # NOTE holdout_size < 0 is also here; this can be used in
                 # subclasses like ItemColdStartData to preprocess data properly
                 # in that case _sample_holdout must be modified accordingly
                 holdout = self._sample_holdout(test_split)
@@ -554,8 +574,10 @@ class RecommenderData(object):
             invalid_session_index = invalid_sessions.index[invalid_sessions]
             holdout.query('{} not in @invalid_session_index'.format(group_id), inplace=True)
             if self.verbose:
-                msg = '{} of {} {}\'s were filtered out from holdout. Reason: incompatible number of items.'
-                print(msg.format(n_invalid_sessions, len(invalid_sessions), group_id))
+                n_sessions = len(invalid_sessions)
+                incompatible = 'incompatible number of items'
+                print(f'{n_invalid_sessions} of {n_sessions} {group_id} entities '
+                      f'were filtered out from holdout. Reason: {incompatible}.')
 
     def _align_test_users(self):
         if (self._test.testset is None) or (self._test.holdout is None):
@@ -573,18 +595,18 @@ class RecommenderData(object):
             n_unique_users = invalid_holdout_users.nunique()
             holdout.drop(invalid_holdout_users.index, inplace=True)
             if self.verbose:
-                REASON = 'Reason: inconsistent with testset'
-                msg = '{} {}\'s were filtered out from holdout. {}.'
-                print(msg.format(n_unique_users, userid, REASON))
+                inconsistent = 'inconsistent with testset'
+                print(f'{n_unique_users} {userid} entities were filtered out '
+                      f'from holdout. Reason: {inconsistent}.')
 
         if not testset_in_holdout.all():
             invalid_testset_users = testset.loc[~testset_in_holdout, userid]
             n_unique_users = invalid_testset_users.nunique()
             testset.drop(invalid_testset_users.index, inplace=True)
             if self.verbose:
-                REASON = 'Reason: inconsistent with holdout'
-                msg = '{} {}\'s were filtered out from testset. {}.'
-                print(msg.format(n_unique_users, userid, REASON))
+                inconsistent = 'inconsistent with holdout'
+                print(f'{n_unique_users} {userid} entities were filtered out '
+                      f'from testset. Reason: {inconsistent}.')
 
     def _reindex_train_users(self):
         userid = self.fields.userid
@@ -600,8 +622,8 @@ class RecommenderData(object):
     def get_entity_index(self, entity, index_id='training'):
         entity_type = self.fields._fields[self.fields.index(entity)]
         index_data = getattr(self.index, entity_type)
-
         try: # check whether custom index is introduced (as in e.g. coldstart)
+        # TODO catch index_id='test' for warm_start = True
             entity_idx = getattr(index_data, index_id)
         except AttributeError: # fall back to standard case
             entity_idx = index_data
@@ -651,9 +673,10 @@ class RecommenderData(object):
             # unseen_index = dataset.index[unseen_entities]
             # dataset.drop(unseen_index, inplace=True)
             if self.verbose:
-                UNSEEN = 'not in the training data'
-                msg = '{} unique {}\'s within {} {} interactions were filtered. Reason: {}.'
-                print(msg.format(n_unseen_entities, entity, (~seen_data).sum(), label, UNSEEN))
+                unseen = 'not in the training data'
+                print(f'{n_unseen_entities} unique {entity} entities within '
+                      f'{(~seen_data).sum()} {label} interactions were filtered. '
+                      f'Reason: {unseen}.')
 
     def _reindex_testset_users(self):
         userid = self.fields.userid
@@ -695,30 +718,31 @@ class RecommenderData(object):
     def _sample_holdout(self, test_split, group_id=None):
         # TODO order_field may also change - need to check it as well
         order_field = self._custom_order or self.fields.feedback or []
+        sample_at_random = self._random_holdout or (order_field == [])
 
         selector = self._data.loc[test_split, order_field]
         # data may have many items with the same top ratings
         # randomizing the data helps to avoid biases in that case
-        if self._permute_tops and not self._random_holdout:
+        if self._permute_tops and not sample_at_random:
             random_state = np.random.RandomState(self.seed)
             selector = selector.sample(frac=1, random_state=random_state)
 
         group_id = group_id or self.fields.userid
         grouper = selector.groupby(self._data[group_id], sort=False, group_keys=False)
 
-        if self._random_holdout:  # randomly sample data for evaluation
+        if sample_at_random: # randomly sample data for evaluation
             random_state = np.random.RandomState(self.seed)
-            if self._holdout_size >= 1:  # pick at most _holdout_size elements
+            if self._holdout_size >= 1: # pick at most _holdout_size elements
                 holdout = grouper.apply(random_choice, self._holdout_size, random_state)
             else:
                 holdout = grouper.apply(random_sample, self._holdout_size, random_state)
-        elif self._negative_prediction:  # try to holdout negative only examples
-            if self._holdout_size >= 1:  # pick at most _holdout_size elements
+        elif self._negative_prediction: # try to holdout negative only examples
+            if self._holdout_size >= 1: # pick at most _holdout_size elements
                 holdout = grouper.nsmallest(self._holdout_size, keep='last')
             else:
                 raise NotImplementedError
-        else:  # standard top-score prediction mode
-            if self._holdout_size >= 1:  # pick at most _holdout_size elements
+        else: # standard top-score prediction mode
+            if self._holdout_size >= 1: # pick at most _holdout_size elements
                 holdout = grouper.nlargest(self._holdout_size, keep='last')
             else:
                 frac = self._holdout_size
@@ -861,7 +885,7 @@ class RecommenderData(object):
 
 
     def set_test_data(self, testset=None, holdout=None, warm_start=False, test_users=None,
-                            reindex=True, ensure_consistency=True, holdout_size=None, copy=True):
+                      reindex=True, ensure_consistency=True, holdout_size=None, copy=True):
         '''Should be used only with custom data.'''
         if warm_start and ((testset is None) and (test_users is None)):
             raise ValueError('When warm_start is True, information about test users must be present. '
@@ -905,6 +929,69 @@ class RecommenderData(object):
         if reindex:
             self._try_reindex_test_data()  # either assign known index, or reindex (if warm_start)
         self._try_sort_test_data()
+
+        if self.verbose:
+            if holdout is not None:
+                num_events = self.test.holdout.shape[0]
+                print(f'Done. There are {num_events} events in the holdout.')
+
+class RandomSampleEvaluationMixin():
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.unseen_interactions = None
+        self.unseen_items_num = None
+        self._holdout_item_prefix = 'x'
+
+    def adapt_holdout(self):
+        holdout = self.test.holdout
+        userid = self.fields.userid
+        itemid = self.fields.itemid
+        # holdout items are expected to be in the
+        # first columns of the predicted scores array
+        # hence, holdout item index is monotonic and
+        # starts from 0 -> can use cumcount
+        # example: sequence {user: [ind1 ,ind2]}
+        # will be converted to {user: [0, 1]}
+        holdout_item_index = (
+            holdout
+            .groupby(userid, sort=False)
+            [itemid]
+            .transform('cumcount')
+        )
+        holdout_item_field = f'{self._holdout_item_prefix}_{itemid}'
+        holdout.loc[:, holdout_item_field] = holdout_item_index
+
+    def set_unseen_interactions(self, interactions, reindex=True, warm_start=False):
+        n_unseen_items = len(interactions.iloc[0])
+        assert interactions.apply(len).eq(n_unseen_items).all(), 'Number of unseen items is inconsistent'
+        if reindex:
+            if warm_start:
+                # TODO modify `set_test_holdout` to generate internal user index
+                raise NotImplementedError
+            else:
+                userid = self.fields.userid
+                itemid = self.fields.itemid
+                get_index = self.get_entity_index
+                # reindexing users
+                user_index = get_index(userid, index_id='training')
+                user_index_map = user_index.set_index('old').new
+                interactions = interactions.loc[user_index_map.index]
+                new_user_index = pd.Index(
+                    interactions.index.map(user_index_map), name=userid
+                )
+                if new_user_index.isnull().any():
+                    raise IndexError('Input is inconsistent with existing data.')
+                interactions = pd.Series(
+                    index=new_user_index, data=interactions.values, name=itemid
+                )
+                # reindexing items
+                item_index = get_index(itemid, index_id='training')
+                item_index_map = item_index.set_index('old').new
+                interactions = interactions.apply(lambda x: item_index_map.loc[x].values)
+
+        self.unseen_interactions = interactions
+        self.unseen_items_num = n_unseen_items
+        self.adapt_holdout()
 
 
 class LongTailMixin(object):

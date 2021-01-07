@@ -13,13 +13,17 @@ from scipy.sparse.linalg import svds
 
 from polara.recommender import defaults
 from polara.recommender.evaluation import get_hits, get_relevance_scores, get_ranking_scores, get_experience_scores
-from polara.recommender.evaluation import get_hr_score, get_mrr_score
+from polara.recommender.evaluation import get_hr_score, get_rr_scores
 from polara.recommender.evaluation import assemble_scoring_matrices
+from polara.recommender.evaluation import matrix_from_observations
 from polara.recommender.utils import array_split
 from polara.lib.optimize import simple_pmf_sgd
 from polara.lib.tensor import hooi
 
-from polara.lib.sparse import sparse_dot, inverse_permutation, rescale_matrix
+from polara.preprocessing.matrices import rescale_matrix
+from polara.lib.sampler import mf_random_item_scoring
+from polara.lib.sparse import sparse_dot, inverse_permutation
+from polara.lib.sparse import inner_product_at
 from polara.lib.sparse import unfold_tensor_coordinates, tensor_outer_at
 from polara.tools.timing import track_time
 
@@ -293,16 +297,16 @@ class RecommenderModel(object):
         # converts external user info into internal representation
         userid, itemid, feedback = self.data.fields
 
-        if isinstance(user_info, dict):
-            user_info = user_info.items()
-        try:
-            items_data, feedback_data = zip(*user_info)
-        except TypeError:
+        if isinstance(user_info, dict):  # item:feedback dictionary
+            items_data, feedback_data = zip(*user_info.items())
+        elif isinstance(user_info, (list, tuple, set, np.ndarray)):  # list of items
             items_data = user_info
             feedback_data = {}
             if feedback is not None:
                 feedback_val = self.data.training[feedback].max()
                 feedback_data = {feedback: [feedback_val]*len(items_data)}
+        else:
+            raise ValueError("Unrecognized input for `user_info`.")
 
         try:
             item_index = self.data.index.itemid.training
@@ -335,18 +339,17 @@ class RecommenderModel(object):
                 self.data._test = namedtuple('TestData', 'testset holdout')._make([testset, holdout])
 
         _topk = self.topk
-        self.topk = topk or _topk
-        # takes care of both sparse and dense recommendation lists
-        top_recs = self.get_topk_elements(scores).squeeze()  # remove singleton
-        self.topk = _topk
-
+        if topk is not None:
+            self.topk = topk
         try:
-            item_index = self.data.index.itemid.training
-        except AttributeError:
-            item_index = self.data.index.itemid
+            # takes care of both sparse and dense recommendation lists
+            top_recs = self.get_topk_elements(scores).squeeze()  # remove singleton
+        finally:
+            self.topk = _topk
 
         seen_idx = seen_idx[1]  # only items idx
         # covert back to external representation
+        item_index = self.data.get_entity_index(self.data.fields.itemid)
         item_idx_map = item_index.set_index('new')
         top_recs = item_idx_map.loc[top_recs, 'old'].values
         seen_items = item_idx_map.loc[seen_idx, 'old'].values
@@ -414,18 +417,13 @@ class RecommenderModel(object):
         if not isinstance(metric_type, (list, tuple)):
             metric_type = [metric_type]
 
-        # support rolling back scenario for @k calculations
         if int(topk or 0) > self.topk:
             self.topk = topk  # will also flush old recommendations
-
-        # ORDER OF CALLS MATTERS!!!
-        # make sure to call holdout before getting recommendations
-        # this will ensure that model is renewed if data has changed
-        holdout = self.data.test.holdout # <-- call before getting recs
+        # support rolling back scenario for @k calculations
         recommendations = self.recommendations[:, :topk]  # will recalculate if empty
-
         switch_positive = switch_positive or self.switch_positive
         feedback = self.data.fields.feedback
+        holdout = self.data.test.holdout
         if (switch_positive is None) or (feedback is None):
             # all recommendations are considered positive predictions
             # this is a proper setting for binary data problems (implicit feedback)
@@ -456,13 +454,14 @@ class RecommenderModel(object):
 
         if 'ranking' in metric_type:
             if (self.data.holdout_size == 1) or simple_rates:
-                scores.append(get_mrr_score(scoring_data[1]))
+                scores.append(get_rr_scores(scoring_data[1]))
             else:
                 ndcg_alternative = get_default('ndcg_alternative')
                 topk = recommendations.shape[1]  # handle topk=None case
                 # topk has to be passed explicitly, otherwise it's unclear how to
                 # estimate ideal ranking for NDCG and NDCL metrics in get_ndcr_discounts
-                scores.append(get_ranking_scores(*scoring_data, switch_positive=switch_positive, topk=topk, alternative=ndcg_alternative))
+                # it's also used in MAP calculation
+                scores.append(get_ranking_scores(*scoring_data, topk=topk, switch_positive=switch_positive, alternative=ndcg_alternative))
 
         if 'experience' in metric_type:  # no need for feedback
             fields = self.data.fields
@@ -788,6 +787,16 @@ class ProbabilisticMF(RecommenderModel):
         return scores, slice_data
 
 
+class EmbeddingsMixin:
+    @property
+    def user_embeddings(self):
+        return self.factors[self.data.fields.userid]
+
+    @property
+    def item_embeddings(self):
+        return self.factors[self.data.fields.itemid]
+
+
 class SVDModel(RecommenderModel):
 
     def __init__(self, *args, **kwargs):
@@ -1081,3 +1090,94 @@ class CoffeeModel(RecommenderModel):
         feedback_idx = self.data.index.feedback.set_index('new')
         predicted_feedback = feedback_idx.loc[predictions, 'old'].values
         return predicted_feedback
+
+
+class RandomSampleEvaluationSVDMixin():
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # as deifined in RandomSampleEvaluationMixin in data models
+        prefix = self.data._holdout_item_prefix
+        self._prediction_target = f'{prefix}_{self.data.fields.itemid}'
+
+    def compute_holdout_scores(self, user_factors, item_factors):
+        holdout = self.data.test.holdout
+        userid = self.data.fields.userid
+        itemid = self.data.fields.itemid
+        holdout_size = self.data.holdout_size
+        assert holdout_size >= 1 # only fixed number of holdout items is supported
+
+        # "rebase" user index (see comments in `get_recommmendations`)
+        useridx = pd.factorize(
+            holdout[userid], sort=False  # already sorted via data moodel
+        )[0].reshape(-1, holdout_size)
+        itemidx = holdout[itemid].values.reshape(-1, holdout_size)
+        inner_product = inner_product_at(target='parallel')
+        # for general matrix factorization user must take care of submitting
+        # user_factors of the correct shape, otherwise, if holdout contains
+        # only a subset of all users, the answer will be incorrect
+        return inner_product(user_factors, item_factors, useridx, itemidx)
+
+    def compute_random_item_scores(self, user_factors, item_factors):
+        holdout = self.data.test.holdout
+        userid = self.data.fields.userid
+        test_users = holdout[userid].drop_duplicates().values # preserve sorted
+        test_items = self.data.unseen_interactions.loc[test_users].values
+        # "rebase" user index (see comments in `get_recommmendations`)
+        n_users = len(test_users)
+        n_items = self.data.unseen_items_num
+        useridx = np.broadcast_to(np.arange(n_users)[:, None], (n_users, n_items))
+        itemidx = np.concatenate(test_items).reshape(n_users, n_items)
+        # perform vectorized scalar products at bulk
+        inner_product = inner_product_at(target='parallel')
+        # for general matrix factorization user must take care of submitting
+        # user_factors of the correct shape, otherwise, if holdout contains
+        # only a subset of all users, the answer will be incorrect
+        return inner_product(user_factors, item_factors, useridx, itemidx)
+
+    def compute_random_item_scores_gen(self, user_factors, item_factors,
+                                       profile_matrix, n_unseen):
+        userid = self.data.fields.userid
+        itemid = self.data.fields.itemid
+        holdout = self.data.test.holdout
+        n_users = profile_matrix.shape[0]
+        seed = self.data.seed
+
+        holdout_matrix = matrix_from_observations(
+            holdout, userid, itemid, profile_matrix.shape, feedback=None
+        )
+        all_seen = profile_matrix + holdout_matrix # only need nnz indices
+
+        scores = np.zeros((n_users, n_unseen))
+        seedseq = np.random.SeedSequence(seed).generate_state(n_users)
+        mf_random_item_scoring(
+            user_factors, item_factors, all_seen.indptr, all_seen.indices,
+            n_unseen, seedseq, scores
+        )
+        return scores
+
+    def get_recommendations(self):
+        itemid = self.data.fields.itemid
+        if self._prediction_target == itemid:
+            return super().get_recommendations()
+
+        item_factors = self.factors[itemid]
+        test_matrix, _ = self.get_test_matrix()
+        user_factors = test_matrix.dot(item_factors)
+        # from now on will need to work with "rebased" user indices
+        # to properly index contiguous user matrices
+        holdout_scores = self.compute_holdout_scores(user_factors, item_factors)
+        if self.data.unseen_interactions is None:
+            n_unseen = self.data.unseen_items_num
+            if n_unseen is None:
+                raise ValueError('Number of items to sample is unspecified.')
+
+            unseen_scores = self.compute_random_item_scores_gen(
+                user_factors, item_factors, test_matrix, n_unseen
+            )
+        else:
+            unseen_scores = self.compute_random_item_scores(
+                user_factors, item_factors
+            )
+        # combine all scores and rank selected items
+        scores = np.concatenate((holdout_scores, unseen_scores), axis=1)
+        return np.apply_along_axis(self.topsort, 1, scores, self.topk)

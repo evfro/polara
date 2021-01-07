@@ -4,7 +4,7 @@ import sys, os
 
 
 def print_frames(dataframes):
-    if not isinstance(dataframes, tuple):
+    if not isinstance(dataframes, (tuple, list)):
         return dataframes
 
     border_style = u'\"border: none\"'

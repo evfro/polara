@@ -55,28 +55,36 @@ def sparse_dot(left_mat, right_mat, dense_output=False, tocsr=False):
     return result
 
 
-def rescale_matrix(matrix, scaling, axis, binary=True, return_scaling_values=False):
-    '''Function to scale either rows or columns of the sparse rating matrix'''
-    scaling_values = None
-    if scaling == 1: # no scaling (standard SVD case)
-        result = matrix
+def inner_product_at(target='parallel', **kwargs):
+    @guvectorize([
+        'f4[:,:], f4[:,:], i4[:], i4[:], f4[:]',
+        'f4[:,:], f4[:,:], i8[:], i8[:], f4[:]',
+        'f8[:,:], f8[:,:], i4[:], i4[:], f8[:]',
+        'f8[:,:], f8[:,:], i8[:], i8[:], f8[:]'],
+        '(i,k),(j,k),(),()->()',
+        target=target, nopython=True, **kwargs)
+    def inner_product_at_wrapped(u, v, ui, vi, res):
+        rank = v.shape[1]
+        tmp = 0
+        for f in range(rank):
+            tmp += u[ui[0], f] * v[vi[0], f]
+        res[0] = tmp
+    return inner_product_at_wrapped
 
-    if binary:
-        norm = np.sqrt(matrix.getnnz(axis=axis)) # compute Euclidean norm as if values are binary
-    else:
-        norm = spnorm(matrix, axis=axis, ord=2) # compute Euclidean norm
-
-    scaling_values = power(norm, scaling-1, where=norm != 0)
-    scaling_matrix = diags(scaling_values)
-
-    if axis == 0: # scale columns
-        result = matrix.dot(scaling_matrix)
-    if axis == 1: # scale rows
-        result = scaling_matrix.dot(matrix)
-
-    if return_scaling_values:
-        result = (result, scaling_values)
-    return result
+# roughly equivalent to
+# @njit(parallel=True)
+# def inner_product_at(u, v, uidx, vidx):
+#     size = len(uidx)
+#     res = np.empty(size)
+#     rank = v.shape[1]
+#     for k in prange(size):
+#         i = uidx[k]
+#         j = vidx[k]
+#         tmp = 0
+#         for f in range(rank):
+#             tmp += u[i, f] * v[j, f]
+#         res[k] = tmp
+#     return res
 
 
 # matvec implementation is based on
