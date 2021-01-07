@@ -19,12 +19,14 @@ class LightFMWrapper(RecommenderModel):
         self.item_alpha = 0.0
         self.item_identity = True
         self._item_features_csr = None
+        self.normalize_item_features = True
 
         self.user_features = user_features
         self.user_features_labels = None
         self.user_alpha = 0.0
         self.user_identity = True
         self._user_features_csr = None
+        self.normalize_user_features = True
 
         self.loss = 'warp'
         self.learning_schedule = 'adagrad'
@@ -72,7 +74,7 @@ class LightFMWrapper(RecommenderModel):
             self._item_features_csr, self.item_features_labels = stack_features(
                 item_features,
                 add_identity=self.item_identity,
-                normalize=True,
+                normalize=self.normalize_item_features,
                 dtype='f4')
         if self.user_features is not None:
             user_features = self.user_features.reindex(
@@ -81,7 +83,7 @@ class LightFMWrapper(RecommenderModel):
             self._user_features_csr, self.user_features_labels = stack_features(
                 user_features,
                 add_identity=self.user_identity,
-                normalize=True,
+                normalize=self.normalize_user_features,
                 dtype='f4')
 
         with track_time(self.training_time, verbose=self.verbose, model=self.method):
