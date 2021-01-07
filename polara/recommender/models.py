@@ -297,16 +297,16 @@ class RecommenderModel(object):
         # converts external user info into internal representation
         userid, itemid, feedback = self.data.fields
 
-        if isinstance(user_info, dict):
-            user_info = user_info.items()
-        try:
-            items_data, feedback_data = zip(*user_info)
-        except TypeError:
+        if isinstance(user_info, dict):  # item:feedback dictionary
+            items_data, feedback_data = zip(*user_info.items())
+        elif isinstance(user_info, (list, tuple, set, np.ndarray)):  # list of items
             items_data = user_info
             feedback_data = {}
             if feedback is not None:
                 feedback_val = self.data.training[feedback].max()
                 feedback_data = {feedback: [feedback_val]*len(items_data)}
+        else:
+            raise ValueError("Unrecognized input for `user_info`.")
 
         try:
             item_index = self.data.index.itemid.training
@@ -339,18 +339,17 @@ class RecommenderModel(object):
                 self.data._test = namedtuple('TestData', 'testset holdout')._make([testset, holdout])
 
         _topk = self.topk
-        self.topk = topk or _topk
-        # takes care of both sparse and dense recommendation lists
-        top_recs = self.get_topk_elements(scores).squeeze()  # remove singleton
-        self.topk = _topk
-
+        if topk is not None:
+            self.topk = topk
         try:
-            item_index = self.data.index.itemid.training
-        except AttributeError:
-            item_index = self.data.index.itemid
+            # takes care of both sparse and dense recommendation lists
+            top_recs = self.get_topk_elements(scores).squeeze()  # remove singleton
+        finally:
+            self.topk = _topk
 
         seen_idx = seen_idx[1]  # only items idx
         # covert back to external representation
+        item_index = self.data.get_entity_index(self.data.fields.itemid)
         item_idx_map = item_index.set_index('new')
         top_recs = item_idx_map.loc[top_recs, 'old'].values
         seen_items = item_idx_map.loc[seen_idx, 'old'].values
