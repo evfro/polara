@@ -21,10 +21,11 @@ from polara.lib.optimize import simple_pmf_sgd
 from polara.lib.tensor import hooi
 
 from polara.preprocessing.matrices import rescale_matrix
-from polara.lib.sampler import mf_random_item_scoring
+from polara.lib.sampler import mf_random_item_scoring, sample_row_wise
 from polara.lib.sparse import sparse_dot, inverse_permutation
 from polara.lib.sparse import inner_product_at
 from polara.lib.sparse import unfold_tensor_coordinates, tensor_outer_at
+from polara.tools.random import random_seeds
 from polara.tools.timing import track_time
 
 def get_default(name):
@@ -669,25 +670,30 @@ class PopularityModel(RecommenderModel):
 
 
 class RandomModel(RecommenderModel):
-    def __init__(self, *args, **kwargs):
-        self.seed = kwargs.pop('seed', None)
+    def __init__(self, *args, seed=None, **kwargs):
+        self.seed = seed
         super(RandomModel, self).__init__(*args, **kwargs)
         self.method = 'RND'
 
     def build(self):
-        try:
-            index_data = self.data.index.itemid.training
-        except AttributeError:
-            index_data = self.data.index.itemid
-        self.n_items = index_data.shape[0]
-        seed = self.seed
-        self._random_state = np.random.RandomState(seed) if seed is not None else np.random
+        pass
 
-    def slice_recommendations(self, test_data, shape, start, stop, test_users=None):
-        slice_data = self._slice_test_data(test_data, start, stop)
-        n_users = stop - start
-        scores = self._random_state.rand(n_users, self.n_items)
-        return scores, slice_data
+    def get_recommendations(self):
+        if self.filter_seen:
+            test_matrix, _ = self.get_test_matrix()
+            n_users, n_items = test_matrix.shape
+            assert (test_matrix.getnnz(axis=1) + self.topk <= n_items).all(), "topk value is too large"
+            seen_inds = test_matrix.indices
+            seen_ptr = test_matrix.indptr
+        else: # mimic empty test matrix
+            n_users, n_items = self.data.get_test_shape()
+            assert self.topk <= n_items, "topk value is too large"
+            seen_inds = np.array([], dtype=np.min_scalar_type(n_items))
+            seen_ptr = np.broadcast_to(0, n_users+1)
+        
+        seed_seq = random_seeds(n_users, self.seed)
+        recs = sample_row_wise(seen_ptr, seen_inds, n_items, self.topk, seed_seq)
+        return recs
 
 
 class CooccurrenceModel(RecommenderModel):
