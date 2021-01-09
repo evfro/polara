@@ -864,16 +864,15 @@ class RecommenderData(object):
 
     def get_test_shape(self, tensor_mode=False):
         userid = self.fields.userid
+        itemid = self.fields.itemid
+        
         if self.test.holdout is None:
             num_users = self.test.testset[userid].nunique()
             # TODO make it a property
         else:
             num_users = self.test.holdout[userid].nunique()
-
-        try:
-            item_index = self.index.itemid.training
-        except AttributeError:
-            item_index = self.index.itemid
+        
+        item_index = self.get_entity_index(itemid)
         num_items = item_index.shape[0]
         shape = (num_users, num_items)
 
