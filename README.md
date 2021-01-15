@@ -16,13 +16,16 @@ If you use a separate `conda` environment for testing, the following command can
 
 Alternatively, a new conda environment with all required packages can be created by:
 
-`conda create -n <your_environment_name> python=3.6 --file conda_req.txt`
+`conda create -n <your_environment_name> python=3.7 --file conda_req.txt`
 
 
 ## Installation
-If you use specific `conda` environment, don't forget to activate it first with either `source activate <your_environment_name>` (Linux) or  `activate <your_environment_name>` (Windows). Clone this repository to your local machine (`git clone git://github.com/evfro/polara.git`). Once in the root of the newly created local repository, run
+The easiest way is to install directly from source. Activate your conda environment and run:  
+`pip install --no-cache-dir --upgrade git+https://github.com/evfro/polara.git#egg=polara`  
+This will install the current release version.  For the most recent developer version insert `@develop` between `polara.git` and `#egg=polara` in the line above.
 
-`python setup.py install`.
+Alternatively, you can manually clone this repository to a local machine (`git clone git://github.com/evfro/polara.git`). Once in the root of the newly created local repository, run  
+`python setup.py install`
 
 
 ## Usage example
