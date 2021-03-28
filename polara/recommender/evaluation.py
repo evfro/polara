@@ -17,7 +17,11 @@ def no_copy_csr_matrix(data, indices, indptr, shape, dtype):
 
 def safe_divide(a, b, mask=None, dtype=None):
     pos = mask if mask is not None else a > 0
-    return np.divide(a, b, where=pos, dtype=dtype)
+    if dtype is None:
+        dtype = np.float64
+    res = np.zeros_like(a, dtype=dtype) # initialize output array with zeroes, otherwise produces a mess
+    np.divide(a, b, where=pos, out=res)
+    return res
 
 
 def build_rank_matrix(recommendations, shape):
