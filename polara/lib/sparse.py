@@ -10,6 +10,7 @@ from scipy.sparse.linalg import norm as spnorm
 from numba import jit, njit, guvectorize, prange
 from numba import float64 as f8
 from numba import intp as ip
+from numba.typed import List
 
 from polara.recommender import defaults
 
@@ -234,28 +235,36 @@ def dttm_par(idx, val, mat1, mat2, mode1, mode2, unqs, inds, res):
                     res[i0, j1, j2] += vp * mat1[i1, j1] * mat2[i2, j2]
 
 
-# @jit(parallel=True) # numba up to v0.41.dev only supports the 1st argument
+# numba at least up to v0.50.1 only supports the 1st argument of np.unique
 # https://numba.pydata.org/numba-doc/dev/reference/numpysupported.html
-def arrange_index(array):
+def arrange_index(array, typed=True):
+    '''Mainly used in Tucker decomposition calcalatuions. Enables parallelism.
+    '''
     unqs, unq_inv, unq_cnt = np.unique(array, return_inverse=True, return_counts=True)
     inds = np.split(np.argsort(unq_inv), np.cumsum(unq_cnt[:-1]))
+    if typed: # reflected lists are being deprecated in numba - switch to typed lists by default
+        inds_list = List()
+        for ind in inds:
+            inds_list.append(ind)
+        inds = inds_list
     return unqs, inds
 
 def arrange_indices(idx, mode_mask=None):
     n = idx.shape[1]
-    res = [[]]*n
+    res = [[]] * n
     if mode_mask is None:
         mode_mask = [True] * n
 
-    if sum(mode_mask) == 0:
+    n_active_modes = sum(mode_mask)
+    if n_active_modes == 0:
         return res
 
-    if sum(mode_mask) == 1:
-        mode, = [i for i, x in enumerate(mode_mask) if x]
+    if n_active_modes == 1:
+        mode = mode_mask.index(True)
         res[mode] = arrange_index(idx[:, mode])
         return res
 
-    with ThreadPoolExecutor(max_workers=sum(mode_mask)) as executor:
+    with ThreadPoolExecutor(max_workers=n_active_modes) as executor:
         arranged_futures = {executor.submit(arrange_index, idx[:, mode]): mode
                             for mode in range(n) if mode_mask[mode]}
         for future in as_completed(arranged_futures):
