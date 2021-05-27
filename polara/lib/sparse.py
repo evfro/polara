@@ -1,15 +1,10 @@
 import sys
 from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import as_completed
-import numpy as np
-from numpy import power
-from scipy.sparse import csr_matrix
-from scipy.sparse import diags
-from scipy.sparse.linalg import norm as spnorm
 
-from numba import jit, njit, guvectorize, prange
-from numba import float64 as f8
-from numba import intp as ip
+import numpy as np
+from scipy.sparse import csr_matrix
+from numba import njit, guvectorize, prange
 from numba.typed import List
 
 from polara.recommender import defaults
@@ -234,26 +229,46 @@ def dttm_par(idx, val, mat1, mat2, mode1, mode2, unqs, inds, res):
                 for j2 in range(r2):
                     res[i0, j1, j2] += vp * mat1[i1, j1] * mat2[i2, j2]
 
+@njit
+def fill_missing_sorted(arr, inds, size):    
+    filler = inds[0][0:0]
+    arr_filled = np.empty(size, dtype=arr.dtype)
+    inds_filled = List()
+    pos = 0
+    for i in range(size):
+        if i == arr[pos]:
+            inds_filled.append(inds[pos])
+            pos += 1
+        else:
+            inds_filled.append(filler)
+        arr_filled[i] = i
+    return arr_filled, inds_filled
 
 # numba at least up to v0.50.1 only supports the 1st argument of np.unique
 # https://numba.pydata.org/numba-doc/dev/reference/numpysupported.html
-def arrange_index(array, typed=True):
-    '''Mainly used in Tucker decomposition calcalatuions. Enables parallelism.
+def arrange_index(array, typed=True, size=None):
+    '''Mainly used in Tucker decomposition calculations. Enables parallelism.
     '''
     unqs, unq_inv, unq_cnt = np.unique(array, return_inverse=True, return_counts=True)
     inds = np.split(np.argsort(unq_inv), np.cumsum(unq_cnt[:-1]))
+
     if typed: # reflected lists are being deprecated in numba - switch to typed lists by default
-        inds_list = List()
+        inds_typed = List()
         for ind in inds:
-            inds_list.append(ind)
-        inds = inds_list
+            inds_typed.append(ind)
+        inds = inds_typed
+
+    if (size is not None) and (len(unqs) < size):
+        unqs, inds = fill_missing_sorted(unqs, inds, size)
+        unqs = np.array(unqs)
     return unqs, inds
 
-def arrange_indices(idx, mode_mask=None):
+def arrange_indices(idx, mode_mask=None, shape=None):
     n = idx.shape[1]
     res = [[]] * n
     if mode_mask is None:
         mode_mask = [True] * n
+    sizes = list(shape) if shape else [None]*n
 
     n_active_modes = sum(mode_mask)
     if n_active_modes == 0:
@@ -261,12 +276,14 @@ def arrange_indices(idx, mode_mask=None):
 
     if n_active_modes == 1:
         mode = mode_mask.index(True)
-        res[mode] = arrange_index(idx[:, mode])
+        res[mode] = arrange_index(idx[:, mode], size=sizes[mode])
         return res
 
     with ThreadPoolExecutor(max_workers=n_active_modes) as executor:
-        arranged_futures = {executor.submit(arrange_index, idx[:, mode]): mode
-                            for mode in range(n) if mode_mask[mode]}
+        arranged_futures = {
+            executor.submit(arrange_index, idx[:, mode], size=sizes[mode]): mode
+            for mode in range(n) if mode_mask[mode]
+        }
         for future in as_completed(arranged_futures):
             mode = arranged_futures[future]
             res[mode] = future.result()
