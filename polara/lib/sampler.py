@@ -139,7 +139,7 @@ def split_top_continuous(tasks, priorities):
     no task will have another instance with the priority level above the lowest priority in the sequence.
     Usecases: avoiding issues with "recommendations from future" when splitting test data by timestamp.
     """
-    priority_queue = [(-priorities[0], 0)]
+    priority_queue = [(-max(priorities), len(priorities))] # initialize typed
     priority_queue.pop()
 
     for idx, priority in enumerate(priorities):
@@ -160,6 +160,6 @@ def split_top_continuous(tasks, priorities):
             nonseq_idx.append(visited)
         topseq[task] = idx
 
-    topseq_idx = list(topseq.values())
+    topseq_idx = [idx for _, idx in topseq.items()]
     lowseq_idx = [idx for _, idx in priority_queue]  # all remaining tasks
     return topseq_idx, lowseq_idx, nonseq_idx
