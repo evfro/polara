@@ -1,6 +1,10 @@
 import numpy as np
 import pandas as pd
 from scipy.sparse import csr_matrix
+try:
+    import networkx as nx
+except ImportError:
+    nx = None
 from pandas.api.types import is_numeric_dtype
 from polara.lib.sampler import split_top_continuous
 from polara.tools.random import check_random_state
@@ -187,3 +191,56 @@ def filter_sessions_by_length(data, session_label='userid', min_session_length=3
     else:
         new_data = data
     return new_data
+
+
+def pcore_filter(data, pcore, userid, itemid, keep_columns=True):
+    if nx is None:
+        raise NotImplementedError('pcore filtering requires the `networkx` library installed.')
+    g, node_prefix = bipartite_graph_from_df(data, userid, itemid)
+    g_pcore = nx.k_core(g, k=pcore) # apply p-core filtering
+    pcore_data = pd.DataFrame.from_records(
+        read_bipartite_edges(g_pcore, part=0), # iterate user-wise
+        columns=[userid, itemid, 'index']
+    ).set_index('index')
+    # remove user/item node identifiers and restore source dtypes
+    for field, prefix in node_prefix.items():
+        start = len(prefix)
+        pcore_data.loc[:, field] = pcore_data[field].str[start:].astype(data.dtypes[field])
+    if keep_columns and (data.shape[1] > 2):
+        remaining_data = data.loc[pcore_data.index, data.columns.drop([userid, itemid])]
+        pcore_data = pd.concat([pcore_data, remaining_data], axis=1)
+    return pcore_data
+
+def bipartite_graph_from_df(df, top, bottom):
+    '''
+    Construct bipartite top-bottom graph from pandas DataFrame.
+    Assumes DataFrame has `top` and `bottom` columns.
+    Edge weights are used to store source DataFrame index.
+    '''
+    node_prefix = {top: 't-', bottom: 'b-'}
+    nx_data = (
+        df[[top, bottom]]
+        .agg({ # add node identifiers for bipartite graph
+            top: lambda x: f"{node_prefix[top]}{x}",
+            bottom: lambda x: f"{node_prefix[bottom]}{x}",
+        })
+    )
+    g = nx.Graph()
+    g.add_nodes_from(nx_data[top].unique(), bipartite=0)
+    g.add_nodes_from(nx_data[bottom].unique(), bipartite=1)
+    edge_iter = (
+        nx_data
+        .reset_index()
+        [[top, bottom, 'index']] # keep source index
+        .itertuples(index=False, name=None)
+    )
+    g.add_weighted_edges_from(edge_iter)
+    return g, node_prefix
+
+def read_bipartite_edges(graph, part=0):
+    weighted = nx.is_weighted(graph)
+    nodes = (node for node, prop in graph.nodes.items() if prop["bipartite"]==part)
+    for node in nodes:
+        yield from graph.edges(node, data='weight' if weighted else False)
+
+
