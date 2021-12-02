@@ -244,3 +244,14 @@ def read_bipartite_edges(graph, part=0):
         yield from graph.edges(node, data='weight' if weighted else False)
 
 
+def generate_data(seed=None, num=10, allow_repeats=False):
+    def sqns():
+        res = [] if allow_repeats else set()
+        add_pair = res.append if allow_repeats else res.add
+        rs = np.random.RandomState(seed)
+        while len(res) < num:
+            x = rs.rand()
+            y = rs.rand()
+            yield (x, y)
+            add_pair((x, y))
+    return pd.DataFrame.from_records(sqns()).drop_duplicates()
