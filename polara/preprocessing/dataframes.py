@@ -75,30 +75,35 @@ def matrix_from_observations(
     return matrix, user_index, item_index
 
 
-def split_holdout(
+def leave_one_out(
         data,
-        userid = 'userid',
-        feedback = None,
-        sample_max_rated = False,
+        key = 'userid',
+        target = None,
+        sample_top = False,
         random_state = None
     ):
     '''
-    Samples 1 item per every user according to the rule sample_max_rated.
+    Samples 1 item per every user according to the rule `sample_top`.
     It always shuffles the input data. The reason is that even if sampling
     top-rated elements, there could be several items with the same top rating.
     '''
-    idx_grouper = (
-        data
-        .sample(frac=1, random_state=random_state) # randomly permute data
-        .groupby(userid, as_index=False, sort=False)
-    )
-    if sample_max_rated: # take single item with the highest score
-        idx = idx_grouper[feedback].idxmax()
-    else: # data is already shuffled - simply take the 1st element
-        idx = idx_grouper.head(1).index # sample random element
+    if sample_top: # sample item with the highest target value (e.g., rating, time, etc.)
+        idx = (
+            data[target]
+            .sample(frac=1, random_state=random_state) # handle same feedback for different items
+            .groupby(data[key], sort=False)
+            .idxmax()
+        ).values
+    else: # sample random item
+        idx = (
+            data[key]
+            .sample(frac=1, random_state=random_state)
+            .drop_duplicates(keep='first') # data is shuffled - simply take the 1st element
+            .index
+        ).values
 
-    observed = data.drop(idx.values)
-    holdout = data.loc[idx.values]
+    observed = data.drop(idx)
+    holdout = data.loc[idx]
     return observed, holdout
 
 
