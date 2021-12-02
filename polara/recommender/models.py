@@ -153,10 +153,15 @@ class RecommenderModel(object):
         config = {attr: getattr(self, attr) for attr in self._config}
         return config
 
+    def pre_build(self):
+        self._is_ready = False
+        self._recommendations = None
 
     def build(self):
         raise NotImplementedError('This must be implemented in subclasses')
-
+    
+    def post_build(self):
+        self._is_ready = True
 
     def get_training_matrix(self, feedback_threshold=None, ignore_feedback=False,
                             sparse_format='csr', dtype=None):
