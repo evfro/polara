@@ -91,3 +91,12 @@ def rescale_matrix(matrix, scaling, axis, binary=True, return_scaling_values=Fal
     if return_scaling_values:
         result = (result, scaling_values)
     return result
+
+
+def generate_banded_form(matrix):
+    matrix = matrix.todia()
+    bands = matrix.data
+    offsets = matrix.offsets
+    num_l = (offsets < 0).sum()
+    num_u = (offsets > 0).sum()
+    return (num_l, num_u), bands[np.argsort(offsets)[::-1], :]
