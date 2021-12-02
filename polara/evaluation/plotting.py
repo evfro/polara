@@ -53,7 +53,7 @@ def show_hits(all_scores, **kwargs):
 
 def show_ranking(all_scores, **kwargs):
     scores = all_scores['ranking'] if 'ranking' in all_scores else all_scores
-    keys = ['nDCG', 'nDCL']
+    keys = ['ndcg', 'ndcl']
     kwargs['titles'] = ['nDCG@$n$', 'nDCL@$n$']
     kwargs['errors'] = kwargs['errors']['ranking'] if kwargs.get('errors', None) is not None else None
     _plot_pair(scores, keys, **kwargs)
@@ -118,11 +118,11 @@ def show_hit_rates(all_scores, **kwargs):
 
 def show_ranking_positivity(all_scores, **kwargs):
     scores = all_scores['ranking'] if 'ranking' in all_scores else all_scores
-    keys = ['nDCL', 'nDCG']
+    keys = ['ndcl', 'ndcg']
     kwargs['titles'] = ['Negative Ranking', 'Positive Ranking']
     kwargs['errors'] = kwargs['errors']['ranking'] if kwargs.get('errors', None) is not None else None
     kwargs['ROC_middle'] = True
-    kwargs['limit'] = max(scores['nDCL'].max().max(), scores['nDCG'].max().max()) + 0.01
+    kwargs['limit'] = max(scores['ndcl'].max().max(), scores['ndcg'].max().max()) + 0.01
     _cross_plot(scores, keys, **kwargs)
 
 

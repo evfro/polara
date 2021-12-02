@@ -16,7 +16,8 @@ def random_seeds(size, entropy=None):
 
 def seed_generator(seed):
     rs = np.random.RandomState(seed)
+    max_int = np.iinfo('i4').max
     while True:
-        new_seed = yield rs.randint(np.iinfo('i4').max)
+        new_seed = yield rs.randint(max_int)
         if new_seed is not None:
             rs = np.random.RandomState(new_seed)
