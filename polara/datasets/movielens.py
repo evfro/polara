@@ -1,7 +1,7 @@
 from io import BytesIO
 import numpy as np
 import pandas as pd
-
+import urllib
 try:
     from pandas.io.common import ZipFile
 except ImportError:
@@ -19,10 +19,9 @@ def get_movielens_data(local_file=None, get_ratings=True, get_genres=False,
 
     if not local_file:
         # downloading data
-        from requests import get
         zip_file_url = 'http://files.grouplens.org/datasets/movielens/ml-1m.zip'
-        zip_response = get(zip_file_url)
-        zip_contents = BytesIO(zip_response.content)
+        with urllib.request.urlopen(zip_file_url) as zip_response:
+            zip_contents = BytesIO(zip_response.read())
     else:
         zip_contents = local_file
 
@@ -31,7 +30,7 @@ def get_movielens_data(local_file=None, get_ratings=True, get_genres=False,
     with ZipFile(zip_contents) as zfile:
         zip_files = pd.Series(zfile.namelist())
         zip_file = zip_files[zip_files.str.contains('ratings')].iat[0]
-        is_new_format = ('latest' in zip_file) or ('20m' in zip_file)
+        is_new_format = ('latest' in zip_file) or ('20m' in zip_file) or ('25m' in zip_file)
         delimiter = ','
         header = 0 if is_new_format else None
         if get_ratings:
@@ -76,8 +75,7 @@ def get_movielens_data(local_file=None, get_ratings=True, get_genres=False,
                                         names=['movieid', 'imdbid', 'tmdbid'])
 
     res = [data for data in [ml_data, ml_genres, ml_tags, mapping] if data is not None]
-    if len(res)==1: res = res[0]
-    return res
+    return res[0] if len(res)==1 else res
 
 
 def get_split_genres(genres_data):
