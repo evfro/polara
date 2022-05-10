@@ -22,7 +22,7 @@ def sample_ci(df, coef=2.776, level=None): # 95% CI for sample under Student's t
         n = df.index.levshape[1-level]
     else:
         raise ValueError
-    return coef * df.std(level=level, ddof=1) / sqrt(n)
+    return coef * df.groupby(level=level).std(ddof=1) / sqrt(n)
 
 
 def save_scores(scores, dataset_name, experiment_name, save_folder=None):
