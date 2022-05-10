@@ -37,10 +37,9 @@ def clean_build_decorator(build_func):
     # all cached recommendations are cleared
     @wraps(build_func)
     def wrapper(self, *args, **kwargs):
-        self._is_ready = False
-        self._recommendations = None
+        self.pre_build()
         build_res = build_func(self, *args, **kwargs)
-        self._is_ready = True
+        self.post_build()
         return build_res
     return wrapper
 
@@ -155,13 +154,16 @@ class RecommenderModel(object):
 
     def pre_build(self):
         self._is_ready = False
-        self._recommendations = None
 
     def build(self):
         raise NotImplementedError('This must be implemented in subclasses')
     
     def post_build(self):
+        self._recommendations = None
         self._is_ready = True
+
+    def reuse_model(self):
+        raise NotImplementedError('This must be implemented in subclasses')
 
     def get_training_matrix(self, feedback_threshold=None, ignore_feedback=False,
                             sparse_format='csr', dtype=None):
@@ -414,7 +416,7 @@ class RecommenderModel(object):
     def evaluate(self, metric_type='all', topk=None, not_rated_penalty=None,
                  switch_positive=None, ignore_feedback=False, simple_rates=False,
                  on_feedback_level=None):
-        if metric_type == 'all':
+        if metric_type in ['all', None]:
             metric_type = ['hits', 'relevance', 'ranking', 'experience']
 
         if metric_type == 'main':
@@ -918,6 +920,7 @@ class CoffeeModel(RecommenderModel):
         self.chunk = defaults.test_chunk_size
         self.method = 'CoFFee'
         self._flattener = defaults.flattener
+        self.iter_callback = defaults.iter_callback
         self.growth_tol = defaults.growth_tol
         self.num_iters = defaults.num_iters
         self.show_output = defaults.show_output
@@ -1021,18 +1024,29 @@ class CoffeeModel(RecommenderModel):
         idx, val, shp = self.data.to_coo(tensor_mode=True)
 
         with track_time(self.training_time, verbose=self.verbose, model=self.method):
-            (users_factors, items_factors,
-            feedback_factors, core) = hooi(idx, val, shp, self.mlrank,
-                                           growth_tol=self.growth_tol,
-                                           num_iters=self.num_iters,
-                                           verbose=self.show_output,
-                                           parallel_ttm=self.parallel_ttm,
-                                           seed=self.seed)
+            *factors, core = hooi(
+                idx, val, shp, self.mlrank,
+                iter_callback = self.iter_callback,
+                growth_tol = self.growth_tol,
+                num_iters = self.num_iters,
+                verbose = self.show_output,
+                parallel_ttm = self.parallel_ttm,
+                seed = self.seed
+            )
+        self.store_factors(core, factors)
 
+
+    def store_factors(self, core, factors):
+        users_factors, items_factors, feedback_factors = factors
         self.factors[self.data.fields.userid] = users_factors
         self.factors[self.data.fields.itemid] = items_factors
         self.factors[self.data.fields.feedback] = feedback_factors
         self.factors['core'] = core
+
+
+    def reuse_model(self, core, factors):
+        self.store_factors(core, factors)
+        self.post_build() # signal that the self is ready for use        
 
 
     def unfold_test_tensor_slice(self, test_data, shape, start, stop, mode):

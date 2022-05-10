@@ -1,6 +1,6 @@
 from IPython.display import HTML
 from contextlib import contextmanager, redirect_stdout
-import sys, os
+import os
 
 
 def print_frames(dataframes):
@@ -28,3 +28,8 @@ def suppress_stdout(on=True):
                 yield
     else:
         yield
+
+
+def log_status(msg, verbose=True):
+    if verbose:
+        print(msg)

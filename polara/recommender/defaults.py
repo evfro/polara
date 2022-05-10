@@ -22,8 +22,9 @@ verify_integrity = True
 svd_rank = 10
 #coffee
 mlrank = (13, 10, 2)
-growth_tol = 0.001
-num_iters = 10
+iter_callback = None
+growth_tol = 0.0001
+num_iters = 15
 show_output = False
 flattener = slice(0, None)
 parallel_ttm = False # compute tensor-times-matrix products in parallel
