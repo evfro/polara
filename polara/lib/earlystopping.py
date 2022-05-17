@@ -1,7 +1,7 @@
 from polara.tools.display import log_status
 
 
-def early_stopping_callback(evaluate_func, margin=0, max_fails=1, verbose=True, logger=None):
+def early_stopping_callback(evaluate_func, margin=0, max_fails=1, param_store=None, verbose=True, logger=None):
     assert margin >= 0
     assert max_fails >= 0
     if logger is None:
@@ -16,6 +16,8 @@ def early_stopping_callback(evaluate_func, margin=0, max_fails=1, verbose=True, 
         if current_score > previous_best:
             check_metric_growth.target = current_score
             check_metric_growth.iter = step
+            if param_store is not None:
+                param_store(*args, **kwargs)
         # early stopping
         try:
             check_early_stop(current_score, previous_best, margin=margin, max_fails=max_fails)
