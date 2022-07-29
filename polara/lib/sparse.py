@@ -288,3 +288,16 @@ def arrange_indices(idx, mode_mask=None, shape=None):
             mode = arranged_futures[future]
             res[mode] = future.result()
     return res
+
+
+@njit(parallel=True)
+def any_reduceat(bool_array, indptr):
+    '''Roughly equivalent to `np.logical_or.reduceat` or `np.maximum.reduceat`,
+    e.g. as in `np.logical_or.reduceat(matrix.indices==item, matrix.indptr[:-1])`,
+    but uses short-circuit logic of np.any, which is not available in numpy ufuncs.
+    '''
+    n_users = len(indptr) - 1
+    res = np.zeros(n_users, dtype=np.bool_)
+    for u in prange(len(indptr)-1):
+        res[u] = np.any(bool_array[indptr[u]:indptr[u+1]])
+    return res

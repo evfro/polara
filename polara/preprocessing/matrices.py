@@ -1,8 +1,10 @@
+from statistics import mode
 import numpy as np
 from numpy import power
 from scipy.sparse import diags
 from scipy.sparse.linalg import norm as spnorm
 import pandas as pd
+from polara.lib.sparse import any_reduceat
 from polara.tools.random import check_random_state
 
 
@@ -100,3 +102,15 @@ def generate_banded_form(matrix):
     num_l = (offsets < 0).sum()
     num_u = (offsets > 0).sum()
     return (num_l, num_u), bands[np.argsort(offsets)[::-1], :]
+
+
+def find_most_influencing_items(matrix, user_coverage=0.8):
+    assert matrix.format == 'csr'
+    n_users = int(user_coverage * matrix.shape[0]) if user_coverage < 1 else user_coverage
+    item_set = []
+    covered_users = np.zeros(matrix.shape[0], dtype=bool) # true if a user has been checked already
+    while covered_users.sum() < n_users: # stop is the number of checked users exceeds the limit
+        top_item = mode(matrix[~covered_users].indices) # most frequent item among yet unchecked users ~O((1-c)kM)
+        item_set.append(top_item)
+        covered_users += any_reduceat(matrix.indices==top_item, matrix.indptr) # ~O(kM)
+    return item_set
