@@ -1,10 +1,8 @@
-from statistics import mode
 import numpy as np
 from numpy import power
 from scipy.sparse import diags
 from scipy.sparse.linalg import norm as spnorm
-import pandas as pd
-from polara.lib.sparse import any_reduceat
+from numba import njit
 from polara.tools.random import check_random_state
 
 
@@ -104,13 +102,50 @@ def generate_banded_form(matrix):
     return (num_l, num_u), bands[np.argsort(offsets)[::-1], :]
 
 
-def find_most_influencing_items(matrix, user_coverage=0.8):
-    assert matrix.format == 'csr'
-    n_users = int(user_coverage * matrix.shape[0]) if user_coverage < 1 else user_coverage
-    item_set = []
-    covered_users = np.zeros(matrix.shape[0], dtype=bool) # true if a user has been checked already
-    while covered_users.sum() < n_users: # stop is the number of checked users exceeds the limit
-        top_item = mode(matrix[~covered_users].indices) # most frequent item among yet unchecked users ~O((1-c)kM)
+def find_top_influential_items(matrix, user_coverage=0.8):
+    '''
+    Find minimal a set of items at least `user_coverage` unique users have interacted with.
+
+    This is a slightly faster (~2.5x speedup on ML-1M) implementation of a greedy approach:
+    ```python
+    total_users, total_items = matrix.shape
+    n_users = int(user_coverage * total_users) if user_coverage < 1 else user_coverage
+    covered_users = np.zeros(total_items, dtype=bool)
+    while covered_users.sum() < n_users:
+        top_item = mode(matrix[~covered_users].indices, total_items)
         item_set.append(top_item)
-        covered_users += any_reduceat(matrix.indices==top_item, matrix.indptr) # ~O(kM)
+        covered_users += np.logical_or.reduceat(matrix.indices==top_item, matrix.indptr[:-1])
+    ```
+    '''
+    assert matrix.has_canonical_format # we rely on sorted indices and no duplicates
+    assert matrix.format == 'csr'
+    
+    total_users, total_items = matrix.shape
+    n_users = int(user_coverage * total_users) if user_coverage < 1 else min(user_coverage, total_users)
+    useridx = np.arange(total_users)
+
+    n_covered = 0 # to track the number of unique users found
+    item_set = [] # to collect found items
+    matrix_rem = matrix # will shrink this matrix by excluding found users from consideration
+    for _ in range(total_items): # normally would terminate before exhausting full range
+        top_item = find_most_common_item(matrix_rem.indices, total_items) # TODO: reuse previous counts
+        item_set.append(top_item)
+        top_inds = np.flatnonzero(matrix_rem.indices == top_item)
+        users = np.searchsorted(matrix_rem.indptr, top_inds, 'right') - 1
+        n_covered += len(users)
+        if n_covered >= n_users:
+            break
+        remaining_users = np.isin(useridx[:matrix_rem.shape[0]], users, assume_unique=True, invert=True)
+        matrix_rem = matrix_rem[remaining_users]
     return item_set
+
+
+@njit
+def find_most_common_item(indices, n_items):
+    counter = np.zeros(n_items, dtype=np.intp)
+    top_freq, top_item = 0, -1
+    for item in indices:
+        counter[item] = item_freq = counter[item] + 1
+        if item_freq > top_freq:
+            top_freq, top_item = item_freq, item
+    return top_item
