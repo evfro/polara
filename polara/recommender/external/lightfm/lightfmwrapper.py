@@ -101,14 +101,11 @@ class LightFMWrapper(RecommenderModel):
         test_shape = (n_users, n_items)
         test_users_index = test_users[start:stop].astype('i4', copy=False)
         test_items_index = all_items.astype('i4', copy=False)
-        # use stride tricks to avoid unnecessary copies of repeated indices
-        # have to conform with LightFM's dtype to avoid additional copies
-        itemsize = np.dtype('i4').itemsize
-        scores = self._model.predict(
-            as_strided(test_users_index, test_shape, (itemsize, 0)).ravel(),
-            as_strided(test_items_index, test_shape, (0, itemsize)).ravel(),
-            user_features=self._user_features_csr,
-            item_features=self._item_features_csr,
-            num_threads=self.fit_params.get('num_threads', 1)
-        ).reshape(test_shape)
+        # vectorized form to speed up inference
+        item_biases, item_embeddings = self._model.get_item_representations(features=self._item_features_csr)
+        user_biases, user_embeddings = self._model.get_user_representations(features=self._user_features_csr)
+        scores = (user_embeddings[test_users_index, :].dot(item_embeddings[test_items_index, :].T)
+                  + item_biases[np.newaxis, test_items_index]
+                  + user_biases[test_users_index, np.newaxis])
+        assert scores.shape == test_shape
         return scores, slice_data
