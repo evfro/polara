@@ -106,20 +106,46 @@ def find_top_influential_items(matrix, user_coverage=0.8):
     '''
     Find minimal a set of items at least `user_coverage` unique users have interacted with.
 
-    This is a slightly faster (~2.5x speedup on ML-1M) implementation of a greedy approach:
+    This is a slightly faster (~2x speedup on ML-1M) implementation of a greedy approach:
     ```python
     total_users, total_items = matrix.shape
     n_users = int(user_coverage * total_users) if user_coverage < 1 else user_coverage
     covered_users = np.zeros(total_items, dtype=bool)
-    while covered_users.sum() < n_users:
+    item_set = [] # to collect found items
+    while np.count_nonzero(covered_users) < n_users:
         top_item = mode(matrix[~covered_users].indices, total_items)
         item_set.append(top_item)
         covered_users += np.logical_or.reduceat(matrix.indices==top_item, matrix.indptr[:-1])
     ```
+
+    Note
+    ========
+    This is an instance of the so called "set cover problem", which is generally NP-complete.
+    It is known that the greedy approach provides the best approximation in polynonial time.
+    See https://en.wikipedia.org/wiki/Set_cover_problem for more details.
+
+    One of the most straightforward (and slow) implementations reads:
+    ```python
+    def set_cover(matrix):
+        indices = matrix.indices
+        indptr = matrix.indptr
+        universe = np.arange(matrix.shape[1])
+        cover = []
+        while len(universe):
+            subset_sizes = np.add.reduceat(np.in1d(indices, universe), indptr[:-1])
+            idx = np.argmax(subset_sizes)
+            cover.append(idx)
+            universe = np.setdiff1d(
+                universe,
+                indices[indptr[idx]:indptr[idx+1]],
+                assume_unique=True
+            )
+        return cover
+    ```
     '''
     assert matrix.has_canonical_format # we rely on sorted indices and no duplicates
     assert matrix.format == 'csr'
-    
+
     total_users, total_items = matrix.shape
     n_users = int(user_coverage * total_users) if user_coverage < 1 else min(user_coverage, total_users)
     useridx = np.arange(total_users)
@@ -128,7 +154,7 @@ def find_top_influential_items(matrix, user_coverage=0.8):
     item_set = [] # to collect found items
     matrix_rem = matrix # will shrink this matrix by excluding found users from consideration
     for _ in range(total_items): # normally would terminate before exhausting full range
-        top_item = find_most_common_item(matrix_rem.indices, total_items) # TODO: reuse previous counts
+        top_item = find_most_common_element(matrix_rem.indices, total_items) # TODO: reuse previous counts
         item_set.append(top_item)
         top_inds = np.flatnonzero(matrix_rem.indices == top_item)
         users = np.searchsorted(matrix_rem.indptr, top_inds, 'right') - 1
@@ -141,11 +167,17 @@ def find_top_influential_items(matrix, user_coverage=0.8):
 
 
 @njit
-def find_most_common_item(indices, n_items):
-    counter = np.zeros(n_items, dtype=np.intp)
-    top_freq, top_item = 0, -1
-    for item in indices:
-        counter[item] = item_freq = counter[item] + 1
-        if item_freq > top_freq:
-            top_freq, top_item = item_freq, item
-    return top_item
+def find_most_common_element(indices, n_elements):
+    counter = np.zeros(n_elements, dtype=np.intp)
+    top_freq, top_element = 0, -1
+    for element in indices:
+        counter[element] = element_freq = counter[element] + 1
+        if element_freq > top_freq:
+            top_freq, top_element = element_freq, element
+    # TODO: there's no need to parse entire array
+    # after certain point, the frequency of most common element so far
+    # becomes unreachable, we can use this fact to exit the loop early
+    # however, will need to track second most frequent element
+    # the difference in frequencies of most common and second most common
+    # elements will be used as an indicator for early stopping
+    return top_element

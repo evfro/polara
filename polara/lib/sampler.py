@@ -133,7 +133,7 @@ def sample_element_wise(indptr, indices, n_cols, n_samples, seed_seq):
 
 
 @njit
-def split_top_continuous(tasks, priorities):
+def split_top_continuous(tasks, priorities, max_tasks=0):
     """
     Sample a sequence of unique tasks of the highest priority ensuring that
     no task will have another instance with the priority level above the lowest priority in the sequence.
@@ -149,7 +149,10 @@ def split_top_continuous(tasks, priorities):
     nonseq_idx = []  # top-priority tasks that interrupt continuous sequence
 
     unique_tasks = set(tasks)
-    while unique_tasks:
+    if max_tasks<=0:
+        max_tasks = len(unique_tasks)
+    
+    while len(topseq) < max_tasks:
         _, idx = heapq.heappop(priority_queue)
         task = tasks[idx]
         try:

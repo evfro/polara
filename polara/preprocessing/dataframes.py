@@ -155,14 +155,14 @@ def to_numeric_array(series):
     return series.values
 
 
-def earliest_last_out(data, userid='userid', priority='timestamp', copy=False):
+def earliest_last_out(data, userid='userid', priority='timestamp', max_users=None, copy=False):
     '''
     It helps avoiding "recommendations from future", when training set contains
     events that occur later than some events in the holdout and can therefore
     provide an oracle hint for the algorithm. 
     '''
     holdout_idx, observed_idx, future_idx = split_top_continuous(
-        to_numeric_array(data[userid]), data[priority].values
+        to_numeric_array(data[userid]), data[priority].values, max_users or 0
     )
     
     observed = data.iloc[observed_idx]
