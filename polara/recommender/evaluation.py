@@ -124,7 +124,7 @@ def get_mrr_score(hits_rank):
 
 def get_ndcg1_score(hits_rank):
     'Normalized Discounted Cumulative Gain score for single-item holdout'
-    return np.log2(hits_rank+2).power(-1, 'f8').max(axis=1).mean()
+    return hits_rank._with_data(np.log2(hits_rank.data+2)).power(-1, 'f8').max(axis=1).mean()
 
 def get_map_score(hits_rank, eval_matrix, topk):
     'Mean Avergage Precision score'
