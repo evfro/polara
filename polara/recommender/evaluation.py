@@ -109,9 +109,10 @@ def get_hr_score(hits_rank):
 
 def get_rr_scores(hits_rank):
     'Reciprocal Rank scores'
-    arhr = get_arhr_score(hits_rank)
+    ndcg = get_ndcg1_score(hits_rank)
     mrr = get_mrr_score(hits_rank)
-    return namedtuple('Ranking', ['arhr', 'mrr'])._make([arhr, mrr])
+    arhr = get_arhr_score(hits_rank)
+    return namedtuple('Ranking', ['ndcg', 'mrr', 'arhr'])._make([ndcg, mrr, arhr])
 
 def get_arhr_score(hits_rank):
     'Average Reciprocal Hit-Rank score'
@@ -120,6 +121,10 @@ def get_arhr_score(hits_rank):
 def get_mrr_score(hits_rank):
     'Mean Reciprocal Rank score'
     return hits_rank.power(-1, 'f8').max(axis=1).mean()
+
+def get_ndcg1_score(hits_rank):
+    'Normalized Discounted Cumulative Gain score for single-item holdout'
+    return np.log2(hits_rank+2).power(-1, 'f8').max(axis=1).mean()
 
 def get_map_score(hits_rank, eval_matrix, topk):
     'Mean Avergage Precision score'
