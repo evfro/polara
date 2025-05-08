@@ -124,7 +124,7 @@ def get_mrr_score(hits_rank):
 
 def get_ndcg1_score(hits_rank):
     'Normalized Discounted Cumulative Gain score for single-item holdout'
-    return hits_rank._with_data(np.log2(hits_rank.data+2), dtype='f8').power(-1).max(axis=1).mean()
+    return hits_rank._with_data(np.log2(hits_rank.data+2, dtype='f8')).power(-1).max(axis=1).mean()
 
 def get_map_score(hits_rank, eval_matrix, topk):
     'Mean Avergage Precision score'
@@ -142,7 +142,7 @@ def get_map_score(hits_rank, eval_matrix, topk):
     return map_at_k
 
 
-def get_ndcr_discounts(rank_matrix, eval_matrix, topn):
+def get_ndcr_discounts(rank_matrix, eval_matrix):
     discounts = np.reciprocal(np.log2(1+rank_matrix.data, dtype='f8'))
     discounts_matrix = rank_matrix._with_data(discounts, copy=False)
     # circumventing problem in ideal_discounts = eval_matrix.tolil()
