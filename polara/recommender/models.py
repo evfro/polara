@@ -854,14 +854,14 @@ class SVDModel(RecommenderModel):
         svd_params = dict(k=self.rank, return_singular_vectors=return_factors)
 
         with track_time(self.training_time, verbose=self.verbose, model=self.method):
-            user_factors, sigma, item_factors = svds(svd_matrix, **svd_params)
+            user_factors, sigma, item_factors_T = svds(svd_matrix, **svd_params)
 
+        sidx = np.argsort(-sigma)
+        sigma = np.ascontiguousarray(sigma[sidx])
         if user_factors is not None:
-            user_factors = np.ascontiguousarray(user_factors[:, ::-1])
-        if item_factors is not None:
-            item_factors = np.ascontiguousarray(item_factors[::-1, :]).T
-        if sigma is not None:
-            sigma = np.ascontiguousarray(sigma[::-1])
+            user_factors = np.ascontiguousarray(user_factors[:, sidx])
+        if item_factors_T is not None:
+            item_factors = np.ascontiguousarray(item_factors_T[sidx, :]).T
 
         self.factors[self.data.fields.userid] = user_factors
         self.factors[self.data.fields.itemid] = item_factors
