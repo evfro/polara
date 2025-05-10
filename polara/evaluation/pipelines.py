@@ -1,10 +1,12 @@
-from __future__ import print_function
-
 from operator import mul as mul_op
 from functools import reduce
 from random import choice
-import pandas as pd
 from collections import abc
+
+import numpy as np
+import pandas as pd
+
+from polara.preprocessing.matrices import oriented_norm
 
 
 def is_list_like(obj, allow_sets=False, allow_dict=False):
@@ -78,9 +80,13 @@ def evaluate_models(models, target_metric='precision', metric_type='all', **kwar
     return model_scores
 
 
-def find_optimal_svd_rank(model, ranks, target_metric, return_scores=False,
-                          protect_factors=True, config=None, verbose=False,
-                          evaluator=None, iterator=lambda x: x, **kwargs):
+def run_svd_experiment(
+    model, ranks, target_metric,
+    protect_factors=True, config=None, verbose=False,
+    evaluator=None, iterator=None, kwargs=None
+):
+    if iterator is None:
+        iterator = lambda x: x
     evaluator = evaluator or evaluate_models
     model_verbose = model.verbose
     if config:
@@ -100,13 +106,26 @@ def find_optimal_svd_rank(model, ranks, target_metric, return_scores=False,
             model.rank = rank
             res[rank] = evaluator(model, target_metric, **kwargs)[model.method]
             # prevent previous scores caching when assigning svd_rank
-            model._recommendations = None
+            model._refresh_model()
     finally:
         if protect_factors:
             model._rank = svd_rank
             model.factors = svd_factors
         model.verbose = model_verbose
+    return res
 
+
+def find_optimal_svd_rank(
+    model, ranks, target_metric, return_scores=False,
+    protect_factors=True, config=None, verbose=False,
+    evaluator=None, iterator=None, **kwargs
+):
+    res = run_svd_experiment(
+        model, ranks, target_metric,
+        protect_factors=protect_factors, config=config,
+        verbose=verbose, evaluator=evaluator,
+        iterator=iterator, kwargs=kwargs
+    )
     scores = pd.Series(res)
     best_rank = scores.idxmax()
     if return_scores:
@@ -114,6 +133,54 @@ def find_optimal_svd_rank(model, ranks, target_metric, return_scores=False,
         scores.name = model.method
         return best_rank, scores.loc[ranks]
     return best_rank
+
+
+def find_optimal_scaledsvd_config(
+        model, ranks, scale_params, target_metric, return_scores=True, binary=True,
+        config=None, verbose=False, evaluator=None, iterator=None,
+        **kwargs
+    ):
+    grid_results = {}
+    grid_results[1] = run_svd_experiment(
+        model, ranks, target_metric,
+        protect_factors=True, config=config,
+        verbose=verbose, evaluator=evaluator,
+        iterator=iterator, kwargs=kwargs
+    )
+    itemid = model.data.fields.itemid
+    item_factors = model.factors[itemid] * model.factors['singular_values']
+
+    matrix = model.get_training_matrix()
+    item_norm = oriented_norm(matrix, 0, binary)
+
+    for scaling in iterator(scale_params):
+        if scaling == 1:
+            continue
+        scaling_values = np.power(item_norm, scaling-1, where=item_norm != 0)
+        rescaled_factors, s, _ = np.linalg.svd(item_factors * scaling_values[:, None], full_matrices=False)
+        model.factors['singular_values'] = s
+        model.factors[itemid] = rescaled_factors
+        grid_results[scaling] = run_svd_experiment(
+            model, ranks, target_metric,
+            protect_factors=True, config=None,
+            verbose=verbose, evaluator=evaluator,
+            kwargs=kwargs
+        )
+    scores = pd.Series({
+        (rank, scaling): results
+        for scaling, rank_results in grid_results.items()
+        for rank, results in rank_results.items()
+    })
+
+    best_params = scores.idxmax()
+    param_names = ['rank', 'scaling']
+    best_config = params_to_dict(param_names, best_params)
+
+    if return_scores:
+        scores.index.names = param_names
+        scores.name = model.method
+        return best_config, scores
+    return best_config
 
 
 def find_optimal_tucker_ranks(model, tucker_ranks, target_metric, return_scores=False,

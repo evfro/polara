@@ -1,5 +1,4 @@
 import numpy as np
-from numpy import power
 from scipy.sparse import diags
 from scipy.sparse.linalg import norm as spnorm
 from numba import njit
@@ -75,12 +74,8 @@ def rescale_matrix(matrix, scaling, axis, binary=True, return_scaling_values=Fal
     if scaling == 1: # no scaling (standard SVD case)
         result = matrix
 
-    if binary:
-        norm = np.sqrt(matrix.getnnz(axis=axis)) # compute Euclidean norm as if values are binary
-    else:
-        norm = spnorm(matrix, axis=axis, ord=2) # compute Euclidean norm
-
-    scaling_values = power(norm, scaling-1, where=norm != 0)
+    norm = oriented_norm(matrix, axis, assume_binary=binary)
+    scaling_values = np.power(norm, scaling-1, where=norm != 0)
     scaling_matrix = diags(scaling_values)
 
     if axis == 0: # scale columns
@@ -89,8 +84,13 @@ def rescale_matrix(matrix, scaling, axis, binary=True, return_scaling_values=Fal
         result = scaling_matrix.dot(matrix)
 
     if return_scaling_values:
-        result = (result, scaling_values)
+        return (result, scaling_values)
     return result
+
+def oriented_norm(matrix, axis, assume_binary):
+    if assume_binary:
+        return np.sqrt(matrix.getnnz(axis=axis)) # compute Euclidean norm as if values are binary
+    return spnorm(matrix, axis=axis, ord=2) # compute Euclidean norm
 
 
 def generate_banded_form(matrix):
