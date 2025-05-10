@@ -62,7 +62,7 @@ def set_config(model, config, convert_nan=True):
         setattr(model, name, value)
 
 
-def evaluate_models(models, target_metric='precision', metric_type='all', **kwargs):
+def evaluate_models(models, target_metric='ndcg', metric_type='all', **kwargs):
     if not is_list_like(models, allow_sets=True):
         models = [models]
 
