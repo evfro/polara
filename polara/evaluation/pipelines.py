@@ -136,10 +136,12 @@ def find_optimal_svd_rank(
 
 
 def find_optimal_scaledsvd_config(
-        model, ranks, scale_params, target_metric, return_scores=True, binary=True,
-        config=None, verbose=False, evaluator=None, iterator=None,
-        **kwargs
-    ):
+    model, ranks, scale_params, target_metric, return_scores=True, binary=True,
+    config=None, verbose=False, evaluator=None, iterator=None,
+    **kwargs
+):
+    assert model.row_scaling == 1, "Only column (item-based) scaling is supported."
+    model.col_scaling = 1
     grid_results = {}
     grid_results[1] = run_svd_experiment(
         model, ranks, target_metric,
