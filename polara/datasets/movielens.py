@@ -30,7 +30,7 @@ def get_movielens_data(local_file=None, get_ratings=True, get_genres=False,
     with ZipFile(zip_contents) as zfile:
         zip_files = pd.Series(zfile.namelist())
         zip_file = zip_files[zip_files.str.contains('ratings')].iat[0]
-        is_new_format = ('latest' in zip_file) or ('20m' in zip_file) or ('25m' in zip_file)
+        is_new_format = any(tag in zip_file for tag in ['latest', '20m', '25m', '32m'])
         delimiter = ','
         header = 0 if is_new_format else None
         if get_ratings:
